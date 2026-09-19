@@ -88,13 +88,13 @@ load_prompts(path: Path) -> tuple[PromptCase, ...]
 URL, GPU index, models, prompt path, warm-ups, repetitions, random seed,
 telemetry interval, inference options, and optional tariff/currency.
 
-- [ ] Write failing tests for valid TOML, unknown keys, invalid ranges,
+- [x] Write failing tests for valid TOML, unknown keys, invalid ranges,
   duplicate prompt IDs, missing scorer data, and absent tariff semantics.
-- [ ] Run `python -m pytest tests/test_config.py -v` and verify failure.
-- [ ] Implement frozen dataclasses and explicit validators using `tomllib`.
-- [ ] Add the six approved pilot prompts: two short, two long, two scored.
-- [ ] Run config tests and verify success.
-- [ ] Commit as `feat: define experiment and prompt contracts`.
+- [x] Run `python -m pytest tests/test_config.py -v` and verify failure.
+- [x] Implement frozen dataclasses and explicit validators using `tomllib`.
+- [x] Add the six approved pilot prompts: two short, two long, two scored.
+- [x] Run config tests and verify success.
+- [x] Commit as `feat: define experiment and prompt contracts`.
 
 ### Task 3: Result storage and integrity
 

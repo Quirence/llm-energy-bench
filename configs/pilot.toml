@@ -1,0 +1,39 @@
+# Pilot experiment: RTX 3050 Laptop smoke run.
+#
+# This configuration validates the measurement pipeline end to end. It is not
+# part of the research conclusions: the RTX 3050 is a technical smoke test, and
+# the two-host comparison uses configs/benchmark-v1.toml.
+#
+# 6 prompts x 3 repetitions x 1 model = 18 measured requests.
+
+[experiment]
+id = "pilot-rtx3050"
+host_id = "host-pilot"
+output_dir = "../experiments/runs"
+repetitions = 3
+warmup_requests = 2
+# Seeds the deterministic shuffle of the measured request order.
+order_seed = 42
+
+[runtime]
+ollama_url = "http://127.0.0.1:11434"
+models = ["llama3.2:3b-instruct-q4_K_M"]
+
+[gpu]
+index = 0
+telemetry_interval_ms = 100
+
+[prompts]
+path = "../prompts/pilot-v1.jsonl"
+
+[options]
+num_ctx = 4096
+temperature = 0.0
+# Seeds Ollama sampling; unrelated to order_seed above.
+seed = 42
+num_predict = 256
+kv_cache = "f16"
+concurrency = 1
+
+# No [cost] section: without an explicit tariff and currency every cost field
+# stays null rather than being invented from a default electricity price.
