@@ -205,6 +205,7 @@ class InferenceResult:
     done_reason: str | None
     http_status: int | None
     prompt_eval_count: int | None
+    prompt_eval_cached_count: int | None
     eval_count: int | None
     total_duration_ns: int | None
     load_duration_ns: int | None
@@ -571,6 +572,7 @@ class _Stream:
             done_reason=_optional_str(final, "done_reason"),
             http_status=self.http_status,
             prompt_eval_count=_optional_int(final, "prompt_eval_count"),
+            prompt_eval_cached_count=_optional_int(final, "prompt_eval_cached_count"),
             eval_count=eval_count,
             total_duration_ns=_optional_int(final, "total_duration"),
             load_duration_ns=_optional_int(final, "load_duration"),

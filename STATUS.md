@@ -4,7 +4,7 @@ Last updated: 2026-09-19
 
 ## Current Milestone
 
-M1 — Measured Pilot. Tasks 1–5 are integrated; Tasks 6–8 remain.
+M1 — Measured Pilot. Tasks 1–6 are implemented; Tasks 7–8 remain.
 
 ## Done
 
@@ -24,18 +24,18 @@ M1 — Measured Pilot. Tasks 1–5 are integrated; Tasks 6–8 remain.
   measurements, including TTFT, placement, digests, and partial failures.
 - Task 5 (Qcsteeven): NVML capability probe and request-scoped telemetry
   sampler with total-energy/instant-power/legacy-power fallback.
-- Integrated test baseline: 189 tests pass on Python 3.12 without Ollama or
+- Task 6: deterministic warm experiment runner, cache contamination handling,
+  request metrics, partial-run preservation, and semantic validation.
+- Integrated test baseline: 207 tests pass on Python 3.12 without Ollama or
   NVIDIA hardware.
 
 ## In Progress
 
-- No unfinished implementation is present on `main`. The next code change is
-  Task 6, which will connect the independently tested contracts.
+- Task 7: wire `doctor`, `run`, and `report` into the CLI and implement
+  aggregate CSV/Markdown reporting.
 
 ## Next
 
-- Task 6: metrics and experiment runner, wiring the Ollama client to the NVML
-  sampler.
 - Task 7: doctor output and reports.
 - Task 8: RTX 3050 hardware pilot.
 
@@ -45,8 +45,8 @@ M1 — Measured Pilot. Tasks 1–5 are integrated; Tasks 6–8 remain.
 - Hardware validation is still pending: NVML is covered by a fake binding and
   Ollama by mock HTTP streams, but neither path has been validated on a real
   GPU in this repository yet.
-- The CLI is a command shell only. `doctor`, `run`, and `report` intentionally
-  return exit code 3 until Tasks 6 and 7 wire in their implementations.
+- The runner is implemented but not exposed through the CLI yet. `doctor`,
+  `run`, and `report` intentionally return exit code 3 until Task 7.
 
 ## Latest Validated Run
 

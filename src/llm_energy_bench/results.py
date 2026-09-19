@@ -414,6 +414,7 @@ def validate_run(run_dir: Path) -> ValidationReport:
 
     if status is RunStatus.COMPLETED and not errors:
         _cross_check_counts(counts, warnings)
+        _validate_schema_v1(run_dir, errors)
     elif status is not RunStatus.COMPLETED:
         warnings.append(f"the run ended with status {status.value}; its data is partial")
 
@@ -473,3 +474,85 @@ def _cross_check_counts(counts: dict[str, int], warnings: list[str]) -> None:
         warnings.append(f"{REQUESTS} holds {requests} records but {OUTPUTS} holds {outputs}")
     if counts.get(TELEMETRY) == 0:
         warnings.append(f"{TELEMETRY} holds no samples")
+
+
+def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
+    """Validate the measurement invariants introduced by runner schema v1."""
+    try:
+        manifest = json.loads((run_dir / MANIFEST).read_text(encoding=_ENCODING))
+    except (OSError, json.JSONDecodeError):
+        return  # The structural validation above already reports this.
+    if manifest.get("schema_version") != 1:
+        return
+
+    models = manifest.get("models")
+    if not isinstance(models, list) or not models:
+        errors.append(f"{MANIFEST} schema v1 has no model records")
+        return
+
+    expected_digests: dict[str, str] = {}
+    for model in models:
+        if not isinstance(model, dict):
+            errors.append(f"{MANIFEST} schema v1 contains a malformed model record")
+            continue
+        name = model.get("name")
+        digest = model.get("digest")
+        if model.get("fully_on_gpu") is not True:
+            errors.append(f"model {name!r} is not confirmed fully on GPU")
+        if isinstance(name, str) and isinstance(digest, str) and digest:
+            expected_digests[name] = digest
+
+    try:
+        requests = read_jsonl(run_dir / REQUESTS)
+        outputs = read_jsonl(run_dir / OUTPUTS)
+        telemetry = read_gzip_jsonl(run_dir / TELEMETRY)
+    except ResultsError:
+        return  # The structural validation already includes the read failure.
+
+    request_ids = [record.get("request_id") for record in requests]
+    output_ids = [record.get("request_id") for record in outputs]
+    if len(request_ids) != len(set(request_ids)):
+        errors.append(f"{REQUESTS} contains duplicate request IDs")
+    if set(request_ids) != set(output_ids):
+        errors.append(f"{REQUESTS} and {OUTPUTS} do not describe the same request IDs")
+
+    telemetry_times: dict[str, list[float]] = {}
+    for record in telemetry:
+        request_id = record.get("request_id")
+        timestamp = record.get("monotonic_s")
+        if isinstance(request_id, str) and isinstance(timestamp, int | float):
+            telemetry_times.setdefault(request_id, []).append(float(timestamp))
+
+    for output in outputs:
+        request_id = output.get("request_id")
+        label = repr(request_id)
+        if output.get("valid") is not True:
+            errors.append(f"request {label} is invalid for primary analysis")
+
+        model_name = output.get("model")
+        expected_digest = expected_digests.get(model_name)
+        if expected_digest is None or output.get("model_digest") != expected_digest:
+            errors.append(f"request {label} model digest does not match the manifest")
+
+        cached = output.get("prompt_eval_cached_count")
+        if isinstance(cached, int) and not isinstance(cached, bool) and cached > 0:
+            errors.append(f"request {label} used {cached} cached prompt tokens")
+
+        metrics = output.get("metrics")
+        if not isinstance(metrics, dict):
+            errors.append(f"request {label} has no derived metrics")
+            continue
+        energy = metrics.get("gpu_energy_joules")
+        if not isinstance(energy, int | float) or isinstance(energy, bool) or energy <= 0:
+            errors.append(f"request {label} has no positive GPU energy")
+        gap = metrics.get("max_telemetry_gap_seconds")
+        if isinstance(gap, int | float) and not isinstance(gap, bool) and gap > 0.5:
+            errors.append(f"request {label} has a telemetry gap above 500 ms")
+
+        times = sorted(telemetry_times.get(request_id, []))
+        if len(times) < 2:
+            errors.append(f"request {label} has no telemetry coverage")
+        elif any(
+            right - left > 0.5 for left, right in zip(times, times[1:], strict=False)
+        ):
+            errors.append(f"request {label} raw telemetry has a gap above 500 ms")

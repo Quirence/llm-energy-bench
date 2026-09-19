@@ -306,6 +306,48 @@ def complete_run(tmp_path: Path, status: RunStatus = RunStatus.COMPLETED) -> Pat
     return run_dir
 
 
+def schema_v1_run(tmp_path: Path) -> Path:
+    run_dir = complete_run(tmp_path)
+    digest = "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+    write_json(
+        run_dir / "manifest.json",
+        {
+            "schema_version": 1,
+            "run_id": run_dir.name,
+            "status": "completed",
+            "models": [
+                {
+                    "name": "llama3.2:3b-instruct-q4_K_M",
+                    "digest": digest,
+                    "fully_on_gpu": True,
+                }
+            ],
+        },
+    )
+    (run_dir / "outputs.jsonl").unlink()
+    with JsonlWriter(run_dir / "outputs.jsonl") as writer:
+        writer.write(
+            {
+                "request_id": "r0",
+                "model": "llama3.2:3b-instruct-q4_K_M",
+                "model_digest": digest,
+                "valid": True,
+                "invalid_reasons": [],
+                "prompt_eval_cached_count": 0,
+                "metrics": {
+                    "gpu_energy_joules": 12.0,
+                    "telemetry_sample_count": 2,
+                    "max_telemetry_gap_seconds": 0.1,
+                },
+            }
+        )
+    (run_dir / "telemetry.jsonl.gz").unlink()
+    with GzipJsonlWriter(run_dir / "telemetry.jsonl.gz") as writer:
+        writer.write({"request_id": "r0", "monotonic_s": 0.0})
+        writer.write({"request_id": "r0", "monotonic_s": 0.1})
+    return run_dir
+
+
 def test_a_complete_run_validates(tmp_path: Path) -> None:
     report = validate_run(complete_run(tmp_path))
 
@@ -383,3 +425,76 @@ def test_every_required_raw_artifact_is_checked(tmp_path: Path) -> None:
         run_dir = complete_run(tmp_path / name.replace(".", "_"))
         (run_dir / name).unlink()
         assert validate_run(run_dir).ok is False, f"{name} must be required"
+
+
+def test_schema_v1_run_passes_semantic_validation(tmp_path: Path) -> None:
+    report = validate_run(schema_v1_run(tmp_path))
+
+    assert report.ok is True
+    assert report.errors == ()
+
+
+def test_partial_gpu_offload_fails_semantic_validation(tmp_path: Path) -> None:
+    run_dir = schema_v1_run(tmp_path)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["models"][0]["fully_on_gpu"] = False
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("fully on GPU" in error for error in report.errors)
+
+
+def test_a_changed_model_digest_fails_semantic_validation(tmp_path: Path) -> None:
+    run_dir = schema_v1_run(tmp_path)
+    outputs = read_jsonl(run_dir / "outputs.jsonl")
+    outputs[0]["model_digest"] = "different"
+    (run_dir / "outputs.jsonl").unlink()
+    with JsonlWriter(run_dir / "outputs.jsonl") as writer:
+        writer.write(outputs[0])
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("digest" in error for error in report.errors)
+
+
+def test_cached_prompt_tokens_fail_semantic_validation(tmp_path: Path) -> None:
+    run_dir = schema_v1_run(tmp_path)
+    outputs = read_jsonl(run_dir / "outputs.jsonl")
+    outputs[0]["prompt_eval_cached_count"] = 4
+    (run_dir / "outputs.jsonl").unlink()
+    with JsonlWriter(run_dir / "outputs.jsonl") as writer:
+        writer.write(outputs[0])
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("cached prompt" in error for error in report.errors)
+
+
+def test_a_telemetry_gap_above_500_ms_fails_semantic_validation(tmp_path: Path) -> None:
+    run_dir = schema_v1_run(tmp_path)
+    outputs = read_jsonl(run_dir / "outputs.jsonl")
+    outputs[0]["metrics"]["max_telemetry_gap_seconds"] = 0.75
+    (run_dir / "outputs.jsonl").unlink()
+    with JsonlWriter(run_dir / "outputs.jsonl") as writer:
+        writer.write(outputs[0])
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("telemetry gap" in error for error in report.errors)
+
+
+def test_missing_request_telemetry_fails_semantic_validation(tmp_path: Path) -> None:
+    run_dir = schema_v1_run(tmp_path)
+    (run_dir / "telemetry.jsonl.gz").unlink()
+    with GzipJsonlWriter(run_dir / "telemetry.jsonl.gz") as writer:
+        writer.write({"request_id": "another-request", "monotonic_s": 0.0})
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("no telemetry" in error for error in report.errors)

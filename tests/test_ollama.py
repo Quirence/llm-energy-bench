@@ -663,7 +663,19 @@ def test_the_prompt_cache_fields_are_raw_and_absent_means_null() -> None:
 
     assert result.valid is True
     assert result.prompt_eval_count is None  # absent is null, never zero
+    assert result.prompt_eval_cached_count is None
     assert result.prompt_eval_duration_ns is None
+
+
+def test_the_prompt_cache_count_is_preserved_from_the_final_chunk() -> None:
+    fake = FakeOllama(
+        stream_pieces=ndjson(token("Hi"), final(prompt_eval_cached_count=17))
+    )
+
+    result = preloaded(fake).generate_stream(request())
+
+    assert result.prompt_eval_count == 26
+    assert result.prompt_eval_cached_count == 17
 
 
 # --------------------------------------------------------------------------
