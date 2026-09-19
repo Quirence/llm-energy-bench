@@ -131,13 +131,13 @@ OllamaClient.generate_stream(request: InferenceRequest) -> InferenceResult
 The result contains client monotonic timestamps, TTFT, output text, done
 reason, token counts, cache counts, and all Ollama duration fields.
 
-- [ ] Write failing mock-stream tests for normal output, missing final chunk,
+- [x] Write failing mock-stream tests for normal output, missing final chunk,
   timeout, disconnect, zero output, digest capture, and placement data.
-- [ ] Run focused tests and verify failure.
-- [ ] Implement `/api/tags`, `/api/ps`, preload, and `/api/generate` streaming.
-- [ ] Verify no method downloads or mutates a model.
-- [ ] Run focused tests and verify success.
-- [ ] Commit as `feat: add Ollama streaming measurements`.
+- [x] Run focused tests and verify failure.
+- [x] Implement `/api/tags`, `/api/ps`, preload, and `/api/generate` streaming.
+- [x] Verify no method downloads or mutates a model.
+- [x] Run focused tests and verify success.
+- [x] Commit as `feat: add Ollama streaming measurements`.
 
 ### Task 5: NVML capability probe and sampler
 
