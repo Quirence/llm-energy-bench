@@ -31,3 +31,6 @@ experiments/tmp/
 # OS
 Thumbs.db
 Desktop.ini
+
+# uv
+uv.lock

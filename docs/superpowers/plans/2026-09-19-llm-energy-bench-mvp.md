@@ -61,12 +61,12 @@ ruff, Ollama, NVIDIA NVML.
 **Produces:** `main(argv: list[str] | None = None) -> int` with `doctor`,
 `run`, and `report` parsers and exit-code constants 0, 2, 3, and 4.
 
-- [ ] Write failing parser and exit-code tests.
-- [ ] Run `python -m pytest tests/test_cli.py -v` and verify failure.
-- [ ] Add the minimal package and `argparse` command shell.
-- [ ] Run the focused test and verify success.
-- [ ] Add Windows/Linux Python 3.12 CI running `ruff check` and `pytest`.
-- [ ] Commit as `chore: add package shell and CI`.
+- [x] Write failing parser and exit-code tests.
+- [x] Run `python -m pytest tests/test_cli.py -v` and verify failure.
+- [x] Add the minimal package and `argparse` command shell.
+- [x] Run the focused test and verify success.
+- [x] Add Windows/Linux Python 3.12 CI running `ruff check` and `pytest`.
+- [x] Commit as `chore: add package shell and CI`.
 
 ### Task 2: Configuration and prompt contracts
 
