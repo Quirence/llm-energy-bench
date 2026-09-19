@@ -4,7 +4,7 @@ Last updated: 2026-09-19
 
 ## Current Milestone
 
-M1 — Measured Pilot. Tasks 1–7 are implemented; Task 8 remains.
+M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 
 ## Done
 
@@ -29,7 +29,10 @@ M1 — Measured Pilot. Tasks 1–7 are implemented; Task 8 remains.
 - Task 7: read-only environment diagnosis, CLI execution path, validation
   summaries, aggregate CSV/Markdown reports, quality floor, and speed/energy
   ranking comparison.
-- Integrated test baseline: 219 tests pass on Python 3.12 without Ollama or
+- Task 9: frozen four-configuration `benchmark-v1` matrix, 24-prompt workload,
+  repeatability CV, bootstrap materiality rule, and explicit negative-result
+  decision criterion.
+- Integrated test baseline: 222 tests pass on Python 3.12 without Ollama or
   NVIDIA hardware.
 
 ## In Progress
@@ -39,7 +42,6 @@ M1 — Measured Pilot. Tasks 1–7 are implemented; Task 8 remains.
 ## Next
 
 - Task 8: RTX 3050 hardware pilot.
-- Task 9: freeze the two-host benchmark-v1 prompt set and model matrix.
 
 ## Blockers
 
@@ -47,6 +49,9 @@ M1 — Measured Pilot. Tasks 1–7 are implemented; Task 8 remains.
 - Hardware validation is still pending: NVML is covered by a fake binding and
   Ollama by mock HTTP streams, but neither path has been validated on a real
   GPU in this repository yet.
+- The official Ollama 0.34.2 installer download timed out repeatedly from
+  GitHub on this host. No package was installed; retrying the download is the
+  current external blocker for Task 8.
 - Ruff is enforced in CI but is not installed in the current global Python
   environment; the local compile and pytest checks pass.
 

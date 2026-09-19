@@ -31,11 +31,14 @@ The repository now contains the tested building blocks for the MVP:
 - a deterministic warm-run experiment orchestrator with immediate raw-record
   persistence and semantic validation;
 - human/JSON environment diagnosis plus CSV and Markdown aggregate reports;
-- Windows and Linux CI plus 219 hardware-independent tests.
+- a frozen 24-prompt, four-configuration `benchmark-v1` protocol for the two
+  main GPU hosts;
+- Windows and Linux CI plus 222 hardware-independent tests.
 
 The software path is complete through Task 7 of the implementation plan. It
 has not yet produced a hardware-validated experimental run; Task 8 is the
-first pilot on a real NVIDIA GPU and remains a separate acceptance gate.
+first pilot on a real NVIDIA GPU and remains a separate acceptance gate. Task
+9 protocol preparation is complete, but it does not bypass that gate.
 
 ## Minimal Scope
 

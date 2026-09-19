@@ -1,0 +1,38 @@
+# Frozen two-host study protocol. Change host_id only when copying this file
+# for the RTX 4060 host; all measurement controls must remain identical.
+#
+# 24 prompts x 5 repetitions x 4 configurations = 480 measured requests.
+
+[experiment]
+id = "benchmark-v1"
+host_id = "maibenben-x16c"
+output_dir = "../experiments/runs"
+repetitions = 5
+warmup_requests = 2
+order_seed = 42
+
+[runtime]
+ollama_url = "http://127.0.0.1:11434"
+models = [
+    "qwen3:4b-instruct-2507-q4_K_M",
+    "qwen3:4b-instruct-2507-q8_0",
+    "llama3.2:3b-instruct-q4_K_M",
+    "llama3.2:3b-instruct-q8_0",
+]
+
+[gpu]
+index = 0
+telemetry_interval_ms = 100
+
+[prompts]
+path = "../prompts/benchmark-v1.jsonl"
+
+[options]
+num_ctx = 4096
+temperature = 0.0
+seed = 42
+num_predict = 256
+kv_cache = "f16"
+concurrency = 1
+
+# Cost remains null until an explicit, documented tariff is selected.

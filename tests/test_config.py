@@ -455,3 +455,51 @@ def test_the_pilot_produces_the_eighteen_records_task_8_expects() -> None:
     prompts = load_prompts(config.prompt_path)
 
     assert len(prompts) * config.repetitions * len(config.models) == 18
+
+
+# --------------------------------------------------------------------------
+# Frozen benchmark-v1 artifacts
+# --------------------------------------------------------------------------
+
+BENCHMARK_MODELS = (
+    "qwen3:4b-instruct-2507-q4_K_M",
+    "qwen3:4b-instruct-2507-q8_0",
+    "llama3.2:3b-instruct-q4_K_M",
+    "llama3.2:3b-instruct-q8_0",
+)
+
+
+def test_benchmark_v1_config_freezes_the_approved_matrix() -> None:
+    config = load_config(REPO_ROOT / "configs" / "benchmark-v1.toml")
+
+    assert config.experiment_id == "benchmark-v1"
+    assert config.models == BENCHMARK_MODELS
+    assert config.repetitions == 5
+    assert config.warmup_requests == 2
+    assert config.telemetry_interval_ms == 100
+    assert config.options.num_ctx == 4096
+    assert config.options.temperature == 0.0
+    assert config.options.seed == 42
+    assert config.options.kv_cache == "f16"
+    assert config.concurrency == 1
+    assert config.cost_reporting_enabled is False
+
+
+def test_benchmark_v1_has_eight_unique_prompts_per_category() -> None:
+    prompts = load_prompts(REPO_ROOT / "prompts" / "benchmark-v1.jsonl")
+
+    assert len(prompts) == 24
+    assert len({prompt.prompt_id for prompt in prompts}) == 24
+    by_category = {c: [p for p in prompts if p.category is c] for c in PromptCategory}
+    assert {category: len(items) for category, items in by_category.items()} == {
+        PromptCategory.SHORT: 8,
+        PromptCategory.LONG: 8,
+        PromptCategory.SCORED: 8,
+    }
+
+
+def test_benchmark_v1_workload_size_is_fixed() -> None:
+    config = load_config(REPO_ROOT / "configs" / "benchmark-v1.toml")
+    prompts = load_prompts(config.prompt_path)
+
+    assert len(prompts) * config.repetitions * len(config.models) == 480

@@ -239,11 +239,11 @@ request metrics for latency, throughput, power, energy, efficiency, and cost.
 - Create `prompts/benchmark-v1.jsonl`
 - Update `docs/research-plan.md`
 
-- [ ] Add eight short/decode, eight long/prefill, and eight scored prompts.
-- [ ] Configure five repetitions and the four fixed model/quant tags.
-- [ ] Add tests confirming 24 unique prompt IDs and fixed matrix values.
-- [ ] Document the repeatability CV and rank-inversion decision rules.
-- [ ] Run all tests and commit as `docs: freeze benchmark v1 protocol`.
+- [x] Add eight short/decode, eight long/prefill, and eight scored prompts.
+- [x] Configure five repetitions and the four fixed model/quant tags.
+- [x] Add tests confirming 24 unique prompt IDs and fixed matrix values.
+- [x] Document the repeatability CV and rank-inversion decision rules.
+- [x] Run all tests and commit as `docs: freeze benchmark v1 protocol`.
 
 ## Completion Criteria
 
