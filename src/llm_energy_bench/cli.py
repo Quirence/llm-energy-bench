@@ -8,9 +8,23 @@ user.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
+
+from llm_energy_bench.config import ConfigError, ExperimentConfig, load_config
+from llm_energy_bench.nvml import EnergySource, NvmlError, NvmlSampler
+from llm_energy_bench.ollama import ModelNotFound, OllamaClient, OllamaError
+from llm_energy_bench.results import (
+    ResultsError,
+    assert_public_safe,
+    build_report,
+    scan_for_private_data,
+    validate_run,
+)
+from llm_energy_bench.runner import RunnerError, RunnerPreflightError, run_experiment
 
 EXIT_OK = 0
 EXIT_USAGE = 2
@@ -32,23 +46,187 @@ class RunFailedError(Exception):
     """Measurement started but could not complete."""
 
 
-def _not_implemented(component: str) -> Callable[[argparse.Namespace], int]:
-    def command(_args: argparse.Namespace) -> int:
-        raise PreflightError(f"{component} is not implemented yet")
+def doctor_environment(
+    config: ExperimentConfig,
+    *,
+    client_factory: Any = None,
+    sampler_factory: Any = None,
+) -> dict[str, Any]:
+    """Inspect the configured runtime, GPU, and model placement without a run."""
+    client_builder = client_factory or OllamaClient
+    sampler_builder = sampler_factory or NvmlSampler
+    runtime: dict[str, Any] = {
+        "name": "ollama",
+        "available": False,
+        "version": None,
+        "error": None,
+    }
+    gpu: dict[str, Any] = {
+        "available": False,
+        "energy_source": EnergySource.UNAVAILABLE.value,
+        "error": None,
+    }
+    models: list[dict[str, Any]] = []
 
-    return command
+    try:
+        with client_builder(config.ollama_url) as client:
+            try:
+                runtime["version"] = client.version()
+                runtime["available"] = True
+            except OllamaError as error:
+                runtime["error"] = _safe_error(error)
+
+            if runtime["available"]:
+                for model_name in config.models:
+                    try:
+                        running = client.preload(model_name)
+                        record = running.to_dict()
+                        record["requested"] = model_name
+                        record["installed"] = True
+                        record["error"] = None
+                    except ModelNotFound as error:
+                        record = {
+                            "requested": model_name,
+                            "installed": False,
+                            "fully_on_gpu": False,
+                            "error": _safe_error(error),
+                        }
+                    except OllamaError as error:
+                        record = {
+                            "requested": model_name,
+                            "installed": None,
+                            "fully_on_gpu": False,
+                            "error": _safe_error(error),
+                        }
+                    models.append(record)
+    except (OllamaError, OSError, ValueError) as error:
+        runtime["error"] = _safe_error(error)
+
+    try:
+        with sampler_builder(
+            gpu_index=config.gpu_index,
+            interval_ms=config.telemetry_interval_ms,
+        ) as sampler:
+            capabilities = sampler.probe(config.gpu_index)
+            gpu = {"available": True, **capabilities.to_dict(), "error": None}
+    except (NvmlError, OSError, ValueError) as error:
+        gpu["error"] = _safe_error(error)
+
+    models_ok = len(models) == len(config.models) and all(
+        model.get("installed") is True
+        and model.get("fully_on_gpu") is True
+        and bool(model.get("digest"))
+        for model in models
+    )
+    report = {
+        "schema_version": 1,
+        "ok": (
+            runtime["available"] is True
+            and gpu.get("available") is True
+            and gpu.get("energy_source") != EnergySource.UNAVAILABLE.value
+            and models_ok
+        ),
+        "runtime": runtime,
+        "gpu": gpu,
+        "models": models,
+        "controls": {
+            "num_ctx": config.options.num_ctx,
+            "kv_cache": config.options.kv_cache,
+            "kv_cache_verification": "not_exposed_by_ollama_api",
+            "concurrency": config.concurrency,
+        },
+    }
+    report = _sanitize_payload(report)
+    assert_public_safe(report)
+    return report
+
+
+def _default_config_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "configs" / "pilot.toml"
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    return _not_implemented("doctor")(args)
+    try:
+        config = load_config(_default_config_path())
+    except ConfigError as error:
+        raise UsageError(str(error)) from error
+
+    report = doctor_environment(config)
+    if args.json:
+        print(json.dumps(report, sort_keys=True, ensure_ascii=False, indent=2))
+    else:
+        _print_doctor(report)
+    return EXIT_OK if report["ok"] else EXIT_ENVIRONMENT
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    return _not_implemented("run")(args)
+    try:
+        config = load_config(args.config)
+    except ConfigError as error:
+        raise UsageError(str(error)) from error
+
+    try:
+        run_dir = run_experiment(config)
+    except RunnerPreflightError as error:
+        raise PreflightError(str(error)) from error
+    except RunnerError as error:
+        raise RunFailedError(str(error)) from error
+
+    print(run_dir)
+    validation = validate_run(run_dir)
+    if not validation.ok:
+        for error in validation.errors:
+            print(f"validation: {error}", file=sys.stderr)
+        return EXIT_RUN_FAILED
+    return EXIT_OK
 
 
 def cmd_report(args: argparse.Namespace) -> int:
-    return _not_implemented("report")(args)
+    try:
+        paths = build_report(tuple(args.run_dirs))
+    except ResultsError as error:
+        raise RunFailedError(str(error)) from error
+    print(paths.summary_csv)
+    print(paths.report_markdown)
+    return EXIT_OK if paths.validation_ok else EXIT_RUN_FAILED
+
+
+def _safe_error(error: BaseException) -> str:
+    detail = str(error) or type(error).__name__
+    return "<redacted>" if scan_for_private_data(detail) else detail
+
+
+def _sanitize_payload(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _sanitize_payload(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_payload(item) for item in value]
+    if isinstance(value, str) and scan_for_private_data(value):
+        return "<redacted>"
+    return value
+
+
+def _print_doctor(report: dict[str, Any]) -> None:
+    runtime = report["runtime"]
+    gpu = report["gpu"]
+    print(f"Ollama: {'ok' if runtime['available'] else 'unavailable'}")
+    if runtime.get("version"):
+        print(f"  version: {runtime['version']}")
+    if runtime.get("error"):
+        print(f"  error: {runtime['error']}")
+    print(f"GPU/NVML: {'ok' if gpu.get('available') else 'unavailable'}")
+    if gpu.get("name"):
+        print(f"  device: {gpu['name']}")
+        print(f"  energy source: {gpu['energy_source']}")
+    if gpu.get("error"):
+        print(f"  error: {gpu['error']}")
+    for model in report["models"]:
+        state = "fully on GPU" if model.get("fully_on_gpu") is True else "not ready"
+        print(f"Model {model['requested']}: {state}")
+        if model.get("error"):
+            print(f"  error: {model['error']}")
 
 
 COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {

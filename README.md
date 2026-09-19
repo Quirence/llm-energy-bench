@@ -28,12 +28,14 @@ The repository now contains the tested building blocks for the MVP:
   generation, TTFT, token counts, and runtime durations;
 - an NVML capability probe and request-scoped telemetry sampler with explicit
   fallbacks for consumer GPUs;
-- Windows and Linux CI plus 189 hardware-independent tests.
+- a deterministic warm-run experiment orchestrator with immediate raw-record
+  persistence and semantic validation;
+- human/JSON environment diagnosis plus CSV and Markdown aggregate reports;
+- Windows and Linux CI plus 219 hardware-independent tests.
 
-The components are not wired into an end-to-end benchmark yet. The three CLI
-commands deliberately return a not-implemented environment error until the
-experiment runner, doctor output, aggregation, and report generation are
-completed in Tasks 6 and 7 of the implementation plan.
+The software path is complete through Task 7 of the implementation plan. It
+has not yet produced a hardware-validated experimental run; Task 8 is the
+first pilot on a real NVIDIA GPU and remains a separate acceptance gate.
 
 ## Minimal Scope
 
@@ -74,8 +76,20 @@ suite because the runtime and NVML boundaries use fakes.
 
 The checked-in pilot is intentionally small: one
 `llama3.2:3b-instruct-q4_K_M` configuration, six prompts, two excluded
-warm-ups, and three measured repetitions (18 measured requests when the runner
-is implemented).
+warm-ups, and three measured repetitions (18 measured requests).
+
+## CLI
+
+```text
+python -m llm_energy_bench doctor --json
+python -m llm_energy_bench run --config configs/pilot.toml
+python -m llm_energy_bench report experiments/runs/<run-id>
+```
+
+`doctor` is read-only: it checks the configured Ollama instance, NVML energy
+source, installed model digests, and complete GPU placement. `run` never pulls
+models automatically. `report` regenerates derived CSV/Markdown summaries from
+the raw artifacts and returns exit code 4 if any supplied run fails validation.
 
 ## Project Documents
 

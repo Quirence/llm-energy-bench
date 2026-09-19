@@ -15,13 +15,17 @@ be regenerated at any time. That ordering drives every choice here.
 
 from __future__ import annotations
 
+import csv
 import getpass
 import gzip
 import hashlib
+import io
 import json
 import os
 import re
 import secrets
+import statistics
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -62,6 +66,272 @@ class RunStatus(StrEnum):
     COMPLETED = "completed"
     INTERRUPTED = "interrupted"
     FAILED = "failed"
+
+
+@dataclass(frozen=True, slots=True)
+class ReportPaths:
+    """Derived report artifacts and their aggregate validation status."""
+
+    summary_csv: Path
+    report_markdown: Path
+    validation_ok: bool
+
+
+def build_report(run_dirs: tuple[Path, ...]) -> ReportPaths:
+    """Validate raw runs and generate deterministic CSV and Markdown summaries."""
+    if not run_dirs:
+        raise ResultsError("at least one run directory is required")
+
+    resolved = tuple(Path(run_dir) for run_dir in run_dirs)
+    validations = tuple(validate_run(run_dir) for run_dir in resolved)
+    for validation in validations:
+        write_json(validation.run_dir / VALIDATION, validation.to_dict())
+
+    records: list[dict[str, Any]] = []
+    manifests: dict[str, dict[str, Any]] = {}
+    for run_dir in resolved:
+        try:
+            manifest = json.loads((run_dir / MANIFEST).read_text(encoding=_ENCODING))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ResultsError(f"{run_dir.name}/{MANIFEST} could not be read: {error}") from error
+        if not isinstance(manifest, dict):
+            raise ResultsError(f"{run_dir.name}/{MANIFEST} must contain a JSON object")
+        run_id = str(manifest.get("run_id") or run_dir.name)
+        manifests[run_id] = manifest
+        for record in read_jsonl(run_dir / OUTPUTS):
+            if record.get("valid") is True and isinstance(record.get("metrics"), dict):
+                records.append({"run_id": run_id, **record})
+
+    rows = _aggregate_report_rows(records, manifests)
+    _assign_ranks(rows)
+
+    summary_path = resolved[0] / SUMMARY
+    report_path = resolved[0] / REPORT
+    write_text(summary_path, _render_summary_csv(rows))
+    write_text(report_path, _render_report(rows, validations))
+    return ReportPaths(
+        summary_csv=summary_path,
+        report_markdown=report_path,
+        validation_ok=all(validation.ok for validation in validations),
+    )
+
+
+_SUMMARY_FIELDS = (
+    "run_id",
+    "host_id",
+    "model",
+    "model_digest",
+    "prompt_category",
+    "request_count",
+    "latency_median_seconds",
+    "latency_iqr_seconds",
+    "ttft_median_seconds",
+    "ttft_iqr_seconds",
+    "output_tokens",
+    "gpu_energy_joules",
+    "end_to_end_tokens_per_second",
+    "output_tokens_per_joule",
+    "quality_score",
+    "ranking_eligible",
+    "speed_rank",
+    "energy_rank",
+)
+
+
+def _aggregate_report_rows(
+    records: list[dict[str, Any]], manifests: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    quality: dict[tuple[str, str, str], dict[str, list[float]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+
+    for record in records:
+        run_id = str(record["run_id"])
+        model = str(record.get("model") or "unknown")
+        digest = str(record.get("model_digest") or "unknown")
+        category = str(record.get("prompt_category") or "unknown")
+        grouped[(run_id, model, digest, category)].append(record)
+        score = _number(record["metrics"].get("quality_score"))
+        prompt_id = record.get("prompt_id")
+        if score is not None and isinstance(prompt_id, str):
+            quality[(run_id, model, digest)][prompt_id].append(score)
+
+    config_quality = {
+        key: statistics.fmean(statistics.fmean(scores) for scores in by_prompt.values())
+        for key, by_prompt in quality.items()
+        if by_prompt
+    }
+    rows: list[dict[str, Any]] = []
+    for key in sorted(grouped):
+        run_id, model, digest, category = key
+        group = grouped[key]
+        metrics = [record["metrics"] for record in group]
+        latencies = _numbers(item.get("latency_seconds") for item in metrics)
+        ttfts = _numbers(item.get("ttft_seconds") for item in metrics)
+        tokens = _numbers(item.get("output_tokens") for item in metrics)
+        energies = _numbers(item.get("gpu_energy_joules") for item in metrics)
+        total_latency = sum(latencies)
+        total_tokens = sum(tokens)
+        total_energy = sum(energies)
+        score = config_quality.get((run_id, model, digest))
+        manifest = manifests.get(run_id, {})
+        rows.append(
+            {
+                "run_id": run_id,
+                "host_id": str(manifest.get("host_id") or "unknown"),
+                "model": model,
+                "model_digest": digest,
+                "prompt_category": category,
+                "request_count": len(group),
+                "latency_median_seconds": _median(latencies),
+                "latency_iqr_seconds": _iqr(latencies),
+                "ttft_median_seconds": _median(ttfts),
+                "ttft_iqr_seconds": _iqr(ttfts),
+                "output_tokens": total_tokens,
+                "gpu_energy_joules": total_energy,
+                "end_to_end_tokens_per_second": _safe_ratio(total_tokens, total_latency),
+                "output_tokens_per_joule": _safe_ratio(total_tokens, total_energy),
+                "quality_score": score,
+                "ranking_eligible": score is not None and score >= 0.75,
+                "speed_rank": None,
+                "energy_rank": None,
+            }
+        )
+    return rows
+
+
+def _assign_ranks(rows: list[dict[str, Any]]) -> None:
+    categories = sorted({str(row["prompt_category"]) for row in rows})
+    for category in categories:
+        eligible = [
+            row
+            for row in rows
+            if row["prompt_category"] == category and row["ranking_eligible"]
+        ]
+        speed = sorted(
+            eligible,
+            key=lambda row: (
+                -float(row["end_to_end_tokens_per_second"] or 0),
+                str(row["run_id"]),
+                str(row["model"]),
+            ),
+        )
+        energy = sorted(
+            eligible,
+            key=lambda row: (
+                -float(row["output_tokens_per_joule"] or 0),
+                str(row["run_id"]),
+                str(row["model"]),
+            ),
+        )
+        for rank, row in enumerate(speed, start=1):
+            row["speed_rank"] = rank
+        for rank, row in enumerate(energy, start=1):
+            row["energy_rank"] = rank
+
+
+def _render_summary_csv(rows: list[dict[str, Any]]) -> str:
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=_SUMMARY_FIELDS, lineterminator="\n")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({name: _csv_value(row.get(name)) for name in _SUMMARY_FIELDS})
+    return buffer.getvalue()
+
+
+def _render_report(rows: list[dict[str, Any]], validations: tuple[ValidationReport, ...]) -> str:
+    valid_count = sum(validation.ok for validation in validations)
+    inversions = [
+        row
+        for row in rows
+        if row["speed_rank"] is not None and row["speed_rank"] != row["energy_rank"]
+    ]
+    lines = [
+        "# LLM energy benchmark report",
+        "",
+        f"Validated runs: {valid_count}/{len(validations)}.",
+        "",
+    ]
+    if inversions:
+        lines.extend(
+            [
+                "Speed and energy rankings differ in at least one aggregate workload block.",
+                "This is descriptive only; statistical rank-inversion criteria are "
+                "evaluated separately.",
+                "",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "Speed and energy rankings agree in the observed aggregates.",
+                "This does not establish equivalence outside the measured configurations.",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "| Run | Host | Model | Workload | Requests | tok/s | tok/J | Quality | "
+            "Speed rank | Energy rank |",
+            "|---|---|---|---|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for row in rows:
+        lines.append(
+            "| {run_id} | {host_id} | {model} | {prompt_category} | {request_count} | "
+            "{end_to_end_tokens_per_second} | {output_tokens_per_joule} | {quality_score} | "
+            "{speed_rank} | {energy_rank} |".format(
+                **{key: _csv_value(value) for key, value in row.items()}
+            )
+        )
+    lines.extend(["", "GPU energy and cost figures are GPU-only estimates, not wall energy.", ""])
+    return "\n".join(lines)
+
+
+def _number(value: Any) -> float | None:
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return float(value)
+    return None
+
+
+def _numbers(values: Any) -> list[float]:
+    return [number for value in values if (number := _number(value)) is not None]
+
+
+def _median(values: list[float]) -> float | None:
+    return statistics.median(values) if values else None
+
+
+def _percentile(values: list[float], fraction: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * fraction
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    weight = position - lower
+    return ordered[lower] * (1 - weight) + ordered[upper] * weight
+
+
+def _iqr(values: list[float]) -> float | None:
+    lower = _percentile(values, 0.25)
+    upper = _percentile(values, 0.75)
+    return None if lower is None or upper is None else upper - lower
+
+
+def _safe_ratio(numerator: float, denominator: float) -> float | None:
+    return numerator / denominator if denominator > 0 else None
+
+
+def _csv_value(value: Any) -> Any:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, float):
+        return format(value, ".12g")
+    return value
 
 
 # --------------------------------------------------------------------------

@@ -4,7 +4,7 @@ Last updated: 2026-09-19
 
 ## Current Milestone
 
-M1 — Measured Pilot. Tasks 1–6 are implemented; Tasks 7–8 remain.
+M1 — Measured Pilot. Tasks 1–7 are implemented; Task 8 remains.
 
 ## Done
 
@@ -26,18 +26,20 @@ M1 — Measured Pilot. Tasks 1–6 are implemented; Tasks 7–8 remain.
   sampler with total-energy/instant-power/legacy-power fallback.
 - Task 6: deterministic warm experiment runner, cache contamination handling,
   request metrics, partial-run preservation, and semantic validation.
-- Integrated test baseline: 207 tests pass on Python 3.12 without Ollama or
+- Task 7: read-only environment diagnosis, CLI execution path, validation
+  summaries, aggregate CSV/Markdown reports, quality floor, and speed/energy
+  ranking comparison.
+- Integrated test baseline: 219 tests pass on Python 3.12 without Ollama or
   NVIDIA hardware.
 
 ## In Progress
 
-- Task 7: wire `doctor`, `run`, and `report` into the CLI and implement
-  aggregate CSV/Markdown reporting.
+- Task 8: validate the complete path with a real NVIDIA GPU and Ollama model.
 
 ## Next
 
-- Task 7: doctor output and reports.
 - Task 8: RTX 3050 hardware pilot.
+- Task 9: freeze the two-host benchmark-v1 prompt set and model matrix.
 
 ## Blockers
 
@@ -45,8 +47,8 @@ M1 — Measured Pilot. Tasks 1–6 are implemented; Tasks 7–8 remain.
 - Hardware validation is still pending: NVML is covered by a fake binding and
   Ollama by mock HTTP streams, but neither path has been validated on a real
   GPU in this repository yet.
-- The runner is implemented but not exposed through the CLI yet. `doctor`,
-  `run`, and `report` intentionally return exit code 3 until Task 7.
+- Ruff is enforced in CI but is not installed in the current global Python
+  environment; the local compile and pytest checks pass.
 
 ## Latest Validated Run
 
