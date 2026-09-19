@@ -160,14 +160,14 @@ Each sample contains monotonic/UTC timestamps, request ID, available power
 fields, energy counter, temperature, VRAM, utilization, clocks, power limit,
 and per-field errors.
 
-- [ ] Write failing tests using a fake NVML binding for full support,
+- [x] Write failing tests using a fake NVML binding for full support,
   unsupported fields, sampling exceptions, repeated start, safe stop, and
   shutdown during interruption.
-- [ ] Run focused tests and verify failure.
-- [ ] Implement capability probing without assuming consumer-GPU support.
-- [ ] Implement a 100 ms default sampler thread with `finally` cleanup.
-- [ ] Run focused tests and verify success.
-- [ ] Commit as `feat: add NVML telemetry sampler`.
+- [x] Run focused tests and verify failure.
+- [x] Implement capability probing without assuming consumer-GPU support.
+- [x] Implement a 100 ms default sampler thread with `finally` cleanup.
+- [x] Run focused tests and verify success.
+- [x] Commit as `feat: add NVML telemetry sampler`.
 
 ### Task 6: Metrics and experiment runner
 
