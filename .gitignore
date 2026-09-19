@@ -13,6 +13,9 @@ htmlcov/
 venv/
 env/
 
+# Isolated feature worktrees
+.worktrees/
+
 # Local data and outputs
 *.sqlite
 *.sqlite3
