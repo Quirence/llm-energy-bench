@@ -107,12 +107,12 @@ telemetry interval, inference options, and optional tariff/currency.
 sanitization; `validate_run(run_dir: Path) -> ValidationReport`; and the fixed
 run-directory layout.
 
-- [ ] Write failing tests for atomic writes, gzip round-trip, checksums,
+- [x] Write failing tests for atomic writes, gzip round-trip, checksums,
   interrupted-run preservation, privacy rejection, and the 25 MB file limit.
-- [ ] Run the focused tests and verify failure.
-- [ ] Implement storage and validation without third-party serialization.
-- [ ] Run focused tests and verify success.
-- [ ] Commit as `feat: add immutable run artifacts`.
+- [x] Run the focused tests and verify failure.
+- [x] Implement storage and validation without third-party serialization.
+- [x] Run focused tests and verify success.
+- [x] Commit as `feat: add immutable run artifacts`.
 
 ### Task 4: Ollama streaming client
 
