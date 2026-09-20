@@ -52,6 +52,12 @@ def test_contributor_workstreams_are_versioned() -> None:
     assert "issues/5" in collaboration
     assert "issues/7" in collaboration
     assert "git pull --ff-only" in collaboration
+    assert 'pip install ".[dev]"' in collaboration
+    assert "pip install -e" not in collaboration
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert 'pip install ".[dev]"' in readme
+    assert "pip install -e" not in readme
 
     codeowners = (REPO_ROOT / ".github" / "CODEOWNERS").read_text(
         encoding="utf-8"

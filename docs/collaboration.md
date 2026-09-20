@@ -39,11 +39,15 @@ cd llm-energy-bench
 git switch main
 git pull --ff-only
 python -m venv .venv
-.venv\Scripts\python -m pip install -e ".[dev]"
+.venv\Scripts\python -m pip install ".[dev]"
 .venv\Scripts\python -m pytest -q
 ```
 
 On Linux, replace `.venv\Scripts\python` with `.venv/bin/python`.
+The regular install is deliberate on Windows: Python 3.12 may decode an
+editable install's UTF-8 `.pth` using the local code page when the repository
+path contains non-ASCII characters. Reinstall the package after changing code;
+pytest imports the current `src/` tree directly.
 
 Before editing, open the assigned Issue and create a branch from current
 `main`:

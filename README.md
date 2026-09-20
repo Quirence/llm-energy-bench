@@ -74,7 +74,7 @@ than a completed inference experiment.
 
 ```text
 python -m venv .venv
-.venv\Scripts\python -m pip install -e ".[dev]"
+.venv\Scripts\python -m pip install ".[dev]"
 .venv\Scripts\python -m ruff check .
 .venv\Scripts\python -m pytest -v
 ```
@@ -82,6 +82,11 @@ python -m venv .venv
 On Linux or macOS, replace `.venv\Scripts\python` with
 `.venv/bin/python`. Ollama and an NVIDIA driver are not required for the test
 suite because the runtime and NVML boundaries use fakes.
+
+The documented Windows command intentionally performs a regular wheel install.
+Python 3.12 can misread the UTF-8 `.pth` created by an editable install when a
+checkout path contains Cyrillic or other non-ASCII characters. Reinstall after
+changing package code; tests continue to import directly from `src/`.
 
 The checked-in pilot is intentionally small: one
 `llama3.2:3b-instruct-q4_K_M` configuration, six prompts, two excluded
