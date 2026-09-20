@@ -40,3 +40,34 @@ def test_issue_and_pull_request_templates_cover_reproducible_work() -> None:
     assert "STATUS.md" in pull_request
     assert "schema or methodology" in pull_request
     assert "private" in pull_request.lower()
+
+
+def test_contributor_workstreams_are_versioned() -> None:
+    collaboration_path = REPO_ROOT / "docs" / "collaboration.md"
+    assert collaboration_path.is_file()
+
+    collaboration = collaboration_path.read_text(encoding="utf-8")
+    for contributor in ("@Quirence", "@Qcsteeven", "@Skipl1"):
+        assert contributor in collaboration
+    assert "issues/5" in collaboration
+    assert "issues/7" in collaboration
+    assert "git pull --ff-only" in collaboration
+    assert 'pip install ".[dev]"' in collaboration
+    assert "pip install -e" not in collaboration
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert 'pip install ".[dev]"' in readme
+    assert "pip install -e" not in readme
+
+    codeowners = (REPO_ROOT / ".github" / "CODEOWNERS").read_text(
+        encoding="utf-8"
+    )
+    for path in (
+        "/src/llm_energy_bench/ollama.py",
+        "/tests/test_ollama.py",
+    ):
+        matching = next(
+            line for line in codeowners.splitlines() if line.startswith(path)
+        )
+        assert "@Skipl1" in matching
+        assert "@Quirence" in matching
