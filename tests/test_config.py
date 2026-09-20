@@ -37,6 +37,7 @@ path = "prompts/pilot-v1.jsonl"
 
 [options]
 num_ctx = 4096
+num_gpu = 999
 temperature = 0.0
 seed = 42
 num_predict = 256
@@ -74,6 +75,7 @@ def test_a_valid_config_loads_every_field(tmp_path: Path) -> None:
     assert config.gpu_index == 0
     assert config.telemetry_interval_ms == 100
     assert config.options.num_ctx == 4096
+    assert config.options.num_gpu == 999
     assert config.options.temperature == 0.0
     assert config.options.seed == 42
     assert config.options.num_predict == 256
@@ -115,6 +117,7 @@ path = "p.jsonl"
     assert config.telemetry_interval_ms == 100
     assert config.concurrency == 1
     assert config.options.num_ctx == 4096
+    assert config.options.num_gpu == 999
     assert config.options.temperature == 0.0
     assert config.options.seed == 42
     assert config.options.kv_cache == "f16"
@@ -188,6 +191,7 @@ def test_a_missing_required_key_is_rejected(tmp_path: Path) -> None:
         ("telemetry_interval_ms = 100", "telemetry_interval_ms = 0", "telemetry_interval_ms"),
         ("index = 0", "index = -1", "index"),
         ("num_ctx = 4096", "num_ctx = 0", "num_ctx"),
+        ("num_gpu = 999", "num_gpu = 0", "num_gpu"),
         ("temperature = 0.0", "temperature = -0.5", "temperature"),
         ("num_predict = 256", "num_predict = 0", "num_predict"),
     ],
@@ -437,6 +441,7 @@ def test_the_shipped_pilot_config_is_valid() -> None:
     assert config.repetitions == 3
     assert config.models == ("llama3.2:3b-instruct-q4_K_M",)
     assert config.warmup_requests == 2
+    assert config.options.num_gpu == 999
     assert config.cost_reporting_enabled is False
 
 
@@ -478,6 +483,7 @@ def test_benchmark_v1_config_freezes_the_approved_matrix() -> None:
     assert config.warmup_requests == 2
     assert config.telemetry_interval_ms == 100
     assert config.options.num_ctx == 4096
+    assert config.options.num_gpu == 999
     assert config.options.temperature == 0.0
     assert config.options.seed == 42
     assert config.options.kv_cache == "f16"
