@@ -108,6 +108,7 @@ class RequestMetrics:
     valid: bool
     invalid_kind: str | None
     invalid_reason: str | None
+    quality_pass: bool | None
 
     latency_s: float
     ttft_s: float | None
@@ -144,6 +145,20 @@ class RequestMetrics:
 
     def to_dict(self) -> dict[str, Any]:
         return {field: getattr(self, field) for field in self.__slots__}
+
+
+def score_output(prompt: PromptCase, text: str) -> bool | None:
+    """Judge a scored prompt's answer, or return ``None`` for an unscored one.
+
+    The check is deliberately mechanical: every expected fragment must appear,
+    case-insensitively. Scoring happens while the prompt is in hand so that a
+    run directory stays self-contained and a report never has to reach back to
+    the prompt file that produced it.
+    """
+    if not prompt.is_scored:
+        return None
+    haystack = text.casefold()
+    return all(fragment.casefold() in haystack for fragment in prompt.expect_contains)
 
 
 def integrate_power(points: Sequence[tuple[float, float]]) -> float | None:
@@ -203,6 +218,7 @@ def compute_request_metrics(
         invalid_kind=result.invalid_kind.value if result.invalid_kind else None,
         invalid_reason=result.invalid_reason
         or (None if usable_tokens is not None else "no output tokens were reported"),
+        quality_pass=score_output(prompt, result.text) if prompt else None,
         latency_s=result.latency_s,
         ttft_s=result.ttft_s,
         total_duration_ns=result.total_duration_ns,

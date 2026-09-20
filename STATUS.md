@@ -1,42 +1,40 @@
 # Project Status
 
-Last updated: 2026-09-19
+Last updated: 2026-09-20
 
 ## Current Milestone
 
-M1 — MVP implementation.
+M1 — MVP implementation. Software complete; hardware validation pending.
 
 ## Done
 
-- Research question and failure condition documented.
+- Research question, failure condition, and analysis rules documented.
 - MVP architecture and data flow approved.
-- Initial model and quantization matrix fixed.
-- Collaboration workflow agreed for Quirence and Qcsteeven.
-- Detailed implementation plan prepared.
-- Task 1: package shell, `doctor`/`run`/`report` command parsing, fixed exit
-  codes, and Windows/Linux CI.
-- Task 5 (Qcsteeven): NVML capability probe and request-scoped telemetry
-  sampler, covered by a fake NVML binding.
+- Task 1: package shell, command parsing, fixed exit codes, Windows/Linux CI.
+- Task 2: experiment and prompt contracts, pilot config, six pilot prompts.
+- Task 3: immutable run artifacts, integrity checks, privacy rules.
+- Task 4: Ollama streaming client with client-side timing.
+- Task 5: NVML capability probe and telemetry sampler.
+- Task 6: preflight, measured execution, and derived request metrics.
+- Task 7: environment doctor, summary CSV, and Markdown reports.
 
 ## In Progress
 
-- Tasks 2, 3, 4 (Quirence): config and prompt contracts, result storage, and
-  the Ollama streaming client.
+- Review and merge of the seven feature branches.
 
 ## Next
 
-- Task 6: metrics and experiment runner, wiring the Ollama client to the NVML
-  sampler.
-- Task 7: doctor output and reports.
-- Task 8: RTX 3050 hardware pilot.
+- Task 8: RTX 3050 pilot on a Windows host — the first run on real hardware.
+- Task 9: two-host benchmark protocol (benchmark-v1).
 
 ## Blockers
 
-- The NVML sampler has no hardware validation yet. It is verified only against
-  the fake binding; the development WSL host exposes no NVIDIA driver, so
-  `probe` there correctly reports `NvmlUnavailable`. First real telemetry comes
-  with the Task 8 pilot on Windows.
+- No measurement has touched real hardware yet. Every module is verified
+  against fakes only, because the development WSL host exposes no NVIDIA
+  driver: `probe` there correctly reports `NvmlUnavailable`, and `doctor`
+  correctly exits 3. Task 8 on Windows is what turns this from plausible
+  software into a validated instrument.
 
 ## Latest Validated Run
 
-No experimental runs yet. Task 8 is the first measured run.
+None. Task 8 is the first measured run.

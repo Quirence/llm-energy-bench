@@ -62,9 +62,17 @@ def test_every_command_is_registered(command: str) -> None:
     assert command in cli.COMMANDS
 
 
-def test_commands_are_not_implemented_yet_but_do_not_crash(tmp_path) -> None:
-    """Unimplemented commands report an environment failure, never a traceback."""
+def test_a_host_without_ollama_or_a_gpu_reports_an_environment_failure() -> None:
+    """Doctor never raises: it reports what is wrong and exits with code 3."""
     assert cli.main(["doctor"]) == cli.EXIT_ENVIRONMENT
+
+
+def test_a_missing_run_config_is_a_usage_error(tmp_path) -> None:
+    assert cli.main(["run", "--config", str(tmp_path / "absent.toml")]) == cli.EXIT_USAGE
+
+
+def test_a_missing_report_directory_is_a_usage_error(tmp_path) -> None:
+    assert cli.main(["report", str(tmp_path / "absent")]) == cli.EXIT_USAGE
 
 
 def test_keyboard_interrupt_maps_to_run_failed(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -203,14 +203,14 @@ request metrics for latency, throughput, power, energy, efficiency, and cost.
 **Produces:** human/JSON doctor output and
 `build_report(run_dirs: tuple[Path, ...]) -> ReportPaths`.
 
-- [ ] Write failing doctor tests for unavailable Ollama, missing model,
+- [x] Write failing doctor tests for unavailable Ollama, missing model,
   unsupported energy counter, partial GPU placement, and sanitized JSON.
-- [ ] Write failing report tests for median/IQR, aggregate ratios, equal
+- [x] Write failing report tests for median/IQR, aggregate ratios, equal
   prompt weighting, 75% quality floor, and cross-run ranking.
-- [ ] Run focused tests and verify failure.
-- [ ] Implement doctor, validation summary, CSV output, and Markdown report.
-- [ ] Run focused tests and verify success.
-- [ ] Commit as `feat: add environment doctor and reports`.
+- [x] Run focused tests and verify failure.
+- [x] Implement doctor, validation summary, CSV output, and Markdown report.
+- [x] Run focused tests and verify success.
+- [x] Commit as `feat: add environment doctor and reports`.
 
 ### Task 8: RTX 3050 hardware pilot
 

@@ -585,3 +585,42 @@ def test_the_shipped_pilot_config_runs_end_to_end(tmp_path: Path) -> None:
 
     assert len(read_jsonl(run_dir / REQUESTS)) == len(prompts) * config.repetitions == 18
     assert validate_run(run_dir).ok is True
+
+
+# --------------------------------------------------------------------------
+# Quality scoring
+# --------------------------------------------------------------------------
+
+
+def test_a_scored_prompt_is_judged_at_measurement_time(tmp_path: Path) -> None:
+    """The run directory must stay self-contained: no reaching back to the prompt file."""
+    run_dir = run(tmp_path, FakeOllamaClient(), FakeSampler())
+    records = {r["prompt_id"]: r for r in read_jsonl(run_dir / REQUESTS)}
+
+    assert records["scored-01"]["quality_pass"] is False, "'generated text' lacks '3'"
+    assert records["short-01"]["quality_pass"] is None, "unscored prompts are not judged"
+
+
+def test_scoring_is_case_insensitive_and_requires_every_fragment() -> None:
+    from llm_energy_bench.config import PromptCase, PromptCategory
+    from llm_energy_bench.runner import score_output
+
+    prompt = PromptCase(
+        prompt_id="s",
+        category=PromptCategory.SCORED,
+        prompt="q",
+        expect_contains=("Paris", "France"),
+    )
+
+    assert score_output(prompt, "the capital is paris, in FRANCE") is True
+    assert score_output(prompt, "the capital is Paris") is False
+    assert score_output(prompt, "") is False
+
+
+def test_an_unscored_prompt_is_never_judged() -> None:
+    from llm_energy_bench.config import PromptCase, PromptCategory
+    from llm_energy_bench.runner import score_output
+
+    prompt = PromptCase(prompt_id="s", category=PromptCategory.SHORT, prompt="q")
+
+    assert score_output(prompt, "anything at all") is None
