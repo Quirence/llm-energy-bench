@@ -33,7 +33,7 @@ The repository now contains the tested building blocks for the MVP:
 - human/JSON environment diagnosis plus CSV and Markdown aggregate reports;
 - a frozen 24-prompt, four-configuration `benchmark-v1` protocol for the two
   main GPU hosts;
-- Windows and Linux CI plus 230 hardware-independent tests.
+- Windows and Linux CI plus 231 hardware-independent tests.
 
 The software path is complete through Task 7 of the implementation plan. It
 has not yet produced a hardware-validated experimental run; Task 8 is the
@@ -109,4 +109,5 @@ and the selected source is stored in the request record.
 - [Approved MVP design](docs/superpowers/specs/2026-09-19-llm-energy-bench-design.md)
 - [MVP implementation plan](docs/superpowers/plans/2026-09-19-llm-energy-bench-mvp.md)
 - [Initial research plan](docs/research-plan.md)
+- [Contributor roles and workflow](docs/collaboration.md)
 - [Append-only experiment log](docs/experiment-log.md)

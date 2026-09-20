@@ -15,6 +15,8 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
   into `main` while preserving both contributors' commits.
 - CODEOWNERS plus reproducible bug, experiment, and pull-request templates
   enforce the two-author review workflow in the repository.
+- The versioned collaboration guide maps `@Qcsteeven` to NVML/RTX 4060 work
+  and `@Skipl1` (Dimas) to the Ollama runtime boundary and Issue #7.
 - Public GitHub milestones `M0 Bootstrap`, `M1 Measured Pilot`, `M2 Two-GPU
   Study`, and `M3 Paper Dataset` track the delivery stages.
 - `main` requires a pull request, one approval, CODEOWNERS review, successful
@@ -39,7 +41,7 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - Task 9: frozen four-configuration `benchmark-v1` matrix, 24-prompt workload,
   repeatability CV, bootstrap materiality rule, and explicit negative-result
   decision criterion.
-- Integrated test baseline: 230 tests pass on Python 3.12 without Ollama or
+- Integrated test baseline: 231 tests pass on Python 3.12 without Ollama or
   NVIDIA hardware.
 
 ## In Progress
