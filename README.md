@@ -33,12 +33,18 @@ The repository now contains the tested building blocks for the MVP:
 - human/JSON environment diagnosis plus CSV and Markdown aggregate reports;
 - a frozen 24-prompt, four-configuration `benchmark-v1` protocol for the two
   main GPU hosts;
-- Windows and Linux CI plus 222 hardware-independent tests.
+- Windows and Linux CI plus 231 hardware-independent tests.
 
 The software path is complete through Task 7 of the implementation plan. It
 has not yet produced a hardware-validated experimental run; Task 8 is the
 first pilot on a real NVIDIA GPU and remains a separate acceptance gate. Task
 9 protocol preparation is complete, but it does not bypass that gate.
+
+A real-NVML smoke check has succeeded on the RTX 3050 Laptop host. Its driver
+reports an implausible total-energy counter, and the per-request source sanity
+check correctly selects instantaneous-power integration instead. Ollama and
+the pilot model are not installed yet, so this is telemetry validation rather
+than a completed inference experiment.
 
 ## Minimal Scope
 
@@ -68,7 +74,7 @@ first pilot on a real NVIDIA GPU and remains a separate acceptance gate. Task
 
 ```text
 python -m venv .venv
-.venv\Scripts\python -m pip install -e ".[dev]"
+.venv\Scripts\python -m pip install ".[dev]"
 .venv\Scripts\python -m ruff check .
 .venv\Scripts\python -m pytest -v
 ```
@@ -76,6 +82,11 @@ python -m venv .venv
 On Linux or macOS, replace `.venv\Scripts\python` with
 `.venv/bin/python`. Ollama and an NVIDIA driver are not required for the test
 suite because the runtime and NVML boundaries use fakes.
+
+The documented Windows command intentionally performs a regular wheel install.
+Python 3.12 can misread the UTF-8 `.pth` created by an editable install when a
+checkout path contains Cyrillic or other non-ASCII characters. Reinstall after
+changing package code; tests continue to import directly from `src/`.
 
 The checked-in pilot is intentionally small: one
 `llama3.2:3b-instruct-q4_K_M` configuration, six prompts, two excluded
@@ -103,3 +114,5 @@ and the selected source is stored in the request record.
 - [Approved MVP design](docs/superpowers/specs/2026-09-19-llm-energy-bench-design.md)
 - [MVP implementation plan](docs/superpowers/plans/2026-09-19-llm-energy-bench-mvp.md)
 - [Initial research plan](docs/research-plan.md)
+- [Contributor roles and workflow](docs/collaboration.md)
+- [Append-only experiment log](docs/experiment-log.md)

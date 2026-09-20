@@ -93,7 +93,16 @@ class InvalidKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class AvailableModel:
-    """A model installed on the host, as listed by ``/api/tags``."""
+    """A model installed on the host, as listed by ``/api/tags``.
+
+    ``capabilities`` is what the runtime says the model can do (observed on
+    Ollama 0.34.2: ``completion``, ``tools``, and ``thinking`` for reasoning
+    models). A thinking model streams its reasoning outside the ``response``
+    field, so it cannot be measured the way the frozen matrix is measured.
+
+    ``max_context_length`` is the model's own limit, not the loaded one; the
+    context a loaded model actually runs with is ``RunningModel.context_length``.
+    """
 
     name: str
     model: str | None
@@ -103,6 +112,12 @@ class AvailableModel:
     family: str | None
     parameter_size: str | None
     quantization: str | None
+    capabilities: tuple[str, ...] = ()
+    max_context_length: int | None = None
+
+    @property
+    def is_thinking_model(self) -> bool:
+        return "thinking" in self.capabilities
 
     def to_dict(self) -> dict[str, Any]:
         return _to_plain_dict(self)
@@ -295,6 +310,8 @@ class OllamaClient:
                 family=_optional_str(details, "family"),
                 parameter_size=_optional_str(details, "parameter_size"),
                 quantization=_optional_str(details, "quantization_level"),
+                capabilities=_string_tuple(entry, "capabilities"),
+                max_context_length=_optional_int(details, "context_length"),
             )
             for name, entry, details in self._model_entries("/api/tags")
         )
@@ -664,6 +681,14 @@ def _optional_int(mapping: Mapping[str, Any], key: str) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
+def _string_tuple(mapping: Mapping[str, Any], key: str) -> tuple[str, ...]:
+    """Read a list of strings, ignoring anything that is not one."""
+    value = mapping.get(key)
+    if not isinstance(value, list):
+        return ()
+    return tuple(item for item in value if isinstance(item, str) and item)
+
+
 def _optional_str(mapping: Mapping[str, Any], key: str) -> str | None:
     value = mapping.get(key)
     return value if isinstance(value, str) and value else None
@@ -678,5 +703,7 @@ def _to_plain_dict(record: Any) -> dict[str, Any]:
             value = value.isoformat()
         elif isinstance(value, StrEnum):
             value = value.value
+        elif isinstance(value, tuple):
+            value = list(value)
         plain[item.name] = value
     return plain
