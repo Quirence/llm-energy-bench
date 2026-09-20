@@ -13,6 +13,8 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - Initial model and quantization matrix fixed.
 - Parallel implementation from Qcsteeven and Dimas reviewed and integrated
   into `main` while preserving both contributors' commits.
+- CODEOWNERS plus reproducible bug, experiment, and pull-request templates
+  enforce the two-author review workflow in the repository.
 - Detailed implementation plan prepared.
 - Task 1 (Qcsteeven): package shell, `doctor`/`run`/`report` parsing, fixed
   exit codes, packaging, and Windows/Linux CI.
@@ -32,7 +34,7 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - Task 9: frozen four-configuration `benchmark-v1` matrix, 24-prompt workload,
   repeatability CV, bootstrap materiality rule, and explicit negative-result
   decision criterion.
-- Integrated test baseline: 228 tests pass on Python 3.12 without Ollama or
+- Integrated test baseline: 230 tests pass on Python 3.12 without Ollama or
   NVIDIA hardware.
 
 ## In Progress

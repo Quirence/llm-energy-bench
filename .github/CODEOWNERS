@@ -1,0 +1,13 @@
+# Default ownership for repository maintenance.
+* @Quirence
+
+# Measurement contracts and methodology require review by the other author.
+/src/llm_energy_bench/config.py @Quirence @Qcsteeven
+/src/llm_energy_bench/results.py @Quirence @Qcsteeven
+/src/llm_energy_bench/runner.py @Quirence @Qcsteeven
+/docs/research-plan.md @Quirence @Qcsteeven
+/docs/superpowers/specs/ @Quirence @Qcsteeven
+
+# Qcsteeven owns the NVML path; Quirence provides cross-review.
+/src/llm_energy_bench/nvml.py @Qcsteeven @Quirence
+/tests/test_nvml.py @Qcsteeven @Quirence

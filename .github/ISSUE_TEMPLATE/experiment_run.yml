@@ -1,0 +1,37 @@
+name: Experiment run
+description: Plan and track one reproducible hardware run before committing artifacts.
+title: "experiment: "
+labels:
+  - experiment
+body:
+  - type: input
+    id: milestone
+    attributes:
+      label: Milestone and protocol
+      placeholder: M1 Measured Pilot — configs/pilot.toml
+    validations:
+      required: true
+  - type: textarea
+    id: fixed_inputs
+    attributes:
+      label: Fixed inputs
+      description: Host ID, GPU/driver, runtime version, model tags/digests, and config commit.
+    validations:
+      required: true
+  - type: checkboxes
+    id: acceptance
+    attributes:
+      label: Acceptance checks
+      options:
+        - label: AC power, operating mode, temperature, power limit, and background load recorded.
+        - label: Models are installed manually and confirmed fully on GPU.
+        - label: Warm-ups, request counts, telemetry coverage, hashes, and validation checked.
+        - label: Report labels energy and cost as GPU-only.
+        - label: STATUS.md and docs/experiment-log.md will be updated after validation.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Public-data check
+      options:
+        - label: Artifacts contain no usernames, home paths, raw GPU UUIDs, or secrets.
+          required: true
