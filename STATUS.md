@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-19
+Last updated: 2026-09-20
 
 ## Current Milestone
 
@@ -15,6 +15,11 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
   into `main` while preserving both contributors' commits.
 - CODEOWNERS plus reproducible bug, experiment, and pull-request templates
   enforce the two-author review workflow in the repository.
+- Public GitHub milestones `M0 Bootstrap`, `M1 Measured Pilot`, `M2 Two-GPU
+  Study`, and `M3 Paper Dataset` track the delivery stages.
+- `main` requires a pull request, one approval, CODEOWNERS review, successful
+  Windows and Linux CI, resolved conversations, and linear history. Force
+  pushes and branch deletion are disabled, including for administrators.
 - Detailed implementation plan prepared.
 - Task 1 (Qcsteeven): package shell, `doctor`/`run`/`report` parsing, fixed
   exit codes, packaging, and Windows/Linux CI.
@@ -47,10 +52,9 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 
 ## Blockers
 
-- No known software blocker.
-- Hardware validation is still pending: NVML is covered by a fake binding and
-  Ollama by mock HTTP streams, but neither path has been validated on a real
-  GPU in this repository yet.
+- No known implementation blocker.
+- End-to-end hardware validation is still pending: Ollama is covered by mock
+  HTTP streams, and no real model inference request has completed yet.
 - The official Ollama 0.34.2 installer download timed out repeatedly from
   GitHub on this host. No package was installed; retrying the download is the
   current external blocker for Task 8.

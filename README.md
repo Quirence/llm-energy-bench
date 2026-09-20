@@ -33,12 +33,18 @@ The repository now contains the tested building blocks for the MVP:
 - human/JSON environment diagnosis plus CSV and Markdown aggregate reports;
 - a frozen 24-prompt, four-configuration `benchmark-v1` protocol for the two
   main GPU hosts;
-- Windows and Linux CI plus 222 hardware-independent tests.
+- Windows and Linux CI plus 230 hardware-independent tests.
 
 The software path is complete through Task 7 of the implementation plan. It
 has not yet produced a hardware-validated experimental run; Task 8 is the
 first pilot on a real NVIDIA GPU and remains a separate acceptance gate. Task
 9 protocol preparation is complete, but it does not bypass that gate.
+
+A real-NVML smoke check has succeeded on the RTX 3050 Laptop host. Its driver
+reports an implausible total-energy counter, and the per-request source sanity
+check correctly selects instantaneous-power integration instead. Ollama and
+the pilot model are not installed yet, so this is telemetry validation rather
+than a completed inference experiment.
 
 ## Minimal Scope
 
@@ -103,3 +109,4 @@ and the selected source is stored in the request record.
 - [Approved MVP design](docs/superpowers/specs/2026-09-19-llm-energy-bench-design.md)
 - [MVP implementation plan](docs/superpowers/plans/2026-09-19-llm-energy-bench-mvp.md)
 - [Initial research plan](docs/research-plan.md)
+- [Append-only experiment log](docs/experiment-log.md)
