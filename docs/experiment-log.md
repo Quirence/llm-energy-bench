@@ -38,3 +38,25 @@ Ollama and `llama3.2:3b-instruct-q4_K_M` are available locally.
   `power_instant_integration` and records the rejection reason.
 - Scope: telemetry smoke validation only. Ollama was unavailable, no model was
   loaded, and no inference run was produced.
+
+### 2026-09-20 — GTX 1080 Ollama runtime observation
+
+- Contributor: Skipl1 (Dimas)
+- Scope: Issue #7 runtime validation. This entry executed real inference
+  requests, but it is **not** an experimental run: the GPU is outside the
+  research matrix and the workload was three ad-hoc prompts at one
+  repetition, not the frozen protocol. Its artifacts were written outside the
+  repository and are not committed.
+- GPU: NVIDIA GeForce GTX 1080, 8 GiB, compute capability 6.1
+- Driver: 582.66; reported power limit 200 W
+- Runtime: Ollama 0.34.2; model `llama3.2:3b-instruct-q4_K_M`, digest
+  `a80c4f17acd5…`, pulled by hand
+- Result: `doctor --json` reported `ok: true` with the live version, the
+  resolved digest and `gpu_fraction 1.0`; the run completed in 10.5 s and
+  wrote every artifact with `energy_source: total_energy_counter`.
+- Findings that block measurement everywhere: the chat-template prompt-cache
+  floor of 20–21 tokens against a rule that rejects any cached token, and a
+  cache buster whose shared run-ID head is itself cached. See
+  `docs/ollama-runtime-observations.md`.
+- Telemetry note: unlike the RTX 3050 host, this driver's total-energy counter
+  is self-consistent, matching integrated power to about 1.5%.

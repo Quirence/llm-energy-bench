@@ -41,25 +41,46 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - Task 9: frozen four-configuration `benchmark-v1` matrix, 24-prompt workload,
   repeatability CV, bootstrap materiality rule, and explicit negative-result
   decision criterion.
-- Integrated test baseline: 231 tests pass on Python 3.12 without Ollama or
+- Issue #7 (Dimas): the Ollama runtime path is validated against a live
+  Ollama 0.34.2 server. `doctor` reports the real version, digest and
+  full-VRAM placement, and a streaming request completes end to end. The
+  observation is recorded in `docs/ollama-runtime-observations.md`.
+- Integrated test baseline: 239 tests pass on Python 3.12 without Ollama or
   NVIDIA hardware.
 
 ## In Progress
 
 - Task 8: validate the complete path with a real NVIDIA GPU and Ollama model.
+- Agreeing the prompt-cache validity rule the Issue #7 observation makes
+  necessary.
 
 ## Next
 
-- Task 8: RTX 3050 hardware pilot.
+- Decide the cached-token rule and the cache-buster shape, then Task 8:
+  RTX 3050 hardware pilot.
 
 ## Blockers
 
-- No known implementation blocker.
-- End-to-end hardware validation is still pending: Ollama is covered by mock
-  HTTP streams, and no real model inference request has completed yet.
+- **Every measured request is currently invalid.** Ollama reuses the chat
+  template preamble, so `prompt_eval_cached_count` never drops below about 20
+  tokens after the first request, while `runner.py` and `results.py` invalidate
+  any request with a non-zero cached count. Measured on a live 0.34.2 server;
+  the floor is constant across prompt bodies and lengths. A pilot cannot
+  produce valid data until the rule distinguishes the template floor from real
+  contamination.
+- **The cache buster leaks a shared prefix.** Request IDs share a long
+  run-specific head that Ollama caches: 46 of 69 prompt tokens came from cache
+  on a short prompt, so prefill was measured on a fraction of the prompt. The
+  per-request entropy has to come first.
+- Both are documented with evidence and a proposed fix in
+  `docs/ollama-runtime-observations.md` and await review by the owners of
+  `runner.py` and `results.py`.
+- End-to-end hardware validation on a matrix GPU is still pending. The Ollama
+  runtime path itself is now validated on real hardware, but only on a GTX
+  1080 observation host that is outside the research matrix.
 - The official Ollama 0.34.2 installer download timed out repeatedly from
-  GitHub on this host. No package was installed; retrying the download is the
-  current external blocker for Task 8.
+  GitHub on the RTX 3050 host. It installed without trouble on the GTX 1080
+  observation host, so the download, not the package, is the obstacle there.
 - Real NVML probing succeeds on the RTX 3050 and exposes all requested fields.
   Driver 572.83 reports an inconsistent total-energy counter, so the new
   per-request sanity check correctly falls back to instantaneous power
@@ -67,4 +88,8 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 
 ## Latest Validated Run
 
-No experimental runs yet. Task 8 is the first measured run.
+No experimental runs yet. Task 8 is the first measured run. The GTX 1080
+observation of 2026-09-20 exercised the runtime path end to end, but it used a
+non-matrix GPU and three prompts instead of the frozen protocol, and all three
+of its requests were rejected by the cached-token rule. It is an observation,
+not a run.
