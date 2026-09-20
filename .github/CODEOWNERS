@@ -11,3 +11,7 @@
 # Qcsteeven owns the NVML path; Quirence provides cross-review.
 /src/llm_energy_bench/nvml.py @Qcsteeven @Quirence
 /tests/test_nvml.py @Qcsteeven @Quirence
+
+# Skipl1 (Dimas) owns the Ollama runtime boundary; Quirence provides cross-review.
+/src/llm_energy_bench/ollama.py @Skipl1 @Quirence
+/tests/test_ollama.py @Skipl1 @Quirence
