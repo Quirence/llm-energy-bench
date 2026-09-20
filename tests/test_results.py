@@ -10,7 +10,11 @@ import pytest
 
 from llm_energy_bench.results import (
     MAX_ARTIFACT_BYTES,
+    OUTPUTS,
+    REQUESTS,
     REQUIRED_RAW_ARTIFACTS,
+    RUN_ARTIFACTS,
+    TELEMETRY,
     GzipJsonlWriter,
     JsonlWriter,
     PrivacyError,
@@ -383,3 +387,44 @@ def test_every_required_raw_artifact_is_checked(tmp_path: Path) -> None:
         run_dir = complete_run(tmp_path / name.replace(".", "_"))
         (run_dir / name).unlink()
         assert validate_run(run_dir).ok is False, f"{name} must be required"
+
+
+# --------------------------------------------------------------------------
+# The layout the runner actually produces
+# --------------------------------------------------------------------------
+
+
+def test_the_runner_writes_exactly_the_declared_raw_layout(tmp_path: Path) -> None:
+    """results.py and runner.py must not drift apart on file names."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from fake_runtime import FakeOllamaClient, FakeSampler
+    from llm_energy_bench.runner import run_experiment
+    from test_runner import build_config
+
+    run_dir = run_experiment(
+        build_config(tmp_path / "cfg"), client=FakeOllamaClient(), sampler=FakeSampler()
+    )
+
+    produced = {p.name for p in run_dir.iterdir()}
+    assert set(REQUIRED_RAW_ARTIFACTS) <= produced
+    assert produced - set(RUN_ARTIFACTS) == set(), "no artifact outside the declared layout"
+
+
+def test_a_runner_produced_run_validates_clean(tmp_path: Path) -> None:
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from fake_runtime import FakeOllamaClient, FakeSampler
+    from llm_energy_bench.runner import run_experiment
+    from test_runner import build_config
+
+    run_dir = run_experiment(
+        build_config(tmp_path / "cfg"), client=FakeOllamaClient(), sampler=FakeSampler()
+    )
+    report = validate_run(run_dir)
+
+    assert report.ok is True, report.errors
+    assert report.record_counts[REQUESTS] == report.record_counts[OUTPUTS]
+    assert report.record_counts[TELEMETRY] > 0

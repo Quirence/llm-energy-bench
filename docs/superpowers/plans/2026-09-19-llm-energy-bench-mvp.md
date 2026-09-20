@@ -183,14 +183,14 @@ atomic result writers.
 **Produces:** `run_experiment(config: ExperimentConfig) -> Path` and derived
 request metrics for latency, throughput, power, energy, efficiency, and cost.
 
-- [ ] Write failing tests for deterministic order, two excluded warm-ups,
+- [x] Write failing tests for deterministic order, two excluded warm-ups,
   unique leading cache-buster IDs, full-GPU preflight, telemetry cleanup,
   total-energy preference, trapezoidal fallback, and partial-run status.
-- [ ] Add formula tests for J/token, token/J, and optional tariff cost.
-- [ ] Run focused tests and verify failure.
-- [ ] Implement the minimal orchestration and metric calculations.
-- [ ] Run focused tests and verify success.
-- [ ] Commit as `feat: run measured Ollama experiments`.
+- [x] Add formula tests for J/token, token/J, and optional tariff cost.
+- [x] Run focused tests and verify failure.
+- [x] Implement the minimal orchestration and metric calculations.
+- [x] Run focused tests and verify success.
+- [x] Commit as `feat: run measured Ollama experiments`.
 
 ### Task 7: Doctor and reporting
 
