@@ -142,6 +142,9 @@ def doctor_environment(
 
 
 def _default_config_path() -> Path:
+    checkout_config = Path.cwd() / "configs" / "pilot.toml"
+    if checkout_config.is_file():
+        return checkout_config.resolve()
     return Path(__file__).resolve().parents[2] / "configs" / "pilot.toml"
 
 
