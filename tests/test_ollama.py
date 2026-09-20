@@ -50,7 +50,13 @@ MUTATING_ENDPOINTS = (
 # --------------------------------------------------------------------------
 
 
-def tag_entry(name: str = MODEL, digest: str = DIGEST, quant: str = "Q4_K_M") -> dict[str, Any]:
+def tag_entry(
+    name: str = MODEL,
+    digest: str = DIGEST,
+    quant: str = "Q4_K_M",
+    capabilities: tuple[str, ...] = ("completion", "tools"),
+) -> dict[str, Any]:
+    """One /api/tags entry, shaped like Ollama 0.34.2 answers on a real host."""
     return {
         "name": name,
         "model": name,
@@ -58,12 +64,16 @@ def tag_entry(name: str = MODEL, digest: str = DIGEST, quant: str = "Q4_K_M") ->
         "size": 2_019_393_189,
         "digest": digest,
         "details": {
+            "parent_model": "",
             "format": "gguf",
             "family": "llama",
             "families": ["llama"],
             "parameter_size": "3.2B",
             "quantization_level": quant,
+            "context_length": 131_072,
+            "embedding_length": 3072,
         },
+        "capabilities": list(capabilities),
     }
 
 
@@ -277,6 +287,37 @@ def test_list_models_reports_digest_and_quantization() -> None:
     assert models[1].quantization == "Q8_0"
 
 
+def test_capabilities_and_model_context_limit_are_reported() -> None:
+    """Observed on Ollama 0.34.2: tags carry capabilities and the model's own limit."""
+    (model,) = FakeOllama().client().list_models()
+
+    assert model.capabilities == ("completion", "tools")
+    assert model.is_thinking_model is False
+    assert model.max_context_length == 131_072
+    assert model.to_dict()["capabilities"] == ["completion", "tools"]
+
+
+def test_a_thinking_model_is_identifiable_before_it_is_measured() -> None:
+    """A thinking model streams reasoning outside 'response', so it needs flagging."""
+    fake = FakeOllama(
+        models=[tag_entry(capabilities=("completion", "thinking", "tools"))],
+    )
+    (model,) = fake.client().list_models()
+
+    assert model.is_thinking_model is True
+
+
+def test_capabilities_missing_from_an_older_runtime_are_empty_not_wrong() -> None:
+    entry = tag_entry()
+    del entry["capabilities"]
+    del entry["details"]["context_length"]
+    (model,) = FakeOllama(models=[entry]).client().list_models()
+
+    assert model.capabilities == ()
+    assert model.is_thinking_model is False
+    assert model.max_context_length is None
+
+
 def test_running_models_report_full_gpu_placement() -> None:
     fake = FakeOllama(running=[ps_entry()])
     (model,) = fake.client().running_models()
@@ -395,6 +436,53 @@ def test_generation_sends_one_deterministic_streaming_request() -> None:
         "options": {"num_ctx": 4096, "temperature": 0, "seed": 42},
         "keep_alive": "30m",
     }
+
+
+def test_keep_alive_is_omitted_unless_the_runner_asks_for_it() -> None:
+    """An unset keep_alive leaves the server default alone instead of guessing one."""
+    fake = FakeOllama()
+    preloaded(fake).generate_stream(request())
+
+    _, _, body = fake.requests[-1]
+    assert body is not None
+    assert "keep_alive" not in body
+
+
+def test_truncation_by_num_predict_is_a_valid_measurement() -> None:
+    """``done_reason='length'`` means the answer was cut short, not that it failed."""
+    fake = FakeOllama(
+        stream_pieces=ndjson(token("Hel"), token("lo"), final(done_reason="length", eval_count=2))
+    )
+    result = preloaded(fake).generate_stream(request())
+
+    assert result.valid is True
+    assert result.done_reason == "length"
+    assert result.eval_count == 2
+
+
+def test_nothing_after_the_final_chunk_is_measured() -> None:
+    """The measurement ends with the final chunk; trailing bytes cannot extend it."""
+    fake = FakeOllama(
+        stream_pieces=ndjson(token("Hi"), final(eval_count=1), token(" ignored")),
+        stream_delay_s=0.01,
+    )
+    result = preloaded(fake).generate_stream(request())
+
+    assert result.valid is True
+    assert result.text == "Hi"
+    assert result.chunk_count == 2
+    assert result.latency_s < 0.03  # the trailing chunk is never waited for
+
+
+def test_a_reloaded_model_keeps_its_load_duration_visible() -> None:
+    """A model evicted between requests shows up as load time, not as fast decode."""
+    fake = FakeOllama(
+        stream_pieces=ndjson(token("Hi"), final(load_duration=4_500_000_000, eval_count=1))
+    )
+    result = preloaded(fake).generate_stream(request())
+
+    assert result.valid is True
+    assert result.load_duration_ns == 4_500_000_000
 
 
 def test_normal_generation_records_text_counts_and_raw_durations() -> None:
@@ -668,14 +756,41 @@ def test_the_prompt_cache_fields_are_raw_and_absent_means_null() -> None:
 
 
 def test_the_prompt_cache_count_is_preserved_from_the_final_chunk() -> None:
-    fake = FakeOllama(
-        stream_pieces=ndjson(token("Hi"), final(prompt_eval_cached_count=17))
-    )
+    fake = FakeOllama(stream_pieces=ndjson(token("Hi"), final(prompt_eval_cached_count=17)))
 
     result = preloaded(fake).generate_stream(request())
 
     assert result.prompt_eval_count == 26
     assert result.prompt_eval_cached_count == 17
+
+
+def test_a_near_total_cache_hit_is_reported_not_smoothed() -> None:
+    """Live 0.34.2 behaviour: a repeated prompt reports almost every token cached.
+
+    The client reports the counts; deciding which requests this disqualifies is
+    the runner's rule, not the client's.
+    """
+    fake = FakeOllama(
+        stream_pieces=ndjson(
+            token("Hi"), final(prompt_eval_count=35, prompt_eval_cached_count=34, eval_count=1)
+        )
+    )
+    result = preloaded(fake).generate_stream(request())
+
+    assert result.valid is True
+    assert result.prompt_eval_count == 35
+    assert result.prompt_eval_cached_count == 34
+
+
+def test_a_zero_cache_hit_is_zero_not_absent() -> None:
+    """A cold cache reports 0, which must not be confused with 'not reported'."""
+    fake = FakeOllama(
+        stream_pieces=ndjson(token("Hi"), final(prompt_eval_cached_count=0, eval_count=1))
+    )
+    result = preloaded(fake).generate_stream(request())
+
+    assert result.prompt_eval_cached_count == 0
+    assert result.to_dict()["prompt_eval_cached_count"] == 0
 
 
 # --------------------------------------------------------------------------
