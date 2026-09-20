@@ -75,6 +75,22 @@ power. These figures describe GPU-only energy, not wall-system energy. An
 external wattmeter is reserved for a later validation study and is required
 before making whole-system energy or cost claims.
 
+Counter availability is not treated as proof of correctness. For every
+request, a positive total-energy delta is compared with integrated power and
+with the enforced power limit. A counter is rejected when it differs from the
+available power integral by more than a factor of two or implies average power
+above 120% of the enforced limit. The request then falls back to instantaneous
+power integration, followed by legacy power integration, and records the
+actual source and reason. These deliberately broad thresholds detect broken
+driver counters; they are not a substitute for external-meter calibration.
+
+During the 2026-09-20 RTX 3050 preflight, driver 572.83 exposed a total-energy
+counter, but a two-second idle sample reported a 171.249 J increase while
+instantaneous-power integration reported 23.881 J (11.852 W average). The
+counter therefore failed the consistency rule and the tool selected
+`power_instant_integration`. This is a preflight observation, not a completed
+model-inference experiment.
+
 ## Main Failure Condition
 
 ### Repeatability and material effects

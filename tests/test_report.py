@@ -186,6 +186,8 @@ def output_record(
     output_tokens: int,
     energy: float,
     quality: float | None = None,
+    cost: float | None = None,
+    currency: str | None = None,
 ) -> dict[str, Any]:
     return {
         "request_id": request_id,
@@ -195,6 +197,10 @@ def output_record(
         "prompt_category": category,
         "repetition": 0,
         "valid": True,
+        "prompt_eval_count": 40,
+        "prompt_eval_duration_ns": 2_000_000_000,
+        "eval_count": output_tokens,
+        "eval_duration_ns": 1_000_000_000,
         "metrics": {
             "latency_seconds": latency,
             "ttft_seconds": latency / 4,
@@ -206,6 +212,14 @@ def output_record(
             "gpu_energy_joules": energy,
             "joules_per_output_token": energy / output_tokens,
             "output_tokens_per_joule": output_tokens / energy,
+            "gpu_cost_per_million_output_tokens": cost,
+            "cost_currency": currency,
+            "energy_source": "total_energy_counter",
+            "temperature_start_c": 55,
+            "temperature_peak_c": 61,
+            "power_limit_watts": 80,
+            "vram_start_bytes": 2_000_000_000,
+            "vram_peak_bytes": 2_200_000_000,
             "quality_score": quality,
         },
     }
@@ -291,6 +305,36 @@ def test_report_uses_ratios_of_sums_not_means_of_request_ratios(tmp_path: Path) 
 
     assert float(row["end_to_end_tokens_per_second"]) == 3.0
     assert float(row["output_tokens_per_joule"]) == 3.0
+
+
+def test_summary_exposes_primary_and_context_metrics(tmp_path: Path) -> None:
+    record = output_record(
+        "r1",
+        prompt_id="p1",
+        category="short",
+        latency=2.0,
+        output_tokens=10,
+        energy=20.0,
+        cost=0.5,
+        currency="RUB",
+    )
+    report = build_report((make_run(tmp_path, "run-a", [record]),))
+    row = rows(report.summary_csv)[0]
+
+    assert float(row["prompt_tokens"]) == 40
+    assert float(row["prefill_tokens_per_second"]) == 20
+    assert float(row["decode_tokens_per_second"]) == 10
+    assert float(row["average_gpu_power_median_watts"]) == 10
+    assert float(row["observed_peak_gpu_power_max_watts"]) == 11
+    assert float(row["joules_per_output_token"]) == 2
+    assert float(row["gpu_cost_per_million_output_tokens"]) == 0.5
+    assert row["cost_currency"] == "RUB"
+    assert row["energy_source"] == "total_energy_counter"
+    assert float(row["temperature_start_median_c"]) == 55
+    assert float(row["temperature_peak_max_c"]) == 61
+    assert float(row["power_limit_median_watts"]) == 80
+    assert float(row["vram_start_median_bytes"]) == 2_000_000_000
+    assert float(row["vram_peak_max_bytes"]) == 2_200_000_000
 
 
 def test_quality_gives_each_prompt_equal_weight_after_repetitions(tmp_path: Path) -> None:

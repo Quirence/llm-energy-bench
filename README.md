@@ -93,6 +93,9 @@ python -m llm_energy_bench report experiments/runs/<run-id>
 source, installed model digests, and complete GPU placement. `run` never pulls
 models automatically. `report` regenerates derived CSV/Markdown summaries from
 the raw artifacts and returns exit code 4 if any supplied run fails validation.
+The nominal NVML source shown by `doctor` is revalidated for every request;
+physically inconsistent total-energy counters fall back to power integration
+and the selected source is stored in the request record.
 
 ## Project Documents
 

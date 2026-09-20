@@ -167,13 +167,20 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     try:
         run_dir = run_experiment(config)
+    except ConfigError as error:
+        raise UsageError(str(error)) from error
     except RunnerPreflightError as error:
         raise PreflightError(str(error)) from error
-    except RunnerError as error:
+    except (OllamaError, NvmlError) as error:
+        raise PreflightError(str(error)) from error
+    except (RunnerError, ResultsError) as error:
         raise RunFailedError(str(error)) from error
 
     print(run_dir)
-    validation = validate_run(run_dir)
+    try:
+        validation = validate_run(run_dir)
+    except ResultsError as error:
+        raise RunFailedError(str(error)) from error
     if not validation.ok:
         for error in validation.errors:
             print(f"validation: {error}", file=sys.stderr)

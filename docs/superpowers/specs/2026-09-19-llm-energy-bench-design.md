@@ -149,6 +149,12 @@ Energy uses the best supported source in this order: total-energy counter,
 instantaneous-power integration, legacy-power integration. The source and
 fallback reason are stored with every request.
 
+Support is necessary but not sufficient for the total-energy counter. Each
+request checks that its counter delta is positive, does not imply average
+power above 120% of the enforced limit, and stays within a factor of two of an
+available power integral. A failed check selects the next usable source and
+records the reason; it never silently publishes the inconsistent counter.
+
 An electricity tariff is optional. Without an explicit tariff and currency,
 cost fields are `null`. Any reported cost is labelled as a GPU-only estimate,
 not whole-system energy or total cost of ownership.

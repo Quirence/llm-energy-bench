@@ -127,10 +127,24 @@ _SUMMARY_FIELDS = (
     "latency_iqr_seconds",
     "ttft_median_seconds",
     "ttft_iqr_seconds",
+    "prompt_tokens",
     "output_tokens",
+    "prefill_tokens_per_second",
+    "decode_tokens_per_second",
+    "average_gpu_power_median_watts",
+    "observed_peak_gpu_power_max_watts",
     "gpu_energy_joules",
+    "joules_per_output_token",
     "end_to_end_tokens_per_second",
     "output_tokens_per_joule",
+    "gpu_cost_per_million_output_tokens",
+    "cost_currency",
+    "energy_source",
+    "temperature_start_median_c",
+    "temperature_peak_max_c",
+    "power_limit_median_watts",
+    "vram_start_median_bytes",
+    "vram_peak_max_bytes",
     "quality_score",
     "ranking_eligible",
     "speed_rank",
@@ -170,9 +184,31 @@ def _aggregate_report_rows(
         latencies = _numbers(item.get("latency_seconds") for item in metrics)
         ttfts = _numbers(item.get("ttft_seconds") for item in metrics)
         tokens = _numbers(item.get("output_tokens") for item in metrics)
+        prompt_tokens = _numbers(
+            item.get("prompt_tokens", record.get("prompt_eval_count"))
+            for record, item in zip(group, metrics, strict=True)
+        )
+        prompt_durations = _numbers(record.get("prompt_eval_duration_ns") for record in group)
+        decode_durations = _numbers(record.get("eval_duration_ns") for record in group)
+        average_power = _numbers(item.get("average_gpu_power_watts") for item in metrics)
+        peak_power = _numbers(item.get("observed_peak_gpu_power_watts") for item in metrics)
         energies = _numbers(item.get("gpu_energy_joules") for item in metrics)
+        costs = [
+            (cost, tokens_for_request)
+            for item in metrics
+            if (cost := _number(item.get("gpu_cost_per_million_output_tokens"))) is not None
+            and (tokens_for_request := _number(item.get("output_tokens"))) is not None
+        ]
+        currencies = _strings(item.get("cost_currency") for item in metrics)
+        energy_sources = _strings(item.get("energy_source") for item in metrics)
+        temperature_start = _numbers(item.get("temperature_start_c") for item in metrics)
+        temperature_peak = _numbers(item.get("temperature_peak_c") for item in metrics)
+        power_limits = _numbers(item.get("power_limit_watts") for item in metrics)
+        vram_start = _numbers(item.get("vram_start_bytes") for item in metrics)
+        vram_peak = _numbers(item.get("vram_peak_bytes") for item in metrics)
         total_latency = sum(latencies)
         total_tokens = sum(tokens)
+        total_prompt_tokens = sum(prompt_tokens)
         total_energy = sum(energies)
         score = config_quality.get((run_id, model, digest))
         manifest = manifests.get(run_id, {})
@@ -188,10 +224,28 @@ def _aggregate_report_rows(
                 "latency_iqr_seconds": _iqr(latencies),
                 "ttft_median_seconds": _median(ttfts),
                 "ttft_iqr_seconds": _iqr(ttfts),
+                "prompt_tokens": total_prompt_tokens,
                 "output_tokens": total_tokens,
+                "prefill_tokens_per_second": _safe_ratio(
+                    total_prompt_tokens, sum(prompt_durations) / 1e9
+                ),
+                "decode_tokens_per_second": _safe_ratio(
+                    total_tokens, sum(decode_durations) / 1e9
+                ),
+                "average_gpu_power_median_watts": _median(average_power),
+                "observed_peak_gpu_power_max_watts": _maximum(peak_power),
                 "gpu_energy_joules": total_energy,
+                "joules_per_output_token": _safe_ratio(total_energy, total_tokens),
                 "end_to_end_tokens_per_second": _safe_ratio(total_tokens, total_latency),
                 "output_tokens_per_joule": _safe_ratio(total_tokens, total_energy),
+                "gpu_cost_per_million_output_tokens": _weighted_average(costs),
+                "cost_currency": _one_or_joined(currencies),
+                "energy_source": _one_or_joined(energy_sources),
+                "temperature_start_median_c": _median(temperature_start),
+                "temperature_peak_max_c": _maximum(temperature_peak),
+                "power_limit_median_watts": _median(power_limits),
+                "vram_start_median_bytes": _median(vram_start),
+                "vram_peak_max_bytes": _maximum(vram_peak),
                 "quality_score": score,
                 "ranking_eligible": score is not None and score >= 0.75,
                 "speed_rank": None,
@@ -299,8 +353,16 @@ def _numbers(values: Any) -> list[float]:
     return [number for value in values if (number := _number(value)) is not None]
 
 
+def _strings(values: Any) -> list[str]:
+    return [value for value in values if isinstance(value, str) and value]
+
+
 def _median(values: list[float]) -> float | None:
     return statistics.median(values) if values else None
+
+
+def _maximum(values: list[float]) -> float | None:
+    return max(values) if values else None
 
 
 def _percentile(values: list[float], fraction: float) -> float | None:
@@ -322,6 +384,18 @@ def _iqr(values: list[float]) -> float | None:
 
 def _safe_ratio(numerator: float, denominator: float) -> float | None:
     return numerator / denominator if denominator > 0 else None
+
+
+def _weighted_average(values: list[tuple[float, float]]) -> float | None:
+    total_weight = sum(weight for _, weight in values)
+    if total_weight <= 0:
+        return None
+    return sum(value * weight for value, weight in values) / total_weight
+
+
+def _one_or_joined(values: list[str]) -> str | None:
+    unique = sorted(set(values))
+    return "|".join(unique) if unique else None
 
 
 def _csv_value(value: Any) -> Any:

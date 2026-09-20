@@ -32,7 +32,7 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - Task 9: frozen four-configuration `benchmark-v1` matrix, 24-prompt workload,
   repeatability CV, bootstrap materiality rule, and explicit negative-result
   decision criterion.
-- Integrated test baseline: 222 tests pass on Python 3.12 without Ollama or
+- Integrated test baseline: 228 tests pass on Python 3.12 without Ollama or
   NVIDIA hardware.
 
 ## In Progress
@@ -52,8 +52,10 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - The official Ollama 0.34.2 installer download timed out repeatedly from
   GitHub on this host. No package was installed; retrying the download is the
   current external blocker for Task 8.
-- Ruff is enforced in CI but is not installed in the current global Python
-  environment; the local compile and pytest checks pass.
+- Real NVML probing succeeds on the RTX 3050 and exposes all requested fields.
+  Driver 572.83 reports an inconsistent total-energy counter, so the new
+  per-request sanity check correctly falls back to instantaneous power
+  integration; this still needs validation under model load.
 
 ## Latest Validated Run
 

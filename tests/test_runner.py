@@ -194,10 +194,9 @@ class FakeClient:
 
     def preload(self, model: str) -> RunningModel:
         size = 3_000_000_000
-        if self.fully_on_gpu is None:
-            size_vram = None
-        else:
-            size_vram = size if self.fully_on_gpu else size - 1
+        size_vram = (
+            None if self.fully_on_gpu is None else size if self.fully_on_gpu else size - 1
+        )
         return RunningModel(
             name=model,
             model=model,
@@ -248,8 +247,8 @@ class FakeSampler:
         request_id = self._request_id
         self._request_id = None
         return (
-            sample(request_id, 0.0, energy_j=100.0, instant_w=10.0),
-            sample(request_id, 0.1, energy_j=112.0, instant_w=14.0),
+            sample(request_id, 0.0, energy_j=0.0, instant_w=10.0),
+            sample(request_id, 0.1, energy_j=1.2, instant_w=14.0),
         )
 
 
@@ -259,8 +258,8 @@ def prompt() -> PromptCase:
 
 def test_total_energy_counter_takes_precedence_over_power_integration() -> None:
     samples = (
-        sample("request-1", 0.0, energy_j=100.0, instant_w=100.0),
-        sample("request-1", 1.0, energy_j=112.0, instant_w=100.0),
+        sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+        sample("request-1", 1.0, energy_j=112.0, instant_w=14.0),
     )
 
     metrics = derive_request_metrics(
@@ -270,7 +269,23 @@ def test_total_energy_counter_takes_precedence_over_power_integration() -> None:
     assert metrics.energy_source is EnergySource.TOTAL_ENERGY_COUNTER
     assert metrics.gpu_energy_joules == pytest.approx(12.0)
     assert metrics.average_gpu_power_watts == pytest.approx(12.0)
-    assert metrics.observed_peak_gpu_power_watts == pytest.approx(100.0)
+    assert metrics.observed_peak_gpu_power_watts == pytest.approx(14.0)
+
+
+def test_implausible_energy_counter_falls_back_to_power_integration() -> None:
+    samples = (
+        sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+        sample("request-1", 1.0, energy_j=300.0, instant_w=14.0),
+    )
+
+    metrics = derive_request_metrics(
+        result(), samples, capabilities(), prompt(), repetition=0
+    )
+
+    assert metrics.energy_source is EnergySource.POWER_INSTANT_INTEGRATION
+    assert metrics.gpu_energy_joules == pytest.approx(12.0)
+    assert metrics.energy_fallback_reason is not None
+    assert "counter" in metrics.energy_fallback_reason
 
 
 def test_instantaneous_power_uses_trapezoidal_integration() -> None:
@@ -472,4 +487,4 @@ def test_completed_run_writes_auditable_manifest_and_validation(tmp_path: Path) 
     }
     assert validation["ok"] is True
     assert all(record["valid"] is True for record in outputs)
-    assert all(record["metrics"]["gpu_energy_joules"] == 12.0 for record in outputs)
+    assert all(record["metrics"]["gpu_energy_joules"] == 1.2 for record in outputs)

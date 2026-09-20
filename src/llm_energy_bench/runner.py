@@ -53,6 +53,11 @@ from llm_energy_bench.results import (
 )
 
 MAX_TELEMETRY_GAP_S = 0.5
+# Consumer drivers can expose a callable total-energy field whose values are
+# nevertheless physically implausible. Keep this deliberately permissive: the
+# check rejects broken counters, not ordinary sampling error around short peaks.
+ENERGY_CONSISTENCY_FACTOR = 2.0
+POWER_LIMIT_TOLERANCE = 1.2
 JOULES_PER_KWH = 3_600_000.0
 TOKENS_PER_MILLION = 1_000_000.0
 
@@ -149,7 +154,9 @@ def derive_request_metrics(
     elif max_gap is not None and max_gap > MAX_TELEMETRY_GAP_S:
         reasons.append("telemetry_gap")
 
-    energy, average_power, peak_power = _energy_metrics(ordered, capabilities.energy_source)
+    energy, average_power, peak_power, energy_source, fallback_reason = _energy_metrics(
+        ordered, capabilities
+    )
     if energy is None or energy <= 0:
         reasons.append("gpu_energy")
 
@@ -209,8 +216,8 @@ def derive_request_metrics(
         output_tokens_per_joule=tokens_per_joule,
         gpu_cost_per_million_output_tokens=cost,
         cost_currency=currency if cost is not None else None,
-        energy_source=capabilities.energy_source,
-        energy_fallback_reason=capabilities.energy_fallback_reason,
+        energy_source=energy_source,
+        energy_fallback_reason=fallback_reason,
         telemetry_sample_count=len(ordered),
         max_telemetry_gap_seconds=max_gap,
         temperature_start_c=temperatures[0] if temperatures else None,
@@ -420,32 +427,60 @@ def _execute_requests(
 
 
 def _energy_metrics(
-    samples: tuple[TelemetrySample, ...], source: EnergySource
-) -> tuple[float | None, float | None, float | None]:
+    samples: tuple[TelemetrySample, ...], capabilities: GpuCapabilities
+) -> tuple[
+    float | None,
+    float | None,
+    float | None,
+    EnergySource,
+    str | None,
+]:
+    elapsed = _sampled_elapsed(samples)
+    counter_energy = _counter_delta(samples)
+    instant_energy = _integrated_sample_power(samples, "power_instant_watts")
+    legacy_energy = _integrated_sample_power(samples, "power_legacy_watts")
+    source = capabilities.energy_source
+    reason = capabilities.energy_fallback_reason
+
     if source is EnergySource.TOTAL_ENERGY_COUNTER:
-        counter = [(item.monotonic_s, item.total_energy_joules) for item in samples]
-        points = [(timestamp, value) for timestamp, value in counter if value is not None]
-        energy = None if len(points) < 2 else points[-1][1] - points[0][1]
-        elapsed = None if len(points) < 2 else points[-1][0] - points[0][0]
+        counter_problem = _counter_problem(
+            counter_energy,
+            elapsed,
+            instant_energy if instant_energy is not None else legacy_energy,
+            capabilities.power_limit_watts,
+        )
+        if counter_problem is None:
+            energy = counter_energy
+        elif instant_energy is not None:
+            energy = instant_energy
+            source = EnergySource.POWER_INSTANT_INTEGRATION
+            reason = counter_problem + "; integrating instantaneous power instead"
+        elif legacy_energy is not None:
+            energy = legacy_energy
+            source = EnergySource.POWER_LEGACY_INTEGRATION
+            reason = counter_problem + "; integrating legacy power instead"
+        else:
+            energy = None
+            source = EnergySource.UNAVAILABLE
+            reason = counter_problem + "; no power fallback is available"
     elif source is EnergySource.POWER_INSTANT_INTEGRATION:
-        points = [
-            (item.monotonic_s, item.power_instant_watts)
-            for item in samples
-            if item.power_instant_watts is not None
-        ]
-        energy = _integrate_power(points)
-        elapsed = None if len(points) < 2 else points[-1][0] - points[0][0]
+        if instant_energy is not None:
+            energy = instant_energy
+        elif legacy_energy is not None:
+            energy = legacy_energy
+            source = EnergySource.POWER_LEGACY_INTEGRATION
+            reason = "instantaneous power samples are unusable; integrating legacy power"
+        else:
+            energy = None
+            source = EnergySource.UNAVAILABLE
+            reason = "instantaneous and legacy power samples are unusable"
     elif source is EnergySource.POWER_LEGACY_INTEGRATION:
-        points = [
-            (item.monotonic_s, item.power_legacy_watts)
-            for item in samples
-            if item.power_legacy_watts is not None
-        ]
-        energy = _integrate_power(points)
-        elapsed = None if len(points) < 2 else points[-1][0] - points[0][0]
+        energy = legacy_energy
+        if energy is None:
+            source = EnergySource.UNAVAILABLE
+            reason = "legacy power samples are unusable"
     else:
         energy = None
-        elapsed = None
 
     power_values = _present(item.power_instant_watts for item in samples)
     if not power_values:
@@ -454,7 +489,50 @@ def _energy_metrics(
     average = None
     if energy is not None and elapsed is not None and elapsed > 0:
         average = energy / elapsed
-    return energy, average, peak
+    return energy, average, peak, source, reason
+
+
+def _sampled_elapsed(samples: tuple[TelemetrySample, ...]) -> float | None:
+    if len(samples) < 2:
+        return None
+    elapsed = samples[-1].monotonic_s - samples[0].monotonic_s
+    return elapsed if elapsed > 0 else None
+
+
+def _counter_delta(samples: tuple[TelemetrySample, ...]) -> float | None:
+    values = _present(item.total_energy_joules for item in samples)
+    return values[-1] - values[0] if len(values) >= 2 else None
+
+
+def _integrated_sample_power(
+    samples: tuple[TelemetrySample, ...], field_name: str
+) -> float | None:
+    points = [
+        (item.monotonic_s, value)
+        for item in samples
+        if (value := getattr(item, field_name)) is not None
+    ]
+    return _integrate_power(points)
+
+
+def _counter_problem(
+    counter_energy: float | None,
+    elapsed: float | None,
+    integrated_power_energy: float | None,
+    power_limit_watts: float | None,
+) -> str | None:
+    if counter_energy is None or counter_energy <= 0:
+        return "total-energy counter did not produce a positive delta"
+    if elapsed is not None and power_limit_watts is not None:
+        counter_average_power = counter_energy / elapsed
+        if counter_average_power > power_limit_watts * POWER_LIMIT_TOLERANCE:
+            return "total-energy counter implies power above the enforced limit"
+    if integrated_power_energy is not None and integrated_power_energy > 0:
+        ratio = counter_energy / integrated_power_energy
+        lower = 1 / ENERGY_CONSISTENCY_FACTOR
+        if not lower <= ratio <= ENERGY_CONSISTENCY_FACTOR:
+            return "total-energy counter is inconsistent with integrated power"
+    return None
 
 
 def _integrate_power(points: list[tuple[float, float]]) -> float | None:

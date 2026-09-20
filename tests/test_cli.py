@@ -9,6 +9,10 @@ from types import SimpleNamespace
 import pytest
 
 from llm_energy_bench import cli
+from llm_energy_bench.config import ConfigError
+from llm_energy_bench.nvml import NvmlUnavailable
+from llm_energy_bench.ollama import OllamaUnavailable
+from llm_energy_bench.results import ResultsError
 
 
 def test_exit_code_constants_are_fixed() -> None:
@@ -93,6 +97,64 @@ def test_run_command_returns_validation_failure_without_hiding_artifacts(
     captured = capsys.readouterr()
     assert str(run_dir) in captured.out
     assert "invalid request" in captured.err
+
+
+@pytest.mark.parametrize(
+    "error",
+    [OllamaUnavailable("connection refused"), NvmlUnavailable("NVML unavailable")],
+)
+def test_run_command_maps_known_preflight_failures_without_a_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    error: Exception,
+) -> None:
+    monkeypatch.setattr(cli, "load_config", lambda _path: object())
+
+    def fail(_config: object) -> Path:
+        raise error
+
+    monkeypatch.setattr(cli, "run_experiment", fail)
+
+    assert cli.main(["run", "--config", str(tmp_path / "pilot.toml")]) == 3
+    captured = capsys.readouterr()
+    assert str(error) in captured.err
+    assert "Traceback" not in captured.err
+
+
+def test_run_command_maps_prompt_contract_failure_to_usage_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli, "load_config", lambda _path: object())
+
+    def fail(_config: object) -> Path:
+        raise ConfigError("prompt file is malformed")
+
+    monkeypatch.setattr(cli, "run_experiment", fail)
+
+    assert cli.main(["run", "--config", str(tmp_path / "pilot.toml")]) == 2
+    captured = capsys.readouterr()
+    assert "prompt file is malformed" in captured.err
+    assert "Traceback" not in captured.err
+
+
+def test_run_command_maps_post_run_storage_failure_without_a_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run_dir = tmp_path / "run"
+    monkeypatch.setattr(cli, "load_config", lambda _path: object())
+    monkeypatch.setattr(cli, "run_experiment", lambda _config: run_dir)
+
+    def fail(_path: Path) -> object:
+        raise ResultsError("validation artifact is unreadable")
+
+    monkeypatch.setattr(cli, "validate_run", fail)
+
+    assert cli.main(["run", "--config", str(tmp_path / "pilot.toml")]) == 4
+    captured = capsys.readouterr()
+    assert str(run_dir) in captured.out
+    assert "validation artifact is unreadable" in captured.err
+    assert "Traceback" not in captured.err
 
 
 def test_report_command_returns_validation_failure_after_writing_report(
