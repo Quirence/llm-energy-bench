@@ -7,6 +7,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_default_codeowners_allow_cross_review_between_active_contributors() -> None:
+    content = (REPO_ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
+    default_rule = next(
+        line for line in content.splitlines() if line and not line.startswith("#")
+    )
+
+    assert default_rule.split() == ["*", "@Quirence", "@Qcsteeven", "@Skipl1"]
+
+
 def test_codeowners_requires_cross_review_for_methodology_contracts() -> None:
     content = (REPO_ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
 
