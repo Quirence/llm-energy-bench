@@ -28,6 +28,7 @@ DEFAULT_REPETITIONS = 3
 DEFAULT_ORDER_SEED = 42
 DEFAULT_TELEMETRY_INTERVAL_MS = 100
 DEFAULT_NUM_CTX = 4096
+DEFAULT_NUM_GPU = 999
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_INFERENCE_SEED = 42
 DEFAULT_KV_CACHE = "f16"
@@ -88,6 +89,7 @@ class InferenceOptions:
     """Runtime controls passed to Ollama and recorded in the manifest."""
 
     num_ctx: int = DEFAULT_NUM_CTX
+    num_gpu: int = DEFAULT_NUM_GPU
     temperature: float = DEFAULT_TEMPERATURE
     seed: int = DEFAULT_INFERENCE_SEED
     num_predict: int | None = None
@@ -96,6 +98,7 @@ class InferenceOptions:
     def to_dict(self) -> dict[str, Any]:
         return {
             "num_ctx": self.num_ctx,
+            "num_gpu": self.num_gpu,
             "temperature": self.temperature,
             "seed": self.seed,
             "num_predict": self.num_predict,
@@ -172,7 +175,15 @@ _SECTIONS: dict[str, set[str]] = {
     "runtime": {"ollama_url", "models"},
     "gpu": {"index", "telemetry_interval_ms"},
     "prompts": {"path"},
-    "options": {"num_ctx", "temperature", "seed", "num_predict", "kv_cache", "concurrency"},
+    "options": {
+        "num_ctx",
+        "num_gpu",
+        "temperature",
+        "seed",
+        "num_predict",
+        "kv_cache",
+        "concurrency",
+    },
     "cost": {"tariff_per_kwh", "currency"},
 }
 _REQUIRED_SECTIONS = ("experiment", "runtime", "prompts")
@@ -257,6 +268,7 @@ def _load_options(table: dict[str, Any]) -> InferenceOptions:
 
     return InferenceOptions(
         num_ctx=_as_int(table, "num_ctx", "options", DEFAULT_NUM_CTX, minimum=1),
+        num_gpu=_as_int(table, "num_gpu", "options", DEFAULT_NUM_GPU, minimum=1),
         temperature=_as_float(table, "temperature", "options", DEFAULT_TEMPERATURE, minimum=0.0),
         seed=_as_int(table, "seed", "options", DEFAULT_INFERENCE_SEED),
         num_predict=num_predict,

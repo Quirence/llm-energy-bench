@@ -72,6 +72,7 @@ class DoctorClient:
     def __init__(self, *, missing: bool = False, placement: bool | None = True) -> None:
         self.missing = missing
         self.placement = placement
+        self.preload_options: list[dict[str, Any] | None] = []
 
     def __enter__(self) -> DoctorClient:
         return self
@@ -82,7 +83,10 @@ class DoctorClient:
     def version(self) -> str:
         return "0.99.0-test"
 
-    def preload(self, model: str) -> RunningModel:
+    def preload(
+        self, model: str, *, options: dict[str, Any] | None = None
+    ) -> RunningModel:
+        self.preload_options.append(options)
         if self.missing:
             raise ModelNotFound(f"model {model!r} is not installed")
         size = 3_000_000_000
@@ -159,6 +163,15 @@ def test_doctor_accepts_power_integration_when_energy_counter_is_unsupported(
     assert report["gpu"]["supports_total_energy"] is False
     assert report["gpu"]["energy_source"] == "power_instant_integration"
     assert report["gpu"]["energy_fallback_reason"]
+
+
+def test_doctor_uses_and_reports_explicit_model_load_controls(tmp_path: Path) -> None:
+    client = DoctorClient()
+
+    report = diagnose(tmp_path, client=client)
+
+    assert client.preload_options == [{"num_ctx": 4096, "num_gpu": 999}]
+    assert report["controls"]["num_gpu"] == 999
 
 
 def test_doctor_rejects_partial_gpu_placement(tmp_path: Path) -> None:

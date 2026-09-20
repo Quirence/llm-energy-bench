@@ -27,13 +27,16 @@ research comparison begins.
   - `qwen3:4b-instruct-2507-q8_0`;
   - `llama3.2:3b-instruct-q4_K_M`;
   - `llama3.2:3b-instruct-q8_0`;
-- fixed inference settings: context length 4096, temperature 0, seed 42,
-  concurrency 1, and f16 KV cache;
+- fixed inference settings: context length 4096, requested GPU layers 999,
+  temperature 0, seed 42, concurrency 1, and f16 KV cache;
 - `benchmark-v1`: 24 prompts and five measured repetitions per configuration.
 
 Model tags and digests must be checked before the campaign. A run records the
 actual Ollama digest, runtime and driver versions, prompt/config hashes, power
 limit, temperature, VRAM context, and the telemetry source used.
+`num_gpu = 999` asks Ollama to place every layer on the GPU during preload and
+measured generation. It does not replace the `/api/ps` full-placement gate;
+partial CPU offload still invalidates a primary run.
 
 The four tags were rechecked against the official
 [Qwen3](https://ollama.com/library/qwen3/tags) and

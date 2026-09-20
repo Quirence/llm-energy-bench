@@ -77,6 +77,7 @@ def make_config(
         concurrency=1,
         options=InferenceOptions(
             num_ctx=4096,
+            num_gpu=999,
             temperature=0.0,
             seed=42,
             num_predict=32,
@@ -181,6 +182,7 @@ class FakeClient:
         self.fully_on_gpu = fully_on_gpu
         self.interrupt_at = interrupt_at
         self.requests: list[InferenceRequest] = []
+        self.preload_options: list[dict[str, Any] | None] = []
         self.closed = False
 
     def __enter__(self) -> FakeClient:
@@ -192,7 +194,10 @@ class FakeClient:
     def version(self) -> str:
         return "0.99.0-test"
 
-    def preload(self, model: str) -> RunningModel:
+    def preload(
+        self, model: str, *, options: dict[str, Any] | None = None
+    ) -> RunningModel:
+        self.preload_options.append(options)
         size = 3_000_000_000
         size_vram = (
             None if self.fully_on_gpu is None else size if self.fully_on_gpu else size - 1
@@ -414,6 +419,11 @@ def test_every_generation_has_a_unique_leading_cache_buster(tmp_path: Path) -> N
     assert all(prefix.startswith("[llm-energy-bench:") for prefix in prefixes)
     assert all("kv_cache" not in request.options for request in client.requests)
     assert all(request.options["num_ctx"] == 4096 for request in client.requests)
+    assert all(request.options["num_gpu"] == 999 for request in client.requests)
+    assert client.preload_options == [
+        {"num_ctx": 4096, "num_gpu": 999},
+        {"num_ctx": 4096, "num_gpu": 999},
+    ]
 
 
 @pytest.mark.parametrize("placement", [False, None])

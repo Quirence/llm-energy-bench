@@ -255,7 +255,11 @@ def run_experiment(
                 "GPU exposes neither a total-energy counter nor a usable power field"
             )
 
-        models = tuple(_preflight_model(client.preload(model), model) for model in config.models)
+        load_options = _model_load_options(config)
+        models = tuple(
+            _preflight_model(client.preload(model, options=load_options), model)
+            for model in config.models
+        )
 
         run_dir = create_run_dir(config.output_dir, config.experiment_id, config.host_id)
         resolved_config = _resolved_config_toml(config, prompts_fingerprint(prompts))
@@ -336,7 +340,10 @@ def _execute_requests(
         for model_index, (model_name, expected_model) in enumerate(
             zip(config.models, preflight_models, strict=True)
         ):
-            active_model = _preflight_model(client.preload(model_name), model_name)
+            active_model = _preflight_model(
+                client.preload(model_name, options=_model_load_options(config)),
+                model_name,
+            )
             if active_model.digest != expected_model.digest:
                 raise RunnerError(
                     f"model {model_name!r} digest changed after preflight: "
@@ -586,6 +593,13 @@ def _request_options(config: ExperimentConfig) -> dict[str, Any]:
     return {key: value for key, value in options.items() if value is not None}
 
 
+def _model_load_options(config: ExperimentConfig) -> dict[str, int]:
+    return {
+        "num_ctx": config.options.num_ctx,
+        "num_gpu": config.options.num_gpu,
+    }
+
+
 def _cache_busted_prompt(request_id: str, prompt: str) -> str:
     return f"[llm-energy-bench:{request_id}]\n{prompt}"
 
@@ -698,6 +712,7 @@ def _resolved_config_toml(config: ExperimentConfig, prompt_hash: str) -> str:
             "options",
             (
                 ("num_ctx", config.options.num_ctx),
+                ("num_gpu", config.options.num_gpu),
                 ("temperature", config.options.temperature),
                 ("seed", config.options.seed),
                 ("num_predict", config.options.num_predict),

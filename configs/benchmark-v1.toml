@@ -29,6 +29,8 @@ path = "../prompts/benchmark-v1.jsonl"
 
 [options]
 num_ctx = 4096
+# Force all layers onto the selected GPU; placement is verified through /api/ps.
+num_gpu = 999
 temperature = 0.0
 seed = 42
 num_predict = 256
