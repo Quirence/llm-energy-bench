@@ -92,7 +92,11 @@ run repeated from the reviewed, merged implementation.
 - Analysis result: the report generated successfully, but no comparative rank
   is possible with one model configuration. The scored prompts averaged 0.5,
   below the frozen 0.75 quality floor, so the configuration was correctly
-  excluded from ranking.
+  excluded from ranking. A follow-up A/B check showed that the current leading
+  raw SHA-256 cache-buster changed the arithmetic answer from `391` to a safety
+  refusal. Therefore the observed score is a measurement-instrument confound,
+  not evidence about the model's arithmetic quality. PR #16 records the
+  proposed UUID-form marker design and must be updated before the repeated run.
 - Decision: the acceptance run supports the implementation path only. It
   makes no speed-versus-energy research claim and will be repeated from the
   reviewed, merged commit before publication.
