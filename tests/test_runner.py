@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import pytest
 
@@ -47,9 +48,7 @@ def make_config(
     prompts.write_text(
         "\n".join(
             (
-                json.dumps(
-                    {"id": "short-01", "category": "short", "prompt": "Say hello."}
-                ),
+                json.dumps({"id": "short-01", "category": "short", "prompt": "Say hello."}),
                 json.dumps(
                     {
                         "id": "scored-01",
@@ -199,14 +198,10 @@ class FakeClient:
     def version(self) -> str:
         return "0.99.0-test"
 
-    def preload(
-        self, model: str, *, options: dict[str, Any] | None = None
-    ) -> RunningModel:
+    def preload(self, model: str, *, options: dict[str, Any] | None = None) -> RunningModel:
         self.preload_options.append(options)
         size = 3_000_000_000
-        size_vram = (
-            None if self.fully_on_gpu is None else size if self.fully_on_gpu else size - 1
-        )
+        size_vram = None if self.fully_on_gpu is None else size if self.fully_on_gpu else size - 1
         return RunningModel(
             name=model,
             model=model,
@@ -523,9 +518,7 @@ def test_run_order_is_deterministic_and_warmups_are_excluded(tmp_path: Path) -> 
     assert len(first_requests) == 4
     assert len(read_jsonl(first_dir / "outputs.jsonl")) == 4
     assert len(read_gzip_jsonl(first_dir / "telemetry.jsonl.gz")) == 8
-    assert [
-        (record["prompt_id"], record["repetition"]) for record in first_requests
-    ] == [
+    assert [(record["prompt_id"], record["repetition"]) for record in first_requests] == [
         (record["prompt_id"], record["repetition"]) for record in second_requests
     ]
     assert first_sampler.started == [record["request_id"] for record in first_requests]
@@ -541,12 +534,12 @@ def test_every_generation_has_a_unique_leading_cache_buster(tmp_path: Path) -> N
         sampler_factory=lambda **_kwargs: FakeSampler(),
     )
 
-    prefixes = [request.prompt.splitlines()[0] for request in client.requests]
-    expected = [
-        hashlib.sha256(request.request_id.encode("utf-8")).hexdigest()
-        for request in client.requests
-    ]
-    assert prefixes == expected
+    lines = [request.prompt.splitlines() for request in client.requests]
+    prefixes = [parts[0] for parts in lines]
+    assert all(UUID(prefix).version == 4 for prefix in prefixes)
+    assert all(
+        parts[1] == "[llm-energy-bench request marker; ignore this marker]" for parts in lines
+    )
     assert len(prefixes) == len(set(prefixes))
     assert all("kv_cache" not in request.options for request in client.requests)
     assert all(request.options["num_ctx"] == 4096 for request in client.requests)
@@ -555,6 +548,27 @@ def test_every_generation_has_a_unique_leading_cache_buster(tmp_path: Path) -> N
         {"num_ctx": 4096, "num_gpu": 999},
         {"num_ctx": 4096, "num_gpu": 999},
     ]
+
+
+def test_measured_cache_marker_is_stable_across_model_configurations(tmp_path: Path) -> None:
+    config = replace(make_config(tmp_path), models=(MODEL, "llama3.2:3b-instruct-q8_0"))
+
+    run_dir = run_experiment(
+        config,
+        client_factory=lambda _url: FakeClient(),
+        sampler_factory=lambda **_kwargs: FakeSampler(),
+    )
+
+    records = read_jsonl(run_dir / "requests.jsonl")
+    markers: dict[tuple[str, int], set[str]] = {}
+    for record in records:
+        key = (record["prompt_id"], record["repetition"])
+        markers.setdefault(key, set()).add(record["prompt"].splitlines()[0])
+
+    assert all(len(values) == 1 for values in markers.values())
+    assert len({next(iter(values)) for values in markers.values()}) == len(markers)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["cache_buster_policy"] == "uuid_prefix_v1"
 
 
 def test_run_requires_two_warmups_to_establish_a_cache_baseline(tmp_path: Path) -> None:

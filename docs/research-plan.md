@@ -99,11 +99,14 @@ Ollama's reusable chat-template preamble is controlled separately from prompt
 contamination. Every model performs at least two excluded warm-ups; the final
 warm-up's `prompt_eval_cached_count` becomes the per-model, per-digest template
 baseline recorded in the manifest. Every generated prompt starts with a
-request-specific SHA-256 nonce before any shared text. A measured request is
-eligible only when its cached count is present and does not exceed the
-baseline. All cached tokens, including the accepted template floor, are
-subtracted from the prefill-token numerator. The raw count, applied baseline,
-and excess are stored so validation can reproduce the decision independently.
+deterministic UUID-form marker derived from a run-specific logical request key,
+followed by an instruction to ignore that metadata. The same prompt and
+repetition use the same marker across model configurations in one run. A
+measured request is eligible only when its cached count is present and does not
+exceed the baseline. All cached tokens, including the accepted template floor,
+are subtracted from the prefill-token numerator. The raw count, applied
+baseline, excess and cache-buster policy are stored so validation can reproduce
+the decision independently.
 
 ## Main Failure Condition
 

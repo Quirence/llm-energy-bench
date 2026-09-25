@@ -100,10 +100,14 @@ a quarter of the tokens the prompt actually has. Short prompts are exactly the
 decode-focused cases the protocol depends on. Putting a per-request random
 nonce at the very start of the prompt brings contamination down to the floor.
 
-Issue #13 implements a deterministic SHA-256 nonce derived from the request ID
-as the literal first prompt line. The shared marker follows it, so no common
-run-ID head precedes the entropy. Determinism preserves auditability without
-giving Ollama a reusable leading prefix.
+The first Issue #13 implementation used a raw SHA-256 digest as the literal
+first line. RTX 5060 A/B testing showed that this changed a simple arithmetic
+answer into a safety refusal. The stabilized policy instead renders the first
+16 digest bytes as a deterministic UUID v4, followed by an explicit instruction
+to ignore the benchmark marker. Ten diagnostic requests preserved the answer
+and the 20-token template floor; the subsequent 18-request acceptance check
+produced the expected answer for all six scored repetitions with zero excess
+cached tokens.
 
 ## 5. Placement can be silently CPU-only
 

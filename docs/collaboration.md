@@ -12,6 +12,8 @@ frozen research protocol.
 - `docs/experiment-log.md` is the append-only index of environment probes and
   validated hardware runs.
 - `docs/research-plan.md` and the approved design define the methodology.
+- `docs/pilot-baseline.md` pins the commit, runtime, digest, host configs and
+  commands used for comparable GPU acceptance runs.
 - Pull requests and Git history record reviewed implementation decisions.
 
 Do not report an environment probe as a validated experimental run. Do not
@@ -22,9 +24,9 @@ to improve a result.
 
 | Contributor | Primary responsibility | Active work |
 | --- | --- | --- |
-| `@Quirence` | runner, validation, reporting, methodology, RTX 3050 pilot and RTX 5060 baseline | [Issues #3, #4, and #6](https://github.com/Quirence/llm-energy-bench/issues?q=is%3Aissue+is%3Aopen+assignee%3AQuirence) |
+| `@Quirence` | runner, validation, reporting, methodology and RTX 5060 baseline | [Issues #4 and #6](https://github.com/Quirence/llm-energy-bench/issues?q=is%3Aissue+is%3Aopen+assignee%3AQuirence) |
 | `@Qcsteeven` | NVML capability probing, telemetry lifecycle, energy-source fallback, RTX 4060 desktop study | [Issue #5](https://github.com/Quirence/llm-energy-bench/issues/5) and [Issue #6](https://github.com/Quirence/llm-energy-bench/issues/6) |
-| `@Skipl1` (Dimas) | Ollama preload/inventory, streaming generation, TTFT, model digest and GPU-placement checks | [Issue #7](https://github.com/Quirence/llm-energy-bench/issues/7) |
+| `@Skipl1` (Dimas) | Ollama preload/inventory, streaming generation, TTFT, model digest and GPU-placement review | Runtime boundary review and optional observation hosts |
 
 CODEOWNERS reflects the module ownership. Shared schemas and methodology still
 require cross-review; ownership does not permit unilateral protocol changes.
@@ -95,8 +97,9 @@ the frozen model tags, prompt files, or benchmark configuration.
 
 ## Hardware Coordination
 
-The final RTX 4060 run must use the same committed config, prompt hash, Ollama
-version, and model digests as the RTX 5060 run. Contributors may prepare a host
-and run `doctor` earlier, but a result is comparable only after these inputs are
-frozen and recorded. Invalid requests remain in raw artifacts with explicit
-reasons and are excluded from primary aggregates.
+The RTX 5060 and RTX 4060 acceptance runs use the committed host configs and
+the `pilot-v1-code` tag described in `docs/pilot-baseline.md`. Contributors may
+prepare a host and run `doctor` earlier, but a result is comparable only after
+the commit, prompt hash, Ollama version and model digest are frozen and
+recorded. Invalid requests remain in raw artifacts with explicit reasons and
+are excluded from primary aggregates.

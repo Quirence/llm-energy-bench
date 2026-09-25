@@ -1,0 +1,30 @@
+# Frozen one-model acceptance run for the RTX 4060 desktop comparison host.
+# It differs from pilot-rtx5060.toml only by host_id and this comment.
+
+[experiment]
+id = "pilot-v1"
+host_id = "rtx4060-desktop"
+output_dir = "../experiments/runs"
+repetitions = 3
+warmup_requests = 2
+order_seed = 42
+
+[runtime]
+ollama_url = "http://127.0.0.1:11434"
+models = ["llama3.2:3b-instruct-q4_K_M"]
+
+[gpu]
+index = 0
+telemetry_interval_ms = 100
+
+[prompts]
+path = "../prompts/pilot-v1.jsonl"
+
+[options]
+num_ctx = 4096
+num_gpu = 999
+temperature = 0.0
+seed = 42
+num_predict = 256
+kv_cache = "f16"
+concurrency = 1

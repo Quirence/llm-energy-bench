@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from llm_energy_bench.config import (
     ExperimentConfig,
@@ -260,10 +261,13 @@ def run_experiment(
     client_builder = client_factory or OllamaClient
     sampler_builder = sampler_factory or NvmlSampler
 
-    with client_builder(config.ollama_url) as client, sampler_builder(
-        gpu_index=config.gpu_index,
-        interval_ms=config.telemetry_interval_ms,
-    ) as sampler:
+    with (
+        client_builder(config.ollama_url) as client,
+        sampler_builder(
+            gpu_index=config.gpu_index,
+            interval_ms=config.telemetry_interval_ms,
+        ) as sampler,
+    ):
         runtime_version = client.version()
         capabilities = sampler.probe(config.gpu_index)
         if capabilities.energy_source is EnergySource.UNAVAILABLE:
@@ -328,8 +332,7 @@ def _preflight_model(model: RunningModel, requested_name: str) -> RunningModel:
     if model.fully_on_gpu is not True:
         fraction = "unknown" if model.gpu_fraction is None else f"{model.gpu_fraction:.3f}"
         raise RunnerPreflightError(
-            f"model {requested_name!r} is not confirmed fully on GPU "
-            f"(GPU fraction: {fraction})"
+            f"model {requested_name!r} is not confirmed fully on GPU (GPU fraction: {fraction})"
         )
     if not model.digest:
         raise RunnerPreflightError(f"model {requested_name!r} has no resolved digest")
@@ -368,9 +371,7 @@ def _execute_requests(
 
             for warmup_index in range(config.warmup_requests):
                 prompt = prompts[warmup_index % len(prompts)]
-                request_id = (
-                    f"{run_dir.name}-warmup-m{model_index + 1}-w{warmup_index + 1}"
-                )
+                request_id = f"{run_dir.name}-warmup-m{model_index + 1}-w{warmup_index + 1}"
                 warmup = InferenceRequest(
                     request_id=request_id,
                     model=model_name,
@@ -415,7 +416,10 @@ def _execute_requests(
                 request = InferenceRequest(
                     request_id=request_id,
                     model=model_name,
-                    prompt=_cache_busted_prompt(request_id, item.prompt.prompt),
+                    prompt=_cache_busted_prompt(
+                        f"{run_dir.name}:{item.prompt.prompt_id}:{item.repetition}",
+                        item.prompt.prompt,
+                    ),
                     options=options,
                 )
                 request_record = {
@@ -691,9 +695,10 @@ def _model_load_options(config: ExperimentConfig) -> dict[str, int]:
     }
 
 
-def _cache_busted_prompt(request_id: str, prompt: str) -> str:
-    nonce = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
-    return f"{nonce}\n[llm-energy-bench]\n{prompt}"
+def _cache_busted_prompt(marker_key: str, prompt: str) -> str:
+    digest = hashlib.sha256(marker_key.encode("utf-8")).digest()
+    marker = UUID(bytes=digest[:16], version=4)
+    return f"{marker}\n[llm-energy-bench request marker; ignore this marker]\n{prompt}"
 
 
 def _initial_manifest(
@@ -720,10 +725,9 @@ def _initial_manifest(
         "repetitions": config.repetitions,
         "runtime": {"name": "ollama", "version": runtime_version},
         "gpu": capabilities.to_dict(),
-        "models": [
-            {**model.to_dict(), "template_cache_baseline_tokens": None} for model in models
-        ],
+        "models": [{**model.to_dict(), "template_cache_baseline_tokens": None} for model in models],
         "prompt_cache_policy": "template_floor_v1",
+        "cache_buster_policy": "uuid_prefix_v1",
         "controls": config.to_dict(),
         "host": {
             "os": platform.system(),

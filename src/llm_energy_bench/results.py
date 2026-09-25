@@ -229,9 +229,7 @@ def _aggregate_report_rows(
                 "prefill_tokens_per_second": _safe_ratio(
                     total_prompt_tokens, sum(prompt_durations) / 1e9
                 ),
-                "decode_tokens_per_second": _safe_ratio(
-                    total_tokens, sum(decode_durations) / 1e9
-                ),
+                "decode_tokens_per_second": _safe_ratio(total_tokens, sum(decode_durations) / 1e9),
                 "average_gpu_power_median_watts": _median(average_power),
                 "observed_peak_gpu_power_max_watts": _maximum(peak_power),
                 "gpu_energy_joules": total_energy,
@@ -259,9 +257,7 @@ def _assign_ranks(rows: list[dict[str, Any]]) -> None:
     categories = sorted({str(row["prompt_category"]) for row in rows})
     for category in categories:
         eligible = [
-            row
-            for row in rows
-            if row["prompt_category"] == category and row["ranking_eligible"]
+            row for row in rows if row["prompt_category"] == category and row["ranking_eligible"]
         ]
         speed = sorted(
             eligible,
@@ -830,6 +826,8 @@ def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
         return
     if manifest.get("prompt_cache_policy") != "template_floor_v1":
         errors.append(f"{MANIFEST} schema v1 has no recognized prompt cache policy")
+    if manifest.get("cache_buster_policy") != "uuid_prefix_v1":
+        errors.append(f"{MANIFEST} schema v1 has no recognized cache buster policy")
 
     models = manifest.get("models")
     if not isinstance(models, list) or not models:
@@ -892,9 +890,7 @@ def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
 
         cached = output.get("prompt_eval_cached_count")
         cache_baseline = expected_cache_baselines.get(model_name)
-        cached_is_valid = (
-            isinstance(cached, int) and not isinstance(cached, bool) and cached >= 0
-        )
+        cached_is_valid = isinstance(cached, int) and not isinstance(cached, bool) and cached >= 0
         if not cached_is_valid:
             errors.append(f"request {label} has no valid cached prompt token count")
         elif cache_baseline is not None and cached > cache_baseline:
@@ -926,7 +922,5 @@ def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
         times = sorted(telemetry_times.get(request_id, []))
         if len(times) < 2:
             errors.append(f"request {label} has no telemetry coverage")
-        elif any(
-            right - left > 0.5 for left, right in zip(times, times[1:], strict=False)
-        ):
+        elif any(right - left > 0.5 for left, right in zip(times, times[1:], strict=False)):
             errors.append(f"request {label} raw telemetry has a gap above 500 ms")

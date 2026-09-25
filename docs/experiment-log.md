@@ -158,3 +158,23 @@ run repeated from the reviewed, merged implementation.
   accepted template floor.
 - Scope: code and synthetic-test validation only. The policy is not considered
   hardware-validated until it passes against Ollama on the RTX 5060 host.
+
+### 2026-09-25 — UUID cache-marker correction and acceptance
+
+- Correction: the raw SHA-256 first-line marker above is retained as historical
+  context but is superseded. A live A/B check found that it changed the
+  arithmetic utility answer from `391` to a safety refusal.
+- Decision: encode the first 16 SHA-256 bytes as a deterministic UUID v4 and
+  follow it with an explicit instruction that the benchmark marker is metadata
+  to ignore. A logical prompt and repetition share a marker across model
+  configurations in the same run.
+- Diagnostic evidence: 10/10 arithmetic requests returned `391` with the UUID
+  marker and all 10 reported the 20-token template floor.
+- Stabilization acceptance: the complete six-prompt workload then produced
+  18/18 valid measured requests on the RTX 5060 Laptop, all with raw cache 20
+  and excess cache 0. Both scored prompts passed in all three repetitions, so
+  the aggregate quality score was 1.0. All requests selected instantaneous
+  power integration during this run.
+- Scope: ignored local acceptance artifact from the unmerged stabilization
+  branch. It verifies the correction but is not the publishable research run;
+  the run must be repeated from the reviewed `pilot-v1-code` tag.

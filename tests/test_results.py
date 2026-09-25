@@ -316,6 +316,7 @@ def schema_v1_run(tmp_path: Path) -> Path:
             "run_id": run_dir.name,
             "status": "completed",
             "prompt_cache_policy": "template_floor_v1",
+            "cache_buster_policy": "uuid_prefix_v1",
             "models": [
                 {
                     "name": "llama3.2:3b-instruct-q4_K_M",
@@ -505,6 +506,18 @@ def test_schema_v1_requires_the_declared_template_cache_policy(tmp_path: Path) -
 
     assert report.ok is False
     assert any("prompt cache policy" in error for error in report.errors)
+
+
+def test_schema_v1_requires_the_declared_cache_buster_policy(tmp_path: Path) -> None:
+    run_dir = schema_v1_run(tmp_path)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest.pop("cache_buster_policy")
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("cache buster policy" in error for error in report.errors)
 
 
 def test_a_telemetry_gap_above_500_ms_fails_semantic_validation(tmp_path: Path) -> None:
