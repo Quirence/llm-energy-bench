@@ -315,11 +315,13 @@ def schema_v1_run(tmp_path: Path) -> Path:
             "schema_version": 1,
             "run_id": run_dir.name,
             "status": "completed",
+            "prompt_cache_policy": "template_floor_v1",
             "models": [
                 {
                     "name": "llama3.2:3b-instruct-q4_K_M",
                     "digest": digest,
                     "fully_on_gpu": True,
+                    "template_cache_baseline_tokens": 20,
                 }
             ],
         },
@@ -333,11 +335,13 @@ def schema_v1_run(tmp_path: Path) -> Path:
                 "model_digest": digest,
                 "valid": True,
                 "invalid_reasons": [],
-                "prompt_eval_cached_count": 0,
+                "prompt_eval_cached_count": 20,
                 "metrics": {
                     "gpu_energy_joules": 12.0,
                     "telemetry_sample_count": 2,
                     "max_telemetry_gap_seconds": 0.1,
+                    "template_cache_baseline_tokens": 20,
+                    "excess_cached_prompt_tokens": 0,
                 },
             }
         )
@@ -460,10 +464,13 @@ def test_a_changed_model_digest_fails_semantic_validation(tmp_path: Path) -> Non
     assert any("digest" in error for error in report.errors)
 
 
-def test_cached_prompt_tokens_fail_semantic_validation(tmp_path: Path) -> None:
+def test_cached_prompt_tokens_above_the_template_baseline_fail_validation(
+    tmp_path: Path,
+) -> None:
     run_dir = schema_v1_run(tmp_path)
     outputs = read_jsonl(run_dir / "outputs.jsonl")
-    outputs[0]["prompt_eval_cached_count"] = 4
+    outputs[0]["prompt_eval_cached_count"] = 21
+    outputs[0]["metrics"]["excess_cached_prompt_tokens"] = 1
     (run_dir / "outputs.jsonl").unlink()
     with JsonlWriter(run_dir / "outputs.jsonl") as writer:
         writer.write(outputs[0])
@@ -471,7 +478,33 @@ def test_cached_prompt_tokens_fail_semantic_validation(tmp_path: Path) -> None:
     report = validate_run(run_dir)
 
     assert report.ok is False
-    assert any("cached prompt" in error for error in report.errors)
+    assert any("template baseline" in error for error in report.errors)
+
+
+def test_cache_baseline_in_output_must_match_the_manifest(tmp_path: Path) -> None:
+    run_dir = schema_v1_run(tmp_path)
+    outputs = read_jsonl(run_dir / "outputs.jsonl")
+    outputs[0]["metrics"]["template_cache_baseline_tokens"] = 19
+    (run_dir / "outputs.jsonl").unlink()
+    with JsonlWriter(run_dir / "outputs.jsonl") as writer:
+        writer.write(outputs[0])
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("cache baseline" in error for error in report.errors)
+
+
+def test_schema_v1_requires_the_declared_template_cache_policy(tmp_path: Path) -> None:
+    run_dir = schema_v1_run(tmp_path)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest.pop("prompt_cache_policy")
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("prompt cache policy" in error for error in report.errors)
 
 
 def test_a_telemetry_gap_above_500_ms_fails_semantic_validation(tmp_path: Path) -> None:

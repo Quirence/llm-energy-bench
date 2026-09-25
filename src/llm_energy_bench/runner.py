@@ -8,6 +8,7 @@ request is persisted before moving to the next one.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import platform
 import random
@@ -89,6 +90,8 @@ class RequestMetrics:
     ttft_seconds: float | None
     prompt_tokens: int | None
     cached_prompt_tokens: int | None
+    template_cache_baseline_tokens: int
+    excess_cached_prompt_tokens: int | None
     output_tokens: int | None
     prefill_tokens_per_second: float | None
     decode_tokens_per_second: float | None
@@ -136,6 +139,7 @@ def derive_request_metrics(
     prompt: PromptCase,
     *,
     repetition: int,
+    template_cache_baseline_tokens: int,
     tariff_per_kwh: float | None = None,
     currency: str | None = None,
 ) -> RequestMetrics:
@@ -165,8 +169,13 @@ def derive_request_metrics(
         reasons.append("output_tokens")
 
     cached_tokens = result.prompt_eval_cached_count
-    if cached_tokens is not None and cached_tokens > 0:
-        reasons.append("cached_prompt_tokens")
+    excess_cached_tokens = None
+    if cached_tokens is None:
+        reasons.append("cached_prompt_tokens_missing")
+    else:
+        excess_cached_tokens = max(0, cached_tokens - template_cache_baseline_tokens)
+        if excess_cached_tokens > 0:
+            reasons.append("cached_prompt_tokens_above_template_baseline")
 
     prompt_tokens = result.prompt_eval_count
     uncached_prompt_tokens = prompt_tokens
@@ -205,6 +214,8 @@ def derive_request_metrics(
         ttft_seconds=result.ttft_s,
         prompt_tokens=prompt_tokens,
         cached_prompt_tokens=cached_tokens,
+        template_cache_baseline_tokens=template_cache_baseline_tokens,
+        excess_cached_prompt_tokens=excess_cached_tokens,
         output_tokens=output_tokens,
         prefill_tokens_per_second=prefill_rate,
         decode_tokens_per_second=decode_rate,
@@ -240,6 +251,11 @@ def run_experiment(
     Factories are injectable only to keep hardware-independent tests honest;
     normal callers use the one-argument public contract.
     """
+    if config.warmup_requests < 2:
+        raise RunnerPreflightError(
+            "at least two warm-up requests are required to establish the template cache baseline"
+        )
+
     prompts = load_prompts(config.prompt_path)
     client_builder = client_factory or OllamaClient
     sampler_builder = sampler_factory or NvmlSampler
@@ -369,6 +385,23 @@ def _execute_requests(
                     )
                 manifest["completed_warmups"] += 1
 
+            template_cache_baseline = warmup_result.prompt_eval_cached_count
+            warmup_prompt_tokens = warmup_result.prompt_eval_count
+            if (
+                template_cache_baseline is None
+                or template_cache_baseline < 0
+                or warmup_prompt_tokens is None
+                or template_cache_baseline > warmup_prompt_tokens
+            ):
+                raise RunnerError(
+                    f"the final warm-up for {model_name!r} did not report a usable "
+                    "prompt_eval_cached_count; measured requests were not started"
+                )
+            manifest["models"][model_index]["template_cache_baseline_tokens"] = (
+                template_cache_baseline
+            )
+            _write_manifest(run_dir, manifest)
+
             planned = [
                 _PlannedRequest(prompt=prompt, repetition=repetition)
                 for repetition in range(config.repetitions)
@@ -413,6 +446,7 @@ def _execute_requests(
                     capabilities,
                     item.prompt,
                     repetition=item.repetition,
+                    template_cache_baseline_tokens=template_cache_baseline,
                     tariff_per_kwh=config.tariff_per_kwh,
                     currency=config.currency,
                 )
@@ -658,7 +692,8 @@ def _model_load_options(config: ExperimentConfig) -> dict[str, int]:
 
 
 def _cache_busted_prompt(request_id: str, prompt: str) -> str:
-    return f"[llm-energy-bench:{request_id}]\n{prompt}"
+    nonce = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+    return f"{nonce}\n[llm-energy-bench]\n{prompt}"
 
 
 def _initial_manifest(
@@ -685,7 +720,10 @@ def _initial_manifest(
         "repetitions": config.repetitions,
         "runtime": {"name": "ollama", "version": runtime_version},
         "gpu": capabilities.to_dict(),
-        "models": [model.to_dict() for model in models],
+        "models": [
+            {**model.to_dict(), "template_cache_baseline_tokens": None} for model in models
+        ],
+        "prompt_cache_policy": "template_floor_v1",
         "controls": config.to_dict(),
         "host": {
             "os": platform.system(),
