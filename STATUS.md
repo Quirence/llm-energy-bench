@@ -72,6 +72,11 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - The validity fixes are green in CI but still await the required collaborator
   reviews and integration. Running and publishing the pilot against only a
   subset of those fixes would knowingly produce incomparable artifacts.
+- The raw SHA-256 cache-buster in PR #16 reproducibly changes the arithmetic
+  utility prompt into a safety refusal on the pilot model. A deterministic
+  UUID-form first-line marker preserved the answer and the 20-token template
+  floor in 10/10 diagnostic requests; that reviewed change is now a prerequisite
+  for repeating the pilot.
 - Publishable end-to-end experimental validation is still pending. A local
   combined acceptance run completed with 18/18 valid measured requests, but
   the three prerequisite fixes remain unmerged; therefore those artifacts are
