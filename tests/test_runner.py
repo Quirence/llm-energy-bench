@@ -369,6 +369,22 @@ def test_cost_is_null_without_an_explicit_tariff() -> None:
     assert metrics.cost_currency is None
 
 
+def test_direct_metric_derivation_defaults_to_a_strict_zero_cache_baseline() -> None:
+    metrics = derive_request_metrics(
+        result(cached_tokens=0),
+        (
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+            sample("request-1", 0.1, energy_j=101.2, instant_w=14.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.valid is True
+    assert metrics.template_cache_baseline_tokens == 0
+
+
 def test_cached_prompt_count_at_the_template_baseline_is_valid() -> None:
     metrics = derive_request_metrics(
         result(cached_tokens=20),
