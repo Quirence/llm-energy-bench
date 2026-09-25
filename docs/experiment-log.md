@@ -22,6 +22,29 @@ Ollama and `llama3.2:3b-instruct-q4_K_M` are available locally.
 
 ## Environment Probes
 
+### 2026-09-25 — RTX 5060 Laptop NVML reliability check
+
+- Contributor: Quirence/Codex
+- GPU: NVIDIA GeForce RTX 5060 Laptop GPU, 8 GiB
+- Driver: 591.66; reported power limit 80 W
+- Capability result: all requested NVML fields are exposed.
+- Initial observation: the total-energy counter implied hundreds of watts at
+  idle and was rejected by the existing physical-consistency check. A stress
+  probe also found equal consecutive monotonic timestamps in 6 of 20 short
+  windows and one transient 4666 W instantaneous-power sample. The former made
+  otherwise usable integrations unavailable; the latter could dominate an
+  energy result.
+- Corrective check: equal timestamps now retain the latest reading while a
+  decreasing timestamp remains invalid. A power stream containing a reading
+  above 120% of the enforced limit is rejected rather than clipped, with
+  fallback from instantaneous to legacy power.
+- Verification: 20 consecutive 0.25 s windows at a 50 ms sampling interval
+  all selected `power_instant_integration`; none was unavailable. Observed
+  average and peak power stayed within approximately 8.71–9.21 W.
+- Scope: telemetry reliability validation at idle only. Ollama was not
+  installed, no model was loaded, and no inference run was produced. The same
+  checks must pass under model load before Task 8 is accepted.
+
 ### 2026-09-20 — RTX 3050 Laptop NVML smoke check
 
 - Contributor: Quirence/Codex

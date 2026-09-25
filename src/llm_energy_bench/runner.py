@@ -444,8 +444,18 @@ def _energy_metrics(
 ]:
     elapsed = _sampled_elapsed(samples)
     counter_energy = _counter_delta(samples)
-    instant_energy = _integrated_sample_power(samples, "power_instant_watts")
-    legacy_energy = _integrated_sample_power(samples, "power_legacy_watts")
+    instant_energy, instant_values, instant_problem = _integrated_sample_power(
+        samples,
+        "power_instant_watts",
+        label="instantaneous power",
+        power_limit_watts=capabilities.power_limit_watts,
+    )
+    legacy_energy, legacy_values, legacy_problem = _integrated_sample_power(
+        samples,
+        "power_legacy_watts",
+        label="legacy power",
+        power_limit_watts=capabilities.power_limit_watts,
+    )
     source = capabilities.energy_source
     reason = capabilities.energy_fallback_reason
 
@@ -465,33 +475,55 @@ def _energy_metrics(
         elif legacy_energy is not None:
             energy = legacy_energy
             source = EnergySource.POWER_LEGACY_INTEGRATION
-            reason = counter_problem + "; integrating legacy power instead"
+            reason = _join_problems(
+                counter_problem,
+                instant_problem,
+                "integrating legacy power instead",
+            )
         else:
             energy = None
             source = EnergySource.UNAVAILABLE
-            reason = counter_problem + "; no power fallback is available"
+            reason = _join_problems(
+                counter_problem,
+                instant_problem,
+                legacy_problem,
+                "no power fallback is available",
+            )
     elif source is EnergySource.POWER_INSTANT_INTEGRATION:
         if instant_energy is not None:
             energy = instant_energy
         elif legacy_energy is not None:
             energy = legacy_energy
             source = EnergySource.POWER_LEGACY_INTEGRATION
-            reason = "instantaneous power samples are unusable; integrating legacy power"
+            reason = _join_problems(
+                instant_problem or "instantaneous power samples are unusable",
+                "integrating legacy power instead",
+            )
         else:
             energy = None
             source = EnergySource.UNAVAILABLE
-            reason = "instantaneous and legacy power samples are unusable"
+            reason = _join_problems(
+                instant_problem or "instantaneous power samples are unusable",
+                legacy_problem or "legacy power samples are unusable",
+            )
     elif source is EnergySource.POWER_LEGACY_INTEGRATION:
         energy = legacy_energy
         if energy is None:
             source = EnergySource.UNAVAILABLE
-            reason = "legacy power samples are unusable"
+            reason = legacy_problem or "legacy power samples are unusable"
     else:
         energy = None
 
-    power_values = _present(item.power_instant_watts for item in samples)
-    if not power_values:
-        power_values = _present(item.power_legacy_watts for item in samples)
+    if source is EnergySource.POWER_INSTANT_INTEGRATION:
+        power_values = instant_values
+    elif source is EnergySource.POWER_LEGACY_INTEGRATION:
+        power_values = legacy_values
+    elif source is EnergySource.TOTAL_ENERGY_COUNTER:
+        power_values = instant_values if instant_problem is None else legacy_values
+        if instant_problem is not None and legacy_problem is not None:
+            power_values = []
+    else:
+        power_values = []
     peak = max(power_values) if power_values else None
     average = None
     if energy is not None and elapsed is not None and elapsed > 0:
@@ -512,14 +544,28 @@ def _counter_delta(samples: tuple[TelemetrySample, ...]) -> float | None:
 
 
 def _integrated_sample_power(
-    samples: tuple[TelemetrySample, ...], field_name: str
-) -> float | None:
+    samples: tuple[TelemetrySample, ...],
+    field_name: str,
+    *,
+    label: str,
+    power_limit_watts: float | None,
+) -> tuple[float | None, list[float], str | None]:
     points = [
         (item.monotonic_s, value)
         for item in samples
         if (value := getattr(item, field_name)) is not None
     ]
-    return _integrate_power(points)
+    values = [value for _, value in points]
+    if any(value < 0 for value in values):
+        return None, [], f"{label} contains a negative reading"
+    if power_limit_watts is not None and any(
+        value > power_limit_watts * POWER_LIMIT_TOLERANCE for value in values
+    ):
+        return None, [], f"{label} exceeds the enforced power limit"
+    energy = _integrate_power(points)
+    if energy is None:
+        return None, [], f"{label} samples are insufficient or non-monotonic"
+    return energy, values, None
 
 
 def _counter_problem(
@@ -543,17 +589,28 @@ def _counter_problem(
 
 
 def _integrate_power(points: list[tuple[float, float]]) -> float | None:
-    if len(points) < 2:
+    unique_points: list[tuple[float, float]] = []
+    for timestamp, power in points:
+        if unique_points and timestamp < unique_points[-1][0]:
+            return None
+        if unique_points and timestamp == unique_points[-1][0]:
+            unique_points[-1] = (timestamp, power)
+        else:
+            unique_points.append((timestamp, power))
+
+    if len(unique_points) < 2:
         return None
     energy = 0.0
     for (left_t, left_power), (right_t, right_power) in zip(
-        points, points[1:], strict=False
+        unique_points, unique_points[1:], strict=False
     ):
         interval = right_t - left_t
-        if interval <= 0:
-            return None
         energy += interval * (left_power + right_power) / 2.0
     return energy
+
+
+def _join_problems(*parts: str | None) -> str:
+    return "; ".join(part for part in parts if part is not None)
 
 
 def _rate(count: int | None, duration: float | int | None, scale: float) -> float | None:
