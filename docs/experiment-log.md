@@ -17,8 +17,8 @@ section below and are never counted as experimental runs.
 
 ## Validated Experimental Runs
 
-None yet. The first entry will be the RTX 3050 Laptop `pilot-v1` run after
-Ollama and `llama3.2:3b-instruct-q4_K_M` are available locally.
+None yet. The first publishable entry will be the RTX 5060 Laptop `pilot-v1`
+run repeated from the reviewed, merged implementation.
 
 ## Environment Probes
 

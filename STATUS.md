@@ -58,8 +58,9 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
   publish only that reproducible run.
 - PR #14 enforces explicit full-GPU placement, PR #15 hardens NVML energy
   fallback, and PR #16 implements the reviewed template-cache baseline rule.
-- Hardening power integration against equal Windows timer readings and
-  physically impossible NVML power samples observed on the RTX 5060 Laptop.
+- Monitoring the state-dependent total-energy counter through explicit source
+  recording; no further telemetry policy change is proposed before review of
+  the provisional evidence.
 
 ## Next
 
