@@ -8,6 +8,7 @@ request is persisted before moving to the next one.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import platform
 import random
@@ -18,6 +19,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from llm_energy_bench.config import (
     ExperimentConfig,
@@ -89,6 +91,8 @@ class RequestMetrics:
     ttft_seconds: float | None
     prompt_tokens: int | None
     cached_prompt_tokens: int | None
+    template_cache_baseline_tokens: int
+    excess_cached_prompt_tokens: int | None
     output_tokens: int | None
     prefill_tokens_per_second: float | None
     decode_tokens_per_second: float | None
@@ -136,6 +140,7 @@ def derive_request_metrics(
     prompt: PromptCase,
     *,
     repetition: int,
+    template_cache_baseline_tokens: int = 0,
     tariff_per_kwh: float | None = None,
     currency: str | None = None,
 ) -> RequestMetrics:
@@ -165,8 +170,13 @@ def derive_request_metrics(
         reasons.append("output_tokens")
 
     cached_tokens = result.prompt_eval_cached_count
-    if cached_tokens is not None and cached_tokens > 0:
-        reasons.append("cached_prompt_tokens")
+    excess_cached_tokens = None
+    if cached_tokens is None:
+        reasons.append("cached_prompt_tokens_missing")
+    else:
+        excess_cached_tokens = max(0, cached_tokens - template_cache_baseline_tokens)
+        if excess_cached_tokens > 0:
+            reasons.append("cached_prompt_tokens_above_template_baseline")
 
     prompt_tokens = result.prompt_eval_count
     uncached_prompt_tokens = prompt_tokens
@@ -205,6 +215,8 @@ def derive_request_metrics(
         ttft_seconds=result.ttft_s,
         prompt_tokens=prompt_tokens,
         cached_prompt_tokens=cached_tokens,
+        template_cache_baseline_tokens=template_cache_baseline_tokens,
+        excess_cached_prompt_tokens=excess_cached_tokens,
         output_tokens=output_tokens,
         prefill_tokens_per_second=prefill_rate,
         decode_tokens_per_second=decode_rate,
@@ -240,14 +252,22 @@ def run_experiment(
     Factories are injectable only to keep hardware-independent tests honest;
     normal callers use the one-argument public contract.
     """
+    if config.warmup_requests < 2:
+        raise RunnerPreflightError(
+            "at least two warm-up requests are required to establish the template cache baseline"
+        )
+
     prompts = load_prompts(config.prompt_path)
     client_builder = client_factory or OllamaClient
     sampler_builder = sampler_factory or NvmlSampler
 
-    with client_builder(config.ollama_url) as client, sampler_builder(
-        gpu_index=config.gpu_index,
-        interval_ms=config.telemetry_interval_ms,
-    ) as sampler:
+    with (
+        client_builder(config.ollama_url) as client,
+        sampler_builder(
+            gpu_index=config.gpu_index,
+            interval_ms=config.telemetry_interval_ms,
+        ) as sampler,
+    ):
         runtime_version = client.version()
         capabilities = sampler.probe(config.gpu_index)
         if capabilities.energy_source is EnergySource.UNAVAILABLE:
@@ -255,7 +275,11 @@ def run_experiment(
                 "GPU exposes neither a total-energy counter nor a usable power field"
             )
 
-        models = tuple(_preflight_model(client.preload(model), model) for model in config.models)
+        load_options = _model_load_options(config)
+        models = tuple(
+            _preflight_model(client.preload(model, options=load_options), model)
+            for model in config.models
+        )
 
         run_dir = create_run_dir(config.output_dir, config.experiment_id, config.host_id)
         resolved_config = _resolved_config_toml(config, prompts_fingerprint(prompts))
@@ -308,8 +332,7 @@ def _preflight_model(model: RunningModel, requested_name: str) -> RunningModel:
     if model.fully_on_gpu is not True:
         fraction = "unknown" if model.gpu_fraction is None else f"{model.gpu_fraction:.3f}"
         raise RunnerPreflightError(
-            f"model {requested_name!r} is not confirmed fully on GPU "
-            f"(GPU fraction: {fraction})"
+            f"model {requested_name!r} is not confirmed fully on GPU (GPU fraction: {fraction})"
         )
     if not model.digest:
         raise RunnerPreflightError(f"model {requested_name!r} has no resolved digest")
@@ -336,7 +359,10 @@ def _execute_requests(
         for model_index, (model_name, expected_model) in enumerate(
             zip(config.models, preflight_models, strict=True)
         ):
-            active_model = _preflight_model(client.preload(model_name), model_name)
+            active_model = _preflight_model(
+                client.preload(model_name, options=_model_load_options(config)),
+                model_name,
+            )
             if active_model.digest != expected_model.digest:
                 raise RunnerError(
                     f"model {model_name!r} digest changed after preflight: "
@@ -345,9 +371,7 @@ def _execute_requests(
 
             for warmup_index in range(config.warmup_requests):
                 prompt = prompts[warmup_index % len(prompts)]
-                request_id = (
-                    f"{run_dir.name}-warmup-m{model_index + 1}-w{warmup_index + 1}"
-                )
+                request_id = f"{run_dir.name}-warmup-m{model_index + 1}-w{warmup_index + 1}"
                 warmup = InferenceRequest(
                     request_id=request_id,
                     model=model_name,
@@ -362,6 +386,23 @@ def _execute_requests(
                     )
                 manifest["completed_warmups"] += 1
 
+            template_cache_baseline = warmup_result.prompt_eval_cached_count
+            warmup_prompt_tokens = warmup_result.prompt_eval_count
+            if (
+                template_cache_baseline is None
+                or template_cache_baseline < 0
+                or warmup_prompt_tokens is None
+                or template_cache_baseline > warmup_prompt_tokens
+            ):
+                raise RunnerError(
+                    f"the final warm-up for {model_name!r} did not report a usable "
+                    "prompt_eval_cached_count; measured requests were not started"
+                )
+            manifest["models"][model_index]["template_cache_baseline_tokens"] = (
+                template_cache_baseline
+            )
+            _write_manifest(run_dir, manifest)
+
             planned = [
                 _PlannedRequest(prompt=prompt, repetition=repetition)
                 for repetition in range(config.repetitions)
@@ -375,7 +416,10 @@ def _execute_requests(
                 request = InferenceRequest(
                     request_id=request_id,
                     model=model_name,
-                    prompt=_cache_busted_prompt(request_id, item.prompt.prompt),
+                    prompt=_cache_busted_prompt(
+                        f"{run_dir.name}:{item.prompt.prompt_id}:{item.repetition}",
+                        item.prompt.prompt,
+                    ),
                     options=options,
                 )
                 request_record = {
@@ -406,6 +450,7 @@ def _execute_requests(
                     capabilities,
                     item.prompt,
                     repetition=item.repetition,
+                    template_cache_baseline_tokens=template_cache_baseline,
                     tariff_per_kwh=config.tariff_per_kwh,
                     currency=config.currency,
                 )
@@ -437,8 +482,18 @@ def _energy_metrics(
 ]:
     elapsed = _sampled_elapsed(samples)
     counter_energy = _counter_delta(samples)
-    instant_energy = _integrated_sample_power(samples, "power_instant_watts")
-    legacy_energy = _integrated_sample_power(samples, "power_legacy_watts")
+    instant_energy, instant_values, instant_problem = _integrated_sample_power(
+        samples,
+        "power_instant_watts",
+        label="instantaneous power",
+        power_limit_watts=capabilities.power_limit_watts,
+    )
+    legacy_energy, legacy_values, legacy_problem = _integrated_sample_power(
+        samples,
+        "power_legacy_watts",
+        label="legacy power",
+        power_limit_watts=capabilities.power_limit_watts,
+    )
     source = capabilities.energy_source
     reason = capabilities.energy_fallback_reason
 
@@ -458,33 +513,55 @@ def _energy_metrics(
         elif legacy_energy is not None:
             energy = legacy_energy
             source = EnergySource.POWER_LEGACY_INTEGRATION
-            reason = counter_problem + "; integrating legacy power instead"
+            reason = _join_problems(
+                counter_problem,
+                instant_problem,
+                "integrating legacy power instead",
+            )
         else:
             energy = None
             source = EnergySource.UNAVAILABLE
-            reason = counter_problem + "; no power fallback is available"
+            reason = _join_problems(
+                counter_problem,
+                instant_problem,
+                legacy_problem,
+                "no power fallback is available",
+            )
     elif source is EnergySource.POWER_INSTANT_INTEGRATION:
         if instant_energy is not None:
             energy = instant_energy
         elif legacy_energy is not None:
             energy = legacy_energy
             source = EnergySource.POWER_LEGACY_INTEGRATION
-            reason = "instantaneous power samples are unusable; integrating legacy power"
+            reason = _join_problems(
+                instant_problem or "instantaneous power samples are unusable",
+                "integrating legacy power instead",
+            )
         else:
             energy = None
             source = EnergySource.UNAVAILABLE
-            reason = "instantaneous and legacy power samples are unusable"
+            reason = _join_problems(
+                instant_problem or "instantaneous power samples are unusable",
+                legacy_problem or "legacy power samples are unusable",
+            )
     elif source is EnergySource.POWER_LEGACY_INTEGRATION:
         energy = legacy_energy
         if energy is None:
             source = EnergySource.UNAVAILABLE
-            reason = "legacy power samples are unusable"
+            reason = legacy_problem or "legacy power samples are unusable"
     else:
         energy = None
 
-    power_values = _present(item.power_instant_watts for item in samples)
-    if not power_values:
-        power_values = _present(item.power_legacy_watts for item in samples)
+    if source is EnergySource.POWER_INSTANT_INTEGRATION:
+        power_values = instant_values
+    elif source is EnergySource.POWER_LEGACY_INTEGRATION:
+        power_values = legacy_values
+    elif source is EnergySource.TOTAL_ENERGY_COUNTER:
+        power_values = instant_values if instant_problem is None else legacy_values
+        if instant_problem is not None and legacy_problem is not None:
+            power_values = []
+    else:
+        power_values = []
     peak = max(power_values) if power_values else None
     average = None
     if energy is not None and elapsed is not None and elapsed > 0:
@@ -505,14 +582,28 @@ def _counter_delta(samples: tuple[TelemetrySample, ...]) -> float | None:
 
 
 def _integrated_sample_power(
-    samples: tuple[TelemetrySample, ...], field_name: str
-) -> float | None:
+    samples: tuple[TelemetrySample, ...],
+    field_name: str,
+    *,
+    label: str,
+    power_limit_watts: float | None,
+) -> tuple[float | None, list[float], str | None]:
     points = [
         (item.monotonic_s, value)
         for item in samples
         if (value := getattr(item, field_name)) is not None
     ]
-    return _integrate_power(points)
+    values = [value for _, value in points]
+    if any(value < 0 for value in values):
+        return None, [], f"{label} contains a negative reading"
+    if power_limit_watts is not None and any(
+        value > power_limit_watts * POWER_LIMIT_TOLERANCE for value in values
+    ):
+        return None, [], f"{label} exceeds the enforced power limit"
+    energy = _integrate_power(points)
+    if energy is None:
+        return None, [], f"{label} samples are insufficient or non-monotonic"
+    return energy, values, None
 
 
 def _counter_problem(
@@ -536,17 +627,28 @@ def _counter_problem(
 
 
 def _integrate_power(points: list[tuple[float, float]]) -> float | None:
-    if len(points) < 2:
+    unique_points: list[tuple[float, float]] = []
+    for timestamp, power in points:
+        if unique_points and timestamp < unique_points[-1][0]:
+            return None
+        if unique_points and timestamp == unique_points[-1][0]:
+            unique_points[-1] = (timestamp, power)
+        else:
+            unique_points.append((timestamp, power))
+
+    if len(unique_points) < 2:
         return None
     energy = 0.0
     for (left_t, left_power), (right_t, right_power) in zip(
-        points, points[1:], strict=False
+        unique_points, unique_points[1:], strict=False
     ):
         interval = right_t - left_t
-        if interval <= 0:
-            return None
         energy += interval * (left_power + right_power) / 2.0
     return energy
+
+
+def _join_problems(*parts: str | None) -> str:
+    return "; ".join(part for part in parts if part is not None)
 
 
 def _rate(count: int | None, duration: float | int | None, scale: float) -> float | None:
@@ -586,8 +688,17 @@ def _request_options(config: ExperimentConfig) -> dict[str, Any]:
     return {key: value for key, value in options.items() if value is not None}
 
 
-def _cache_busted_prompt(request_id: str, prompt: str) -> str:
-    return f"[llm-energy-bench:{request_id}]\n{prompt}"
+def _model_load_options(config: ExperimentConfig) -> dict[str, int]:
+    return {
+        "num_ctx": config.options.num_ctx,
+        "num_gpu": config.options.num_gpu,
+    }
+
+
+def _cache_busted_prompt(marker_key: str, prompt: str) -> str:
+    digest = hashlib.sha256(marker_key.encode("utf-8")).digest()
+    marker = UUID(bytes=digest[:16], version=4)
+    return f"{marker}\n[llm-energy-bench request marker; ignore this marker]\n{prompt}"
 
 
 def _initial_manifest(
@@ -614,7 +725,9 @@ def _initial_manifest(
         "repetitions": config.repetitions,
         "runtime": {"name": "ollama", "version": runtime_version},
         "gpu": capabilities.to_dict(),
-        "models": [model.to_dict() for model in models],
+        "models": [{**model.to_dict(), "template_cache_baseline_tokens": None} for model in models],
+        "prompt_cache_policy": "template_floor_v1",
+        "cache_buster_policy": "uuid_prefix_v1",
         "controls": config.to_dict(),
         "host": {
             "os": platform.system(),
@@ -698,6 +811,7 @@ def _resolved_config_toml(config: ExperimentConfig, prompt_hash: str) -> str:
             "options",
             (
                 ("num_ctx", config.options.num_ctx),
+                ("num_gpu", config.options.num_gpu),
                 ("temperature", config.options.temperature),
                 ("seed", config.options.seed),
                 ("num_predict", config.options.num_predict),

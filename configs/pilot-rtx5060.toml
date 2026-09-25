@@ -1,0 +1,30 @@
+# Frozen one-model acceptance run for the primary MAIBENBEN X16C host.
+# 6 prompts x 3 repetitions x 1 model = 18 measured requests.
+
+[experiment]
+id = "pilot-v1"
+host_id = "maibenben-x16c-rtx5060"
+output_dir = "../experiments/runs"
+repetitions = 3
+warmup_requests = 2
+order_seed = 42
+
+[runtime]
+ollama_url = "http://127.0.0.1:11434"
+models = ["llama3.2:3b-instruct-q4_K_M"]
+
+[gpu]
+index = 0
+telemetry_interval_ms = 100
+
+[prompts]
+path = "../prompts/pilot-v1.jsonl"
+
+[options]
+num_ctx = 4096
+num_gpu = 999
+temperature = 0.0
+seed = 42
+num_predict = 256
+kv_cache = "f16"
+concurrency = 1

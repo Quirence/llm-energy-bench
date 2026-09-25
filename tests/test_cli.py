@@ -42,6 +42,20 @@ def test_doctor_parses_json_flag() -> None:
     assert args.json is True
 
 
+def test_default_doctor_config_prefers_repository_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = tmp_path / "configs" / "pilot.toml"
+    expected.parent.mkdir()
+    expected.write_text("[experiment]\n", encoding="utf-8")
+    installed_module = tmp_path / ".venv" / "Lib" / "site-packages" / "llm_energy_bench" / "cli.py"
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "__file__", str(installed_module))
+
+    assert cli._default_config_path() == expected.resolve()
+
+
 def test_run_requires_a_config(capsys: pytest.CaptureFixture[str]) -> None:
     assert cli.main(["run"]) == cli.EXIT_USAGE
     assert "--config" in capsys.readouterr().err

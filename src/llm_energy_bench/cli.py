@@ -79,7 +79,13 @@ def doctor_environment(
             if runtime["available"]:
                 for model_name in config.models:
                     try:
-                        running = client.preload(model_name)
+                        running = client.preload(
+                            model_name,
+                            options={
+                                "num_ctx": config.options.num_ctx,
+                                "num_gpu": config.options.num_gpu,
+                            },
+                        )
                         record = running.to_dict()
                         record["requested"] = model_name
                         record["installed"] = True
@@ -131,6 +137,7 @@ def doctor_environment(
         "models": models,
         "controls": {
             "num_ctx": config.options.num_ctx,
+            "num_gpu": config.options.num_gpu,
             "kv_cache": config.options.kv_cache,
             "kv_cache_verification": "not_exposed_by_ollama_api",
             "concurrency": config.concurrency,
@@ -142,6 +149,9 @@ def doctor_environment(
 
 
 def _default_config_path() -> Path:
+    checkout_config = Path.cwd() / "configs" / "pilot.toml"
+    if checkout_config.is_file():
+        return checkout_config.resolve()
     return Path(__file__).resolve().parents[2] / "configs" / "pilot.toml"
 
 

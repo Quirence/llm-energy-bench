@@ -48,9 +48,9 @@ prompt against a loaded model:
 The field means what its name says, and prefill time follows it. The field
 already merged into `ollama.py` is therefore correct.
 
-## 3. A structural cache floor makes every request invalid today
+## 3. A structural cache floor required an explicit validity rule
 
-**This blocks the benchmark.** `runner.py` marks a request invalid when
+At the time of this observation, `runner.py` marked a request invalid when
 `prompt_eval_cached_count > 0`, and `results.py` repeats the rule in
 validation. But Ollama always reuses the chat-template preamble, so the count
 never reaches zero after the first request.
@@ -71,14 +71,16 @@ template preamble, not contamination. In the observation run all three
 measured requests were rejected with `cached_prompt_tokens`, so the run
 produced zero requests eligible for primary analysis.
 
-**Proposal (needs review by @Quirence and @Qcsteeven; `runner.py` and
-`results.py` are theirs).** Measure the floor instead of assuming zero: the
-warm-up requests already run per model, so take the cached count of the last
-warm-up as that model's template floor, record it in the manifest, and
-invalidate a request only when `prompt_eval_cached_count > floor`. The rule
-stays strict about real contamination and stops rejecting everything.
+**Resolution in Issue #13.** At least two warm-up requests are required. The
+cached count from the final warm-up is recorded with the model and digest as
+the template baseline. A measured request is invalid only when the count is
+missing or exceeds that baseline; counts at or below the floor remain valid.
+The output stores both the applied baseline and excess, and semantic
+validation recomputes the decision from raw fields. This policy is covered by
+hardware-independent tests but still requires confirmation with Ollama on the
+RTX 5060 host.
 
-## 4. The cache buster needs its entropy first
+## 4. The cache buster now puts entropy first
 
 `_cache_busted_prompt` prefixes the prompt with the request ID, but IDs share
 a long run-specific prefix (`<run-id>-request-000NN`), and the shared part is
@@ -97,6 +99,15 @@ Two thirds of a short prompt is served from cache, and prefill is measured on
 a quarter of the tokens the prompt actually has. Short prompts are exactly the
 decode-focused cases the protocol depends on. Putting a per-request random
 nonce at the very start of the prompt brings contamination down to the floor.
+
+The first Issue #13 implementation used a raw SHA-256 digest as the literal
+first line. RTX 5060 A/B testing showed that this changed a simple arithmetic
+answer into a safety refusal. The stabilized policy instead renders the first
+16 digest bytes as a deterministic UUID v4, followed by an explicit instruction
+to ignore the benchmark marker. Ten diagnostic requests preserved the answer
+and the 20-token template floor; the subsequent 18-request acceptance check
+produced the expected answer for all six scored repetitions with zero excess
+cached tokens.
 
 ## 5. Placement can be silently CPU-only
 
@@ -140,3 +151,12 @@ In `ollama.py` and `test_ollama.py` only:
 
 Nothing in `runner.py`, `results.py`, or the frozen prompt and model protocol
 was touched.
+
+## Follow-up change under Issue #13
+
+The runner and validator now implement the template-floor policy above, record
+the baseline and excess in derived metrics, require two warm-ups, and abort
+before measured requests when the baseline cannot be established. The prompt
+nonce also moved ahead of every static character. These are methodology fixes
+derived from this observation; they do not turn the GTX 1080 observation into
+an experimental run.

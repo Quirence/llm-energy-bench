@@ -28,6 +28,10 @@ path = "../prompts/pilot-v1.jsonl"
 
 [options]
 num_ctx = 4096
+# Ollama treats this as the requested number of GPU layers. A deliberately
+# high value forces all available model layers onto one GPU; preflight rejects
+# the run instead of silently accepting CPU offload when that cannot fit.
+num_gpu = 999
 temperature = 0.0
 # Seeds Ollama sampling; unrelated to order_seed above.
 seed = 42

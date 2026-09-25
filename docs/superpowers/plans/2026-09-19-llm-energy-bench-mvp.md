@@ -28,6 +28,8 @@ ruff, Ollama, NVIDIA NVML.
 - Unsupported telemetry values are `null`, never numeric zero.
 - Model downloading is never automatic.
 - Partial CPU offload invalidates a primary GPU run.
+- Preload and generation both send `num_gpu = 999`; `/api/ps`, not the
+  requested value, proves complete GPU placement.
 - Public artifacts contain no usernames, home paths, serial numbers, tokens,
   or raw GPU UUIDs.
 - Implementation uses test-first RED-GREEN-REFACTOR cycles.
@@ -124,7 +126,9 @@ run-directory layout.
 **Produces:**
 
 ```python
-OllamaClient.preload(model: str) -> RunningModel
+OllamaClient.preload(
+    model: str, *, options: Mapping[str, Any] | None = None
+) -> RunningModel
 OllamaClient.generate_stream(request: InferenceRequest) -> InferenceResult
 ```
 

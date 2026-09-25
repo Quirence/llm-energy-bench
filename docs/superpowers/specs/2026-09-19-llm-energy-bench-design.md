@@ -94,6 +94,7 @@ Default experiment controls are:
 
 ```text
 num_ctx = 4096
+num_gpu = 999
 temperature = 0
 seed = 42
 concurrency = 1
@@ -101,6 +102,10 @@ kv_cache = f16
 warmup_requests = 2
 telemetry_interval_ms = 100
 ```
+
+`num_gpu = 999` is sent during preload and measured generation to request all
+model layers on the GPU. It is only a request to Ollama: `/api/ps` placement
+data remains authoritative, and any partial CPU offload invalidates the run.
 
 The manifest records OS, GPU name, hashed GPU fingerprint, VRAM, driver,
 runtime version, model digest, quantization, context settings, prompt-set

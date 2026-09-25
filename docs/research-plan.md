@@ -11,7 +11,8 @@ research comparison begins.
 
 ### Pilot
 
-- GPU: RTX 3050 Laptop, used only as a smoke/pilot host;
+- GPU: MAIBENBEN X16C RTX 5060 Laptop, the primary measurement host;
+- optional regression host, if still available: RTX 3050 Laptop;
 - runtime: Ollama;
 - model: `llama3.2:3b-instruct-q4_K_M`;
 - prompts: two short/decode, two long/prefill, and two scored utility prompts;
@@ -27,13 +28,16 @@ research comparison begins.
   - `qwen3:4b-instruct-2507-q8_0`;
   - `llama3.2:3b-instruct-q4_K_M`;
   - `llama3.2:3b-instruct-q8_0`;
-- fixed inference settings: context length 4096, temperature 0, seed 42,
-  concurrency 1, and f16 KV cache;
+- fixed inference settings: context length 4096, requested GPU layers 999,
+  temperature 0, seed 42, concurrency 1, and f16 KV cache;
 - `benchmark-v1`: 24 prompts and five measured repetitions per configuration.
 
 Model tags and digests must be checked before the campaign. A run records the
 actual Ollama digest, runtime and driver versions, prompt/config hashes, power
 limit, temperature, VRAM context, and the telemetry source used.
+`num_gpu = 999` asks Ollama to place every layer on the GPU during preload and
+measured generation. It does not replace the `/api/ps` full-placement gate;
+partial CPU offload still invalidates a primary run.
 
 The four tags were rechecked against the official
 [Qwen3](https://ollama.com/library/qwen3/tags) and
@@ -90,6 +94,19 @@ instantaneous-power integration reported 23.881 J (11.852 W average). The
 counter therefore failed the consistency rule and the tool selected
 `power_instant_integration`. This is a preflight observation, not a completed
 model-inference experiment.
+
+Ollama's reusable chat-template preamble is controlled separately from prompt
+contamination. Every model performs at least two excluded warm-ups; the final
+warm-up's `prompt_eval_cached_count` becomes the per-model, per-digest template
+baseline recorded in the manifest. Every generated prompt starts with a
+deterministic UUID-form marker derived from a run-specific logical request key,
+followed by an instruction to ignore that metadata. The same prompt and
+repetition use the same marker across model configurations in one run. A
+measured request is eligible only when its cached count is present and does not
+exceed the baseline. All cached tokens, including the accepted template floor,
+are subtracted from the prefill-token numerator. The raw count, applied
+baseline, excess and cache-buster policy are stored so validation can reproduce
+the decision independently.
 
 ## Main Failure Condition
 

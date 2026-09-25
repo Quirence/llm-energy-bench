@@ -229,9 +229,7 @@ def _aggregate_report_rows(
                 "prefill_tokens_per_second": _safe_ratio(
                     total_prompt_tokens, sum(prompt_durations) / 1e9
                 ),
-                "decode_tokens_per_second": _safe_ratio(
-                    total_tokens, sum(decode_durations) / 1e9
-                ),
+                "decode_tokens_per_second": _safe_ratio(total_tokens, sum(decode_durations) / 1e9),
                 "average_gpu_power_median_watts": _median(average_power),
                 "observed_peak_gpu_power_max_watts": _maximum(peak_power),
                 "gpu_energy_joules": total_energy,
@@ -259,9 +257,7 @@ def _assign_ranks(rows: list[dict[str, Any]]) -> None:
     categories = sorted({str(row["prompt_category"]) for row in rows})
     for category in categories:
         eligible = [
-            row
-            for row in rows
-            if row["prompt_category"] == category and row["ranking_eligible"]
+            row for row in rows if row["prompt_category"] == category and row["ranking_eligible"]
         ]
         speed = sorted(
             eligible,
@@ -828,6 +824,10 @@ def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
         return  # The structural validation above already reports this.
     if manifest.get("schema_version") != 1:
         return
+    if manifest.get("prompt_cache_policy") != "template_floor_v1":
+        errors.append(f"{MANIFEST} schema v1 has no recognized prompt cache policy")
+    if manifest.get("cache_buster_policy") != "uuid_prefix_v1":
+        errors.append(f"{MANIFEST} schema v1 has no recognized cache buster policy")
 
     models = manifest.get("models")
     if not isinstance(models, list) or not models:
@@ -835,16 +835,26 @@ def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
         return
 
     expected_digests: dict[str, str] = {}
+    expected_cache_baselines: dict[str, int] = {}
     for model in models:
         if not isinstance(model, dict):
             errors.append(f"{MANIFEST} schema v1 contains a malformed model record")
             continue
         name = model.get("name")
         digest = model.get("digest")
+        cache_baseline = model.get("template_cache_baseline_tokens")
         if model.get("fully_on_gpu") is not True:
             errors.append(f"model {name!r} is not confirmed fully on GPU")
         if isinstance(name, str) and isinstance(digest, str) and digest:
             expected_digests[name] = digest
+            if (
+                isinstance(cache_baseline, int)
+                and not isinstance(cache_baseline, bool)
+                and cache_baseline >= 0
+            ):
+                expected_cache_baselines[name] = cache_baseline
+            else:
+                errors.append(f"model {name!r} has no valid template cache baseline")
 
     try:
         requests = read_jsonl(run_dir / REQUESTS)
@@ -879,8 +889,15 @@ def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
             errors.append(f"request {label} model digest does not match the manifest")
 
         cached = output.get("prompt_eval_cached_count")
-        if isinstance(cached, int) and not isinstance(cached, bool) and cached > 0:
-            errors.append(f"request {label} used {cached} cached prompt tokens")
+        cache_baseline = expected_cache_baselines.get(model_name)
+        cached_is_valid = isinstance(cached, int) and not isinstance(cached, bool) and cached >= 0
+        if not cached_is_valid:
+            errors.append(f"request {label} has no valid cached prompt token count")
+        elif cache_baseline is not None and cached > cache_baseline:
+            errors.append(
+                f"request {label} used {cached} cached prompt tokens above "
+                f"the template baseline of {cache_baseline}"
+            )
 
         metrics = output.get("metrics")
         if not isinstance(metrics, dict):
@@ -889,6 +906,15 @@ def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
         energy = metrics.get("gpu_energy_joules")
         if not isinstance(energy, int | float) or isinstance(energy, bool) or energy <= 0:
             errors.append(f"request {label} has no positive GPU energy")
+        if metrics.get("template_cache_baseline_tokens") != cache_baseline:
+            errors.append(f"request {label} cache baseline does not match the manifest")
+        expected_excess = (
+            max(0, cached - cache_baseline)
+            if cached_is_valid and cache_baseline is not None
+            else None
+        )
+        if metrics.get("excess_cached_prompt_tokens") != expected_excess:
+            errors.append(f"request {label} cached prompt excess is inconsistent")
         gap = metrics.get("max_telemetry_gap_seconds")
         if isinstance(gap, int | float) and not isinstance(gap, bool) and gap > 0.5:
             errors.append(f"request {label} has a telemetry gap above 500 ms")
@@ -896,7 +922,5 @@ def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
         times = sorted(telemetry_times.get(request_id, []))
         if len(times) < 2:
             errors.append(f"request {label} has no telemetry coverage")
-        elif any(
-            right - left > 0.5 for left, right in zip(times, times[1:], strict=False)
-        ):
+        elif any(right - left > 0.5 for left, right in zip(times, times[1:], strict=False)):
             errors.append(f"request {label} raw telemetry has a gap above 500 ms")

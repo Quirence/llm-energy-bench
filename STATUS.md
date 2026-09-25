@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-20
+Last updated: 2026-09-25
 
 ## Current Milestone
 
@@ -19,9 +19,10 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
   and `@Skipl1` (Dimas) to the Ollama runtime boundary and Issue #7.
 - Public GitHub milestones `M0 Bootstrap`, `M1 Measured Pilot`, `M2 Two-GPU
   Study`, and `M3 Paper Dataset` track the delivery stages.
-- `main` requires a pull request, one approval, CODEOWNERS review, successful
-  Windows and Linux CI, resolved conversations, and linear history. Force
-  pushes and branch deletion are disabled, including for administrators.
+- `main` requires a pull request, one approval, successful Windows and Linux
+  CI, resolved conversations, and linear history. The cross-review CODEOWNERS
+  map is included in the stabilization branch; code-owner enforcement can be
+  enabled after that branch merges without creating an ownership deadlock.
 - Detailed implementation plan prepared.
 - Task 1 (Qcsteeven): package shell, `doctor`/`run`/`report` parsing, fixed
   exit codes, packaging, and Windows/Linux CI.
@@ -45,51 +46,44 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
   Ollama 0.34.2 server. `doctor` reports the real version, digest and
   full-VRAM placement, and a streaming request completes end to end. The
   observation is recorded in `docs/ollama-runtime-observations.md`.
-- Integrated test baseline: 239 tests pass on Python 3.12 without Ollama or
-  NVIDIA hardware.
+- The consolidated stabilization branch passes 258 tests plus `ruff check` and
+  `ruff format --check` on Python 3.12 without requiring NVIDIA hardware.
+- Its local RTX 5060 acceptance check completed with 18/18 valid measured
+  requests, cache baseline 20, excess cache 0, and quality score 1.0. The raw
+  artifact remains unpublished until the reviewed branch is merged and tagged.
 
 ## In Progress
 
-- Task 8: validate the complete path with a real NVIDIA GPU and Ollama model.
-- Agreeing the prompt-cache validity rule the Issue #7 observation makes
-  necessary.
+- Review the single stabilization pull request that supersedes PRs #9, #12,
+  and #14--#16. Its code combines doctor path resolution, cross-review owners,
+  full-GPU placement, NVML sanity checks, the template floor and the verified
+  UUID cache marker.
 
 ## Next
 
-- Decide the cached-token rule and the cache-buster shape, then Task 8:
-  RTX 3050 hardware pilot.
+- Merge the stabilization pull request, tag its merge commit `pilot-v1-code`,
+  and run the committed RTX 5060 and RTX 4060 host configs independently.
 
 ## Blockers
 
-- **Every measured request is currently invalid.** Ollama reuses the chat
-  template preamble, so `prompt_eval_cached_count` never drops below about 20
-  tokens after the first request, while `runner.py` and `results.py` invalidate
-  any request with a non-zero cached count. Measured on a live 0.34.2 server;
-  the floor is constant across prompt bodies and lengths. A pilot cannot
-  produce valid data until the rule distinguishes the template floor from real
-  contamination.
-- **The cache buster leaks a shared prefix.** Request IDs share a long
-  run-specific head that Ollama caches: 46 of 69 prompt tokens came from cache
-  on a short prompt, so prefill was measured on a fraction of the prompt. The
-  per-request entropy has to come first.
-- Both are documented with evidence and a proposed fix in
-  `docs/ollama-runtime-observations.md` and await review by the owners of
-  `runner.py` and `results.py`.
-- End-to-end hardware validation on a matrix GPU is still pending. The Ollama
-  runtime path itself is now validated on real hardware, but only on a GTX
-  1080 observation host that is outside the research matrix.
-- The official Ollama 0.34.2 installer download timed out repeatedly from
-  GitHub on the RTX 3050 host. It installed without trouble on the GTX 1080
-  observation host, so the download, not the package, is the obstacle there.
+- The stabilization branch still needs one collaborator approval and green
+  Windows/Linux CI before it can become the tagged baseline.
+- Publishable end-to-end experimental validation remains pending. The local
+  acceptance run validates the implementation, but comparable artifacts must
+  come from the reviewed tag on both primary hosts.
 - Real NVML probing succeeds on the RTX 3050 and exposes all requested fields.
   Driver 572.83 reports an inconsistent total-energy counter, so the new
   per-request sanity check correctly falls back to instantaneous power
   integration; this still needs validation under model load.
+- RTX 5060 Laptop driver 591.66 exposes a state-dependent total-energy
+  counter: it can be physically inconsistent at idle or return no positive
+  request delta, while most inference intervals agree reasonably with power
+  integration. The per-request sanity gate and explicit fallback are therefore
+  still required. External-meter validation remains out of MVP scope.
 
 ## Latest Validated Run
 
-No experimental runs yet. Task 8 is the first measured run. The GTX 1080
-observation of 2026-09-20 exercised the runtime path end to end, but it used a
-non-matrix GPU and three prompts instead of the frozen protocol, and all three
-of its requests were rejected by the cached-token rule. It is an observation,
-not a run.
+No publishable experimental runs yet. The latest local acceptance check is the
+RTX 5060 18-request stabilization run documented in the experiment log; it is
+valid as implementation evidence but intentionally excluded from the dataset
+because its branch has not been reviewed, merged, and tagged.
