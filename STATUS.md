@@ -47,10 +47,15 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
   observation is recorded in `docs/ollama-runtime-observations.md`.
 - Integrated test baseline: 244 tests pass on Python 3.12 without Ollama or
   NVIDIA hardware.
+- A provisional local integration of PRs #14--#16 passes all 254 tests plus
+  `ruff check`, and completed the six-prompt RTX 5060 acceptance workload with
+  18/18 measured requests semantically valid. Its artifacts remain ignored
+  until the reviewed fixes are merged and the frozen run is repeated.
 
 ## In Progress
 
-- Task 8: validate the complete path with a real NVIDIA GPU and Ollama model.
+- Task 8: repeat the complete RTX 5060 path from a reviewed, merged commit and
+  publish only that reproducible run.
 - PR #14 enforces explicit full-GPU placement, PR #15 hardens NVML energy
   fallback, and PR #16 implements the reviewed template-cache baseline rule.
 - Hardening power integration against equal Windows timer readings and
@@ -66,18 +71,19 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - The validity fixes are green in CI but still await the required collaborator
   reviews and integration. Running and publishing the pilot against only a
   subset of those fixes would knowingly produce incomparable artifacts.
-- End-to-end experimental validation is still pending. The primary RTX 5060
-  Laptop now has Ollama 0.34.2 and the frozen pilot model, and its runtime,
-  placement, cache, and loaded-telemetry paths have been checked separately.
+- Publishable end-to-end experimental validation is still pending. A local
+  combined acceptance run completed with 18/18 valid measured requests, but
+  the three prerequisite fixes remain unmerged; therefore those artifacts are
+  deliberately excluded from the research dataset.
 - Real NVML probing succeeds on the RTX 3050 and exposes all requested fields.
   Driver 572.83 reports an inconsistent total-energy counter, so the new
   per-request sanity check correctly falls back to instantaneous power
   integration; this still needs validation under model load.
-- RTX 5060 Laptop driver 591.66 also reports a physically inconsistent
-  total-energy counter. Instantaneous power is usable, but diagnostic sampling
-  exposed equal monotonic timestamps and one impossible 4666 W reading. The
-  telemetry hardening change is verified both at idle and during a 256-token
-  model request; external-meter validation is still out of MVP scope.
+- RTX 5060 Laptop driver 591.66 exposes a state-dependent total-energy
+  counter: it can be physically inconsistent at idle or return no positive
+  request delta, while most inference intervals agree reasonably with power
+  integration. The per-request sanity gate and explicit fallback are therefore
+  still required. External-meter validation remains out of MVP scope.
 
 ## Latest Validated Run
 
