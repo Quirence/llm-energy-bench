@@ -51,36 +51,24 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 ## In Progress
 
 - Task 8: validate the complete path with a real NVIDIA GPU and Ollama model.
-- Agreeing the prompt-cache validity rule the Issue #7 observation makes
-  necessary.
+- PR #14 enforces explicit full-GPU placement, PR #15 hardens NVML energy
+  fallback, and PR #16 implements the reviewed template-cache baseline rule.
 - Hardening power integration against equal Windows timer readings and
   physically impossible NVML power samples observed on the RTX 5060 Laptop.
 
 ## Next
 
-- Decide the cached-token rule and the cache-buster shape, then Task 8:
-  RTX 3050 hardware pilot.
+- Review and merge PRs #14–#16, then execute the 18-request `pilot-v1` on the
+  RTX 5060 Laptop and commit it only if semantic validation passes.
 
 ## Blockers
 
-- **Every measured request is currently invalid.** Ollama reuses the chat
-  template preamble, so `prompt_eval_cached_count` never drops below about 20
-  tokens after the first request, while `runner.py` and `results.py` invalidate
-  any request with a non-zero cached count. Measured on a live 0.34.2 server;
-  the floor is constant across prompt bodies and lengths. A pilot cannot
-  produce valid data until the rule distinguishes the template floor from real
-  contamination.
-- **The cache buster leaks a shared prefix.** Request IDs share a long
-  run-specific head that Ollama caches: 46 of 69 prompt tokens came from cache
-  on a short prompt, so prefill was measured on a fraction of the prompt. The
-  per-request entropy has to come first.
-- Both are documented with evidence and a proposed fix in
-  `docs/ollama-runtime-observations.md` and await review by the owners of
-  `runner.py` and `results.py`.
-- End-to-end hardware validation on a matrix GPU is still pending. The primary
-  RTX 5060 Laptop host is available and its NVML path has been exercised, but
-  Ollama is not installed there yet. The runtime path itself is validated only
-  on a GTX 1080 observation host that is outside the research matrix.
+- The validity fixes are green in CI but still await the required collaborator
+  reviews and integration. Running and publishing the pilot against only a
+  subset of those fixes would knowingly produce incomparable artifacts.
+- End-to-end experimental validation is still pending. The primary RTX 5060
+  Laptop now has Ollama 0.34.2 and the frozen pilot model, and its runtime,
+  placement, cache, and loaded-telemetry paths have been checked separately.
 - Real NVML probing succeeds on the RTX 3050 and exposes all requested fields.
   Driver 572.83 reports an inconsistent total-energy counter, so the new
   per-request sanity check correctly falls back to instantaneous power
@@ -88,8 +76,8 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - RTX 5060 Laptop driver 591.66 also reports a physically inconsistent
   total-energy counter. Instantaneous power is usable, but diagnostic sampling
   exposed equal monotonic timestamps and one impossible 4666 W reading. The
-  telemetry hardening change is verified at idle and still needs model-load
-  validation.
+  telemetry hardening change is verified both at idle and during a 256-token
+  model request; external-meter validation is still out of MVP scope.
 
 ## Latest Validated Run
 

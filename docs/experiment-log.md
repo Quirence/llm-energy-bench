@@ -42,8 +42,30 @@ Ollama and `llama3.2:3b-instruct-q4_K_M` are available locally.
   all selected `power_instant_integration`; none was unavailable. Observed
   average and peak power stayed within approximately 8.71–9.21 W.
 - Scope: telemetry reliability validation at idle only. Ollama was not
-  installed, no model was loaded, and no inference run was produced. The same
-  checks must pass under model load before Task 8 is accepted.
+  installed during the initial probe, no model was loaded, and no inference
+  run was produced.
+
+#### Follow-up after Ollama installation
+
+- Runtime: Ollama 0.34.2, installed from the pinned `winget` package with a
+  verified installer hash.
+- Model: `llama3.2:3b-instruct-q4_K_M`, digest
+  `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72`,
+  quantization Q4_K_M, parameter size 3.2B.
+- Placement preflight: context 4096, `size_vram == size == 2,554,708,622`
+  bytes, GPU fraction 1.0.
+- Cache probe: the first excluded request paid 43.85 s of one-time startup;
+  the second completed in 0.58 s and reported a 20-token template floor. A
+  long-prompt probe then reported 20 cached of 468 prompt tokens, so the PR #16
+  policy recorded zero excess.
+- Loaded telemetry probe: a 256-output-token request completed in 2.47 s with
+  51 samples and a 63 ms maximum gap. The total-energy counter reported a
+  physically impossible 299.26 J delta. PR #15 rejected it and integrated
+  instantaneous power instead: 152.55 J, 61.79 W average, and 91.90 W observed
+  peak.
+- Scope: component-level hardware acceptance only. This was not the frozen
+  18-request pilot, no run directory was created, and no research comparison
+  is inferred from these values.
 
 ### 2026-09-20 — RTX 3050 Laptop NVML smoke check
 
