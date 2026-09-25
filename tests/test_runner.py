@@ -24,6 +24,7 @@ from llm_energy_bench.ollama import InferenceRequest, InferenceResult, RunningMo
 from llm_energy_bench.results import read_gzip_jsonl, read_jsonl
 from llm_energy_bench.runner import (
     RunnerPreflightError,
+    _integrate_power,
     derive_request_metrics,
     run_experiment,
 )
@@ -306,6 +307,76 @@ def test_instantaneous_power_uses_trapezoidal_integration() -> None:
     assert metrics.gpu_energy_joules == pytest.approx(44.0)
     assert metrics.average_gpu_power_watts == pytest.approx(44.0 / 3.0)
     assert metrics.observed_peak_gpu_power_watts == pytest.approx(18.0)
+
+
+def test_duplicate_timestamp_uses_the_latest_reading_without_losing_energy() -> None:
+    samples = (
+        sample("request-1", 0.0, energy_j=None, instant_w=10.0),
+        sample("request-1", 0.1, energy_j=None, instant_w=14.0),
+        sample("request-1", 0.1, energy_j=None, instant_w=16.0),
+    )
+
+    metrics = derive_request_metrics(
+        result(),
+        samples,
+        capabilities(EnergySource.POWER_INSTANT_INTEGRATION),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.energy_source is EnergySource.POWER_INSTANT_INTEGRATION
+    assert metrics.gpu_energy_joules == pytest.approx(1.3)
+    assert metrics.average_gpu_power_watts == pytest.approx(13.0)
+
+
+def test_power_integration_rejects_decreasing_timestamps() -> None:
+    assert _integrate_power([(0.1, 10.0), (0.0, 12.0)]) is None
+
+
+def test_implausible_instant_power_falls_back_to_legacy_power() -> None:
+    samples = (
+        sample("request-1", 0.0, energy_j=None, instant_w=9.0, legacy_w=8.0),
+        sample("request-1", 0.1, energy_j=None, instant_w=4_666.0, legacy_w=12.0),
+        sample("request-1", 0.2, energy_j=None, instant_w=10.0, legacy_w=16.0),
+    )
+
+    metrics = derive_request_metrics(
+        result(),
+        samples,
+        capabilities(EnergySource.POWER_INSTANT_INTEGRATION),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.energy_source is EnergySource.POWER_LEGACY_INTEGRATION
+    assert metrics.gpu_energy_joules == pytest.approx(2.4)
+    assert metrics.average_gpu_power_watts == pytest.approx(12.0)
+    assert metrics.observed_peak_gpu_power_watts == pytest.approx(16.0)
+    assert metrics.energy_fallback_reason is not None
+    assert "enforced power limit" in metrics.energy_fallback_reason
+
+
+def test_all_implausible_power_sources_make_energy_unavailable() -> None:
+    samples = (
+        sample("request-1", 0.0, energy_j=None, instant_w=9.0, legacy_w=8.0),
+        sample("request-1", 0.1, energy_j=None, instant_w=4_666.0, legacy_w=4_000.0),
+    )
+
+    metrics = derive_request_metrics(
+        result(),
+        samples,
+        capabilities(EnergySource.POWER_INSTANT_INTEGRATION),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.energy_source is EnergySource.UNAVAILABLE
+    assert metrics.gpu_energy_joules is None
+    assert metrics.average_gpu_power_watts is None
+    assert metrics.observed_peak_gpu_power_watts is None
+    assert "gpu_energy" in metrics.invalid_reasons
+    assert metrics.energy_fallback_reason is not None
+    assert "enforced power limit" in metrics.energy_fallback_reason
 
 
 def test_efficiency_throughput_and_optional_cost_formulas() -> None:

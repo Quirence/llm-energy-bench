@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-20
+Last updated: 2026-09-25
 
 ## Current Milestone
 
@@ -45,7 +45,7 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
   Ollama 0.34.2 server. `doctor` reports the real version, digest and
   full-VRAM placement, and a streaming request completes end to end. The
   observation is recorded in `docs/ollama-runtime-observations.md`.
-- Integrated test baseline: 239 tests pass on Python 3.12 without Ollama or
+- Integrated test baseline: 244 tests pass on Python 3.12 without Ollama or
   NVIDIA hardware.
 
 ## In Progress
@@ -53,6 +53,8 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - Task 8: validate the complete path with a real NVIDIA GPU and Ollama model.
 - Agreeing the prompt-cache validity rule the Issue #7 observation makes
   necessary.
+- Hardening power integration against equal Windows timer readings and
+  physically impossible NVML power samples observed on the RTX 5060 Laptop.
 
 ## Next
 
@@ -75,16 +77,19 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - Both are documented with evidence and a proposed fix in
   `docs/ollama-runtime-observations.md` and await review by the owners of
   `runner.py` and `results.py`.
-- End-to-end hardware validation on a matrix GPU is still pending. The Ollama
-  runtime path itself is now validated on real hardware, but only on a GTX
-  1080 observation host that is outside the research matrix.
-- The official Ollama 0.34.2 installer download timed out repeatedly from
-  GitHub on the RTX 3050 host. It installed without trouble on the GTX 1080
-  observation host, so the download, not the package, is the obstacle there.
+- End-to-end hardware validation on a matrix GPU is still pending. The primary
+  RTX 5060 Laptop host is available and its NVML path has been exercised, but
+  Ollama is not installed there yet. The runtime path itself is validated only
+  on a GTX 1080 observation host that is outside the research matrix.
 - Real NVML probing succeeds on the RTX 3050 and exposes all requested fields.
   Driver 572.83 reports an inconsistent total-energy counter, so the new
   per-request sanity check correctly falls back to instantaneous power
   integration; this still needs validation under model load.
+- RTX 5060 Laptop driver 591.66 also reports a physically inconsistent
+  total-energy counter. Instantaneous power is usable, but diagnostic sampling
+  exposed equal monotonic timestamps and one impossible 4666 W reading. The
+  telemetry hardening change is verified at idle and still needs model-load
+  validation.
 
 ## Latest Validated Run
 
