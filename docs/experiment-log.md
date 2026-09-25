@@ -67,6 +67,36 @@ Ollama and `llama3.2:3b-instruct-q4_K_M` are available locally.
   18-request pilot, no run directory was created, and no research comparison
   is inferred from these values.
 
+#### Provisional combined integration run
+
+- Scope: local acceptance of the combined, still-unmerged PR #14, PR #15, and
+  PR #16 changes. The run directory is intentionally ignored by Git and must
+  not be treated as a frozen or published research artifact.
+- Workload: the six `pilot-v1` prompts, three measured repetitions, two
+  excluded warm-ups, one model, concurrency 1, and 18 measured requests.
+- Runtime and placement: Ollama 0.34.2; the same model digest listed above;
+  context 4096; GPU fraction 1.0 on the RTX 5060 Laptop.
+- Cache result: the final warm-up established a 20-token template baseline.
+  All 18 measured requests reported 20 raw cached tokens and zero excess, so
+  none was rejected as prompt-cache contamination.
+- Telemetry result: semantic validation accepted all 18 requests. Seventeen
+  requests used the total-energy counter after its per-request sanity check;
+  one short request produced no positive counter delta and fell back to
+  instantaneous-power integration. For requests that retained the counter,
+  its energy was approximately 0.73--1.29 times the independently integrated
+  instantaneous-power estimate. The mixed source is recorded explicitly in
+  the derived summary rather than hidden.
+- Coverage: the largest observed telemetry gap was 125 ms, below the 500 ms
+  rejection threshold. The maximum observed power sample was 91.70 W; this is
+  an observed sample, not a claim about wall power or sustained TGP.
+- Analysis result: the report generated successfully, but no comparative rank
+  is possible with one model configuration. The scored prompts averaged 0.5,
+  below the frozen 0.75 quality floor, so the configuration was correctly
+  excluded from ranking.
+- Decision: the acceptance run supports the implementation path only. It
+  makes no speed-versus-energy research claim and will be repeated from the
+  reviewed, merged commit before publication.
+
 ### 2026-09-20 — RTX 3050 Laptop NVML smoke check
 
 - Contributor: Quirence/Codex
