@@ -11,7 +11,8 @@ research comparison begins.
 
 ### Pilot
 
-- GPU: RTX 3050 Laptop, used only as a smoke/pilot host;
+- GPU: MAIBENBEN X16C RTX 5060 Laptop, the primary measurement host;
+- optional regression host, if still available: RTX 3050 Laptop;
 - runtime: Ollama;
 - model: `llama3.2:3b-instruct-q4_K_M`;
 - prompts: two short/decode, two long/prefill, and two scored utility prompts;
@@ -90,6 +91,16 @@ instantaneous-power integration reported 23.881 J (11.852 W average). The
 counter therefore failed the consistency rule and the tool selected
 `power_instant_integration`. This is a preflight observation, not a completed
 model-inference experiment.
+
+Ollama's reusable chat-template preamble is controlled separately from prompt
+contamination. Every model performs at least two excluded warm-ups; the final
+warm-up's `prompt_eval_cached_count` becomes the per-model, per-digest template
+baseline recorded in the manifest. Every generated prompt starts with a
+request-specific SHA-256 nonce before any shared text. A measured request is
+eligible only when its cached count is present and does not exceed the
+baseline. All cached tokens, including the accepted template floor, are
+subtracted from the prefill-token numerator. The raw count, applied baseline,
+and excess are stored so validation can reproduce the decision independently.
 
 ## Main Failure Condition
 

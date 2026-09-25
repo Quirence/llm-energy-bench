@@ -60,3 +60,22 @@ Ollama and `llama3.2:3b-instruct-q4_K_M` are available locally.
   `docs/ollama-runtime-observations.md`.
 - Telemetry note: unlike the RTX 3050 host, this driver's total-energy counter
   is self-consistent, matching integrated power to about 1.5%.
+
+## Methodology Decisions
+
+### 2026-09-25 — Ollama template-cache baseline
+
+- Source observation: the 2026-09-20 GTX 1080 runtime check above found a
+  stable 20–21 token chat-template floor and additional contamination from a
+  shared cache-buster prefix.
+- Decision: require at least two warm-ups for every model and use the final
+  warm-up's cached count as the recorded per-model, per-digest baseline.
+- Validity rule: a measured cached count must be present and no larger than the
+  baseline. The raw count, applied baseline, and excess are persisted and
+  independently checked by semantic validation.
+- Prompt construction: a deterministic SHA-256 request nonce is the literal
+  first line, before the shared marker and prompt body.
+- Metric rule: prefill throughput excludes all cached tokens, including the
+  accepted template floor.
+- Scope: code and synthetic-test validation only. The policy is not considered
+  hardware-validated until it passes against Ollama on the RTX 5060 host.
