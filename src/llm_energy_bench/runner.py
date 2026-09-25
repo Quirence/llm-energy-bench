@@ -139,7 +139,7 @@ def derive_request_metrics(
     prompt: PromptCase,
     *,
     repetition: int,
-    template_cache_baseline_tokens: int,
+    template_cache_baseline_tokens: int = 0,
     tariff_per_kwh: float | None = None,
     currency: str | None = None,
 ) -> RequestMetrics:
