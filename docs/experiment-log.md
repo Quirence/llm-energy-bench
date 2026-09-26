@@ -22,6 +22,49 @@ run repeated from the reviewed, merged implementation.
 
 ## Environment Probes
 
+### 2026-09-26 — RTX 4060 Ti desktop pilot-v1 observation
+
+- Contributor: Qcsteeven
+- Scope: three independently launched `pilot-v1` runs on the unmerged
+  stabilization branch (`a683a57`, PR #17). They are **not** publishable runs:
+  the code is not yet tagged `pilot-v1-code`, and the GPU is an RTX 4060 Ti,
+  not the RTX 4060 named in Issue #5. The runs used a local copy of
+  `configs/pilot-rtx4060.toml` that differs only by
+  `host_id = "rtx4060ti-desktop"`. Artifacts stay local and are not committed.
+- GPU: NVIDIA GeForce RTX 4060 Ti, 8 GiB; driver 560.94; enforced power limit
+  160 W (the RTX 4060 is a 115 W part, so the two are not interchangeable
+  hosts).
+- Runtime: Ollama 0.34.2 (portable build); model
+  `llama3.2:3b-instruct-q4_K_M`, digest `a80c4f17acd5…`, pulled by hand.
+- Preflight: `doctor --json` returned `ok: true` with the frozen version and
+  digest, `fully_on_gpu: true`, `gpu_fraction: 1.0`, and
+  `energy_source: total_energy_counter`.
+- Result: 54/54 measured requests valid across the three runs, every
+  `validation.json` reports `ok: true`, quality 1.0 in every run, template
+  cache baseline 20, 21 and 20 tokens, excess cache 0 on every request.
+- Energy source: 48 requests used the total-energy counter; 6 fell back to
+  instantaneous-power integration because the counter produced no positive
+  delta. All six fallbacks record their reason.
+- Run-level repeatability (ratio of sums per run, three runs):
+
+  | Category | tok/s per run | CV | tok/J per run | CV | Threshold |
+  | --- | --- | ---: | --- | ---: | ---: |
+  | short | 99.9, 101.8, 98.7 | 1.5% | 0.940, 0.928, 0.918 | 1.1% | 5.0% |
+  | long | 90.3, 89.7, 87.9 | 1.4% | 0.836, 0.832, 0.819 | 1.0% | 5.0% |
+  | scored | 46.0, 42.4, 40.5 | 6.6% | 0.291, 0.334, 0.454 | 23.5% | 70.4% |
+
+- Finding: scored utility requests produce two output tokens in about 40–50
+  ms, which spans only two 100 ms telemetry samples. Their energy is therefore
+  at the resolution limit of the sampler, the energy CV reaches 23.5%, and
+  single requests imply average power up to 184 W against the 160 W limit. The
+  `scored` block can gate quality, but its energy ranking cannot support a
+  material-inversion claim. Decode-heavy `short` and prefill-heavy `long`
+  blocks are stable to about 1–1.5%.
+- Finding: output length varies between repetitions of the same prompt at
+  temperature 0 and seed 42 (for example 122, 105 and 135 tokens), consistent
+  with the per-repetition UUID marker changing the prompt. Ratio-of-sums
+  metrics absorb this, but per-request comparisons across repetitions do not.
+
 ### 2026-09-25 — RTX 5060 Laptop NVML reliability check
 
 - Contributor: Quirence/Codex
