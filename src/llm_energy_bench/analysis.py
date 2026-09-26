@@ -2,30 +2,40 @@
 
 The reports already say whether speed-only and energy-aware rankings pick the
 same configuration. This module decides whether a difference is worth
-believing, under the criteria fixed in the approved design before any data was
-collected.
+believing, under the criteria fixed in ``docs/research-plan.md`` before any
+data was collected.
+
+A decision block is one host and one prompt category. Within a block the
+configurations are the models measured on that host; a configuration is
+eligible only when its quality over all scored prompts reaches the 75% floor.
 
 A disagreement counts only when both of these hold:
 
-* its relative effect reaches ``max(5%, 3 x repeatability CV)``, so a
-  difference smaller than the measurement's own noise never overturns a
-  conclusion;
-* a bootstrap 95% confidence interval for the difference excludes zero.
+* its relative effect reaches ``max(5%, 3 x max(CV_speed, CV_energy))``,
+  where the CVs come from three independently launched calibration runs on the
+  same host and prompt category, so a difference smaller than the
+  measurement's own noise never overturns a conclusion;
+* a bootstrap 95% confidence interval for the effect excludes zero.
+
+Without calibration data materiality cannot be judged, so a disagreement in
+an uncalibrated block keeps the verdict inconclusive instead of being waved
+through with a guessed threshold.
 
 The thresholds are deliberately fixed in code rather than chosen per dataset.
 Picking them after seeing results is how an honest negative turns into a
 positive.
 
-Bootstrap resampling is over requests, and every draw recomputes the aggregate
-ratio from resampled totals. Resampling per-request ratios instead would let a
-tiny request weigh as much as a long one, which the analysis rules forbid.
+The bootstrap is hierarchical: each draw samples prompt IDs with replacement,
+then repetitions within every selected prompt, and recomputes the aggregate
+ratio from resampled totals. Prompt IDs are shared between the two compared
+configurations because both answered the same prompts.
 """
 
 from __future__ import annotations
 
 import random
 import statistics
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -35,8 +45,9 @@ CV_MULTIPLIER = 3.0
 QUALITY_FLOOR = 0.75
 AGREEMENT_FLOOR = 0.90
 CONFIDENCE = 0.95
-BOOTSTRAP_ITERATIONS = 2000
+BOOTSTRAP_ITERATIONS = 10_000
 BOOTSTRAP_SEED = 42
+CALIBRATION_RUNS = 3
 
 LIMITATIONS = (
     "Energy is measured through NVML on the GPU only. It excludes the "
@@ -44,6 +55,13 @@ LIMITATIONS = (
     "wall-energy or total-cost-of-ownership claim follows from these numbers. "
     "Any cost shown is a GPU-only electricity estimate."
 )
+
+# One request as (output tokens, energy in joules, latency in seconds).
+Request = tuple[float, float, float]
+
+
+class AnalysisError(ValueError):
+    """Run artifacts cannot support the analysis without guessing."""
 
 
 class HypothesisOutcome(StrEnum):
@@ -56,54 +74,60 @@ class HypothesisOutcome(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class BlockMeasurements:
-    """One configuration's requests within one workload block."""
+    """One configuration's valid requests within one decision block.
+
+    ``prompts`` maps each prompt ID to its repetitions, which the hierarchical
+    bootstrap needs. ``quality_score`` belongs to the configuration as a whole,
+    not to this block, so a block without scored prompts cannot rescue a
+    configuration that failed the scored ones.
+    """
 
     label: str
     block: str
-    output_tokens: tuple[float, ...]
-    energy_joules: tuple[float, ...]
-    latency_seconds: tuple[float, ...]
-    quality_score: float | None = None
+    prompts: Mapping[str, tuple[Request, ...]]
+    quality_score: float | None
 
     @property
     def eligible(self) -> bool:
         """Only a configuration that answers correctly enough may be ranked."""
-        return self.quality_score is None or self.quality_score >= QUALITY_FLOOR
+        return self.quality_score is not None and self.quality_score >= QUALITY_FLOOR
+
+    @property
+    def requests(self) -> tuple[Request, ...]:
+        return tuple(request for prompt in sorted(self.prompts) for request in self.prompts[prompt])
 
     @property
     def tokens_per_second(self) -> float | None:
-        return aggregate_ratio(self.output_tokens, self.latency_seconds)
+        requests = self.requests
+        return aggregate_ratio([r[0] for r in requests], [r[2] for r in requests])
 
     @property
     def tokens_per_joule(self) -> float | None:
-        return aggregate_ratio(self.output_tokens, self.energy_joules)
-
-    def repeatability(self) -> float | None:
-        """Spread of the per-request energy cost, used to size a real effect."""
-        per_request = [
-            energy / tokens
-            for tokens, energy in zip(self.output_tokens, self.energy_joules, strict=False)
-            if tokens
-        ]
-        return repeatability_cv(per_request)
+        requests = self.requests
+        return aggregate_ratio([r[0] for r in requests], [r[1] for r in requests])
 
 
 @dataclass(frozen=True, slots=True)
 class Inversion:
-    """One workload block where speed and energy disagreed."""
+    """One decision block where speed and energy disagreed."""
 
     block: str
     speed_winner: str
     energy_winner: str
     relative_effect: float | None
-    threshold: float
+    threshold: float | None
     ci_low: float | None
     ci_high: float | None
     material: bool
     reason: str
 
+    @property
+    def assessable(self) -> bool:
+        """Whether materiality could be decided at all for this block."""
+        return self.threshold is not None and self.relative_effect is not None
+
     def to_dict(self) -> dict[str, Any]:
-        return {field: getattr(self, field) for field in self.__slots__}
+        return {name: getattr(self, name) for name in self.__slots__}
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,7 +167,7 @@ class HypothesisVerdict:
             "",
             self.statement,
             "",
-            f"- Workload blocks evaluated: {self.blocks_evaluated}",
+            f"- Decision blocks (host x prompt category) evaluated: {self.blocks_evaluated}",
             f"- Blocks where speed and energy agreed: {self.blocks_in_agreement}"
             + (
                 ""
@@ -151,8 +175,10 @@ class HypothesisVerdict:
                 else f" ({self.agreement_rate:.0%}, floor {AGREEMENT_FLOOR:.0%})"
             ),
             f"- Criteria: effect at least max({MINIMUM_EFFECT:.0%}, "
-            f"{CV_MULTIPLIER:.0f} x repeatability CV) and a bootstrap "
-            f"{CONFIDENCE:.0%} confidence interval excluding zero",
+            f"{CV_MULTIPLIER:.0f} x max(CV_speed, CV_energy)) from "
+            f"{CALIBRATION_RUNS} calibration runs, and a hierarchical bootstrap "
+            f"{CONFIDENCE:.0%} confidence interval ({BOOTSTRAP_ITERATIONS:,} resamples, "
+            f"seed {BOOTSTRAP_SEED}) excluding zero",
         ]
         if self.excluded:
             lines.append(
@@ -205,54 +231,66 @@ def repeatability_cv(values: Sequence[float]) -> float | None:
     return abs(statistics.stdev(values) / mean)
 
 
-def material_threshold(cv: float | None) -> float:
+def material_threshold(cv: float) -> float:
     """The smallest effect worth believing, given the measurement's noise."""
-    if cv is None:
-        return MINIMUM_EFFECT
     return max(MINIMUM_EFFECT, CV_MULTIPLIER * cv)
 
 
-def bootstrap_ratio_difference_ci(
-    a_numerators: Sequence[float],
-    a_denominators: Sequence[float],
-    b_numerators: Sequence[float],
-    b_denominators: Sequence[float],
+def bootstrap_relative_effect_ci(
+    challenger: Mapping[str, Sequence[tuple[float, float]]],
+    baseline: Mapping[str, Sequence[tuple[float, float]]],
     *,
     confidence: float = CONFIDENCE,
     iterations: int = BOOTSTRAP_ITERATIONS,
     seed: int = BOOTSTRAP_SEED,
 ) -> tuple[float | None, float | None]:
-    """Confidence interval for ``ratio(a) - ratio(b)``, resampling requests.
+    """Confidence interval for ``ratio(challenger) / ratio(baseline) - 1``.
 
-    Each draw recomputes the aggregate ratio from resampled totals, so the
-    interval describes the quantity the reports actually publish.
+    Both inputs map a prompt ID to its repetitions as ``(numerator,
+    denominator)`` pairs. Every draw samples the shared prompt IDs with
+    replacement, then repetitions within each selected prompt for each
+    configuration, and recomputes both ratios from the resampled totals. The
+    interval therefore describes the effect the verdict actually tests, and a
+    prompt with many repetitions never outweighs one with few.
     """
-    if aggregate_ratio(a_numerators, a_denominators) is None:
-        return None, None
-    if aggregate_ratio(b_numerators, b_denominators) is None:
+    prompts = sorted(
+        prompt
+        for prompt in set(challenger) & set(baseline)
+        if challenger[prompt] and baseline[prompt]
+    )
+    if not prompts:
         return None, None
 
     rng = random.Random(seed)
-    differences: list[float] = []
+    effects: list[float] = []
     for _ in range(iterations):
-        a = _resampled_ratio(a_numerators, a_denominators, rng)
-        b = _resampled_ratio(b_numerators, b_denominators, rng)
-        if a is not None and b is not None:
-            differences.append(a - b)
+        drawn = [prompts[rng.randrange(len(prompts))] for _ in prompts]
+        a = _resampled_ratio(challenger, drawn, rng)
+        b = _resampled_ratio(baseline, drawn, rng)
+        if a is not None and b is not None and b > 0:
+            effects.append(a / b - 1.0)
 
-    if not differences:
+    if not effects:
         return None, None
-    differences.sort()
+    effects.sort()
     tail = (1.0 - confidence) / 2.0
-    return _quantile(differences, tail), _quantile(differences, 1.0 - tail)
+    return _quantile(effects, tail), _quantile(effects, 1.0 - tail)
 
 
 def _resampled_ratio(
-    numerators: Sequence[float], denominators: Sequence[float], rng: random.Random
+    samples: Mapping[str, Sequence[tuple[float, float]]],
+    prompts: Sequence[str],
+    rng: random.Random,
 ) -> float | None:
-    size = min(len(numerators), len(denominators))
-    indices = [rng.randrange(size) for _ in range(size)]
-    return aggregate_ratio([numerators[i] for i in indices], [denominators[i] for i in indices])
+    numerator = 0.0
+    denominator = 0.0
+    for prompt in prompts:
+        repetitions = samples[prompt]
+        for _ in repetitions:
+            value, weight = repetitions[rng.randrange(len(repetitions))]
+            numerator += value
+            denominator += weight
+    return numerator / denominator if denominator > 0 else None
 
 
 def _quantile(sorted_values: Sequence[float], fraction: float) -> float:
@@ -272,11 +310,17 @@ def _quantile(sorted_values: Sequence[float], fraction: float) -> float:
 
 def evaluate_hypothesis(
     measurements: Sequence[BlockMeasurements],
+    repeatability: Mapping[str, float] | None = None,
     *,
     seed: int = BOOTSTRAP_SEED,
     iterations: int = BOOTSTRAP_ITERATIONS,
 ) -> HypothesisVerdict:
-    """Apply the pre-registered criteria to a frozen dataset."""
+    """Apply the pre-registered criteria to a frozen dataset.
+
+    ``repeatability`` maps a decision block to ``max(CV_speed, CV_energy)``
+    from its calibration runs; see :func:`calibration_repeatability`.
+    """
+    repeatability = repeatability or {}
     excluded = tuple(sorted({m.label for m in measurements if not m.eligible}))
     eligible = [m for m in measurements if m.eligible]
     labels = tuple(sorted({m.label for m in eligible}))
@@ -312,16 +356,24 @@ def evaluate_hypothesis(
             agreed += 1
             continue
         inversions.append(
-            _assess(name, speed_winner, energy_winner, seed=seed, iterations=iterations)
+            _assess(
+                name,
+                speed_winner,
+                energy_winner,
+                repeatability.get(name),
+                seed=seed,
+                iterations=iterations,
+            )
         )
 
     evaluated = agreed + len(inversions)
     rate = agreed / evaluated if evaluated else None
     material = [inversion for inversion in inversions if inversion.material]
+    unassessed = [inversion for inversion in inversions if not inversion.assessable]
 
     if material:
         outcome = HypothesisOutcome.MATERIAL_INVERSION
-    elif rate is not None and rate >= AGREEMENT_FLOOR:
+    elif rate is not None and rate >= AGREEMENT_FLOOR and not unassessed:
         outcome = HypothesisOutcome.UNSUPPORTED
     else:
         outcome = HypothesisOutcome.INCONCLUSIVE
@@ -334,7 +386,7 @@ def evaluate_hypothesis(
         inversions=tuple(inversions),
         excluded=excluded,
         configurations=labels,
-        statement=_statement(outcome, agreed, evaluated, rate, material),
+        statement=_statement(outcome, agreed, evaluated, rate, material, unassessed),
     )
 
 
@@ -350,6 +402,7 @@ def _assess(
     block: str,
     speed_winner: BlockMeasurements,
     energy_winner: BlockMeasurements,
+    cv: float | None,
     *,
     seed: int,
     iterations: int,
@@ -361,21 +414,11 @@ def _assess(
     if baseline is not None and challenger is not None and baseline > 0:
         effect = (challenger - baseline) / baseline
 
-    cv = max(
-        (
-            value
-            for value in (speed_winner.repeatability(), energy_winner.repeatability())
-            if value is not None
-        ),
-        default=None,
-    )
-    threshold = material_threshold(cv)
+    threshold = None if cv is None else material_threshold(cv)
 
-    low, high = bootstrap_ratio_difference_ci(
-        energy_winner.output_tokens,
-        energy_winner.energy_joules,
-        speed_winner.output_tokens,
-        speed_winner.energy_joules,
+    low, high = bootstrap_relative_effect_ci(
+        _energy_pairs(energy_winner),
+        _energy_pairs(speed_winner),
         iterations=iterations,
         seed=seed,
     )
@@ -383,6 +426,11 @@ def _assess(
 
     if effect is None:
         reason = "the energy metric is unavailable for one configuration"
+    elif threshold is None:
+        reason = (
+            f"no {CALIBRATION_RUNS}-run calibration exists for this block, so "
+            "materiality cannot be assessed"
+        )
     elif abs(effect) < threshold:
         reason = (
             f"the {abs(effect):.1%} effect is below the {threshold:.1%} threshold set by "
@@ -393,7 +441,9 @@ def _assess(
     else:
         reason = "the effect exceeds the repeatability threshold and the interval excludes zero"
 
-    material = effect is not None and abs(effect) >= threshold and excludes_zero
+    material = (
+        effect is not None and threshold is not None and abs(effect) >= threshold and excludes_zero
+    )
     return Inversion(
         block=block,
         speed_winner=speed_winner.label,
@@ -407,17 +457,25 @@ def _assess(
     )
 
 
+def _energy_pairs(measurement: BlockMeasurements) -> dict[str, tuple[tuple[float, float], ...]]:
+    return {
+        prompt: tuple((tokens, energy) for tokens, energy, _latency in requests)
+        for prompt, requests in measurement.prompts.items()
+    }
+
+
 def _statement(
     outcome: HypothesisOutcome,
     agreed: int,
     evaluated: int,
     rate: float | None,
     material: Sequence[Inversion],
+    unassessed: Sequence[Inversion],
 ) -> str:
     if outcome is HypothesisOutcome.UNSUPPORTED:
         return (
             f"Speed-only and energy-aware ranking selected the same configuration in "
-            f"{agreed} of {evaluated} workload blocks ({rate:.0%}), at or above the "
+            f"{agreed} of {evaluated} decision blocks ({rate:.0%}), at or above the "
             f"{AGREEMENT_FLOOR:.0%} floor, and no material rank inversion was found. "
             "The hypothesis is reported as unsupported in the tested scope. This is a "
             "valid result: it says energy-aware metrics did not change the engineering "
@@ -427,14 +485,22 @@ def _statement(
         blocks = ", ".join(inversion.block for inversion in material)
         return (
             f"Speed-only and energy-aware ranking selected different configurations in "
-            f"{len(material)} workload block(s) ({blocks}) by a margin exceeding the "
+            f"{len(material)} decision block(s) ({blocks}) by a margin exceeding the "
             "repeatability threshold, with a bootstrap 95% confidence interval that "
             "excludes zero. The hypothesis is supported in the tested scope."
         )
     if rate is None:
-        return "No comparable workload block was available, so no verdict is recorded."
+        return "No comparable decision block was available, so no verdict is recorded."
+    if unassessed:
+        blocks = ", ".join(inversion.block for inversion in unassessed)
+        return (
+            f"Speed and energy agreed in {agreed} of {evaluated} decision blocks "
+            f"({rate:.0%}), but the disagreement in {blocks} could not be assessed "
+            "because calibration data or the energy metric is missing. The result is "
+            "inconclusive until that data exists; neither verdict is recorded."
+        )
     return (
-        f"Speed and energy agreed in {agreed} of {evaluated} workload blocks "
+        f"Speed and energy agreed in {agreed} of {evaluated} decision blocks "
         f"({rate:.0%}), below the {AGREEMENT_FLOOR:.0%} floor, but no disagreement was "
         "large or stable enough to count as a material inversion. The result is "
         "inconclusive in the tested scope; neither verdict is recorded."
@@ -449,11 +515,14 @@ def _no_comparison_statement(labels: Sequence[str], excluded: Sequence[str]) -> 
         )
     else:
         base = (
-            "No workload block contained two eligible configurations, so no ranking "
+            "No decision block contained two eligible configurations, so no ranking "
             "comparison is possible and no verdict is recorded."
         )
     if excluded:
-        base += f" Excluded below the {QUALITY_FLOOR:.0%} quality floor: {', '.join(excluded)}."
+        base += (
+            f" Excluded below the {QUALITY_FLOOR:.0%} quality floor or without a "
+            f"quality score: {', '.join(excluded)}."
+        )
     return base
 
 
@@ -464,7 +533,7 @@ def _percent(value: float | None) -> str:
 def _interval(low: float | None, high: float | None) -> str:
     if low is None or high is None:
         return "—"
-    return f"[{low:+.3g}, {high:+.3g}]"
+    return f"[{low:+.1%}, {high:+.1%}]"
 
 
 # --------------------------------------------------------------------------
@@ -472,57 +541,117 @@ def _interval(low: float | None, high: float | None) -> str:
 # --------------------------------------------------------------------------
 
 
-def blocks_from_records(
-    records: Sequence[dict[str, Any]], manifests: dict[str, dict[str, Any]] | None = None
-) -> tuple[BlockMeasurements, ...]:
-    """Group validated request records into per-configuration workload blocks.
+def block_name(host: str, category: str) -> str:
+    """The decision block for one host and prompt category."""
+    return f"{host} / {category}"
 
-    A workload block is one prompt category, matching how the reports already
-    rank configurations. A configuration is one host and model pair, so the
-    same model measured on two hosts stays comparable.
+
+def blocks_from_records(
+    records: Sequence[Mapping[str, Any]], manifests: Mapping[str, Mapping[str, Any]]
+) -> tuple[BlockMeasurements, ...]:
+    """Group valid request records into per-configuration decision blocks.
+
+    A configuration is one host and model pair. Its quality score averages
+    repetitions of each scored prompt first and then prompt IDs, over every
+    category, so eligibility is a property of the configuration rather than of
+    whichever block happens to contain the scored prompts.
     """
-    manifests = manifests or {}
-    grouped: dict[tuple[str, str], dict[str, list[float]]] = {}
-    quality: dict[tuple[str, str], list[float]] = {}
+    requests: dict[tuple[str, str, str], dict[str, list[Request]]] = {}
+    quality: dict[tuple[str, str], dict[str, list[float]]] = {}
 
     for record in records:
         metrics = record.get("metrics")
-        if not isinstance(metrics, dict):
+        if not isinstance(metrics, Mapping):
             continue
-        run_id = str(record.get("run_id", ""))
-        host = str((manifests.get(run_id, {}).get("config") or {}).get("host_id") or run_id)
-        label = f"{host} / {metrics.get('model') or record.get('model') or ''}"
-        key = (label, str(metrics.get("prompt_category") or ""))
-
-        tokens = _positive(metrics.get("output_tokens"))
-        energy = _positive(metrics.get("gpu_energy_joules"))
-        latency = _positive(metrics.get("latency_seconds"))
-        if tokens is None or energy is None or latency is None:
-            continue
-
-        bucket = grouped.setdefault(key, {"tokens": [], "energy": [], "latency": []})
-        bucket["tokens"].append(tokens)
-        bucket["energy"].append(energy)
-        bucket["latency"].append(latency)
+        host = _host(record, manifests)
+        model = str(record.get("model") or "unknown")
+        category = str(record.get("prompt_category") or metrics.get("prompt_category") or "")
+        prompt = str(record.get("prompt_id") or metrics.get("prompt_id") or "")
 
         score = metrics.get("quality_score")
-        if isinstance(score, (int, float)):
-            quality.setdefault(key, []).append(float(score))
+        if isinstance(score, (int, float)) and not isinstance(score, bool):
+            quality.setdefault((host, model), {}).setdefault(prompt, []).append(float(score))
+
+        request = _request(metrics)
+        if request is not None:
+            by_prompt = requests.setdefault((host, model, category), {})
+            by_prompt.setdefault(prompt, []).append(request)
 
     blocks = []
-    for (label, category), bucket in sorted(grouped.items()):
-        scores = quality.get((label, category))
+    for (host, model, category), by_prompt in sorted(requests.items()):
+        scores = quality.get((host, model))
         blocks.append(
             BlockMeasurements(
-                label=label,
-                block=category,
-                output_tokens=tuple(bucket["tokens"]),
-                energy_joules=tuple(bucket["energy"]),
-                latency_seconds=tuple(bucket["latency"]),
-                quality_score=statistics.fmean(scores) if scores else None,
+                label=f"{host} / {model}",
+                block=block_name(host, category),
+                prompts={prompt: tuple(by_prompt[prompt]) for prompt in sorted(by_prompt)},
+                quality_score=(
+                    statistics.fmean(statistics.fmean(values) for values in scores.values())
+                    if scores
+                    else None
+                ),
             )
         )
     return tuple(blocks)
+
+
+def calibration_repeatability(
+    records: Sequence[Mapping[str, Any]], manifests: Mapping[str, Mapping[str, Any]]
+) -> dict[str, float]:
+    """``max(CV_speed, CV_energy)`` per decision block from calibration runs.
+
+    Each run contributes one run-level aggregate per host, model, and prompt
+    category: total output tokens over total latency and over total energy.
+    The CV is taken across runs, so it measures how much an independently
+    launched repetition of the whole run moves. A block needs at least
+    ``CALIBRATION_RUNS`` runs; with several calibration models on one host the
+    largest CV is kept.
+    """
+    totals: dict[tuple[str, str, str], dict[str, list[float]]] = {}
+    for record in records:
+        metrics = record.get("metrics")
+        if not isinstance(metrics, Mapping):
+            continue
+        request = _request(metrics)
+        if request is None:
+            continue
+        host = _host(record, manifests)
+        model = str(record.get("model") or "unknown")
+        category = str(record.get("prompt_category") or metrics.get("prompt_category") or "")
+        run = totals.setdefault((host, model, category), {}).setdefault(
+            str(record.get("run_id") or ""), [0.0, 0.0, 0.0]
+        )
+        for index, value in enumerate(request):
+            run[index] += value
+
+    repeatability: dict[str, float] = {}
+    for (host, _model, category), runs in totals.items():
+        if len(runs) < CALIBRATION_RUNS:
+            continue
+        speed = repeatability_cv([tokens / latency for tokens, _energy, latency in runs.values()])
+        energy = repeatability_cv([tokens / energy for tokens, energy, _latency in runs.values()])
+        if speed is None or energy is None:
+            continue
+        name = block_name(host, category)
+        repeatability[name] = max(repeatability.get(name, 0.0), speed, energy)
+    return repeatability
+
+
+def _host(record: Mapping[str, Any], manifests: Mapping[str, Mapping[str, Any]]) -> str:
+    run_id = str(record.get("run_id") or "")
+    host = (manifests.get(run_id) or {}).get("host_id")
+    if not isinstance(host, str) or not host:
+        raise AnalysisError(f"run {run_id!r} has no host_id in its manifest")
+    return host
+
+
+def _request(metrics: Mapping[str, Any]) -> Request | None:
+    tokens = _positive(metrics.get("output_tokens"))
+    energy = _positive(metrics.get("gpu_energy_joules"))
+    latency = _positive(metrics.get("latency_seconds"))
+    if tokens is None or energy is None or latency is None:
+        return None
+    return tokens, energy, latency
 
 
 def _positive(value: Any) -> float | None:

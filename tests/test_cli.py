@@ -179,7 +179,7 @@ def test_report_command_returns_validation_failure_after_writing_report(
         report_markdown=tmp_path / "report.md",
         validation_ok=False,
     )
-    monkeypatch.setattr(cli, "build_report", lambda _run_dirs: paths)
+    monkeypatch.setattr(cli, "build_report", lambda _run_dirs, _calibration=(): paths)
 
     assert cli.main(["report", str(tmp_path / "run")]) == cli.EXIT_RUN_FAILED
     captured = capsys.readouterr()

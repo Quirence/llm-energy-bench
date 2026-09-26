@@ -200,7 +200,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 def cmd_report(args: argparse.Namespace) -> int:
     try:
-        paths = build_report(tuple(args.run_dirs))
+        paths = build_report(tuple(args.run_dirs), tuple(args.calibration))
     except ResultsError as error:
         raise RunFailedError(str(error)) from error
     print(paths.summary_csv)
@@ -294,6 +294,17 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         metavar="<run-dir>",
         help="One or more completed run directories.",
+    )
+    report.add_argument(
+        "--calibration",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="<run-dir>",
+        help=(
+            "Calibration run for the rank-inversion threshold; repeat for each of the "
+            "three independently launched runs."
+        ),
     )
 
     return parser
