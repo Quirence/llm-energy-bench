@@ -25,7 +25,7 @@ to improve a result.
 | Contributor | Primary responsibility | Active work |
 | --- | --- | --- |
 | `@Quirence` | runner, validation, reporting, methodology and RTX 5060 baseline | [Issues #4 and #6](https://github.com/Quirence/llm-energy-bench/issues?q=is%3Aissue+is%3Aopen+assignee%3AQuirence) |
-| `@Qcsteeven` | NVML capability probing, telemetry lifecycle, energy-source fallback, RTX 4060 desktop study | [Issue #5](https://github.com/Quirence/llm-energy-bench/issues/5) and [Issue #6](https://github.com/Quirence/llm-energy-bench/issues/6) |
+| `@Qcsteeven` | NVML capability probing, telemetry lifecycle, energy-source fallback, RTX 4060 Ti desktop study | [Issue #5](https://github.com/Quirence/llm-energy-bench/issues/5) and [Issue #6](https://github.com/Quirence/llm-energy-bench/issues/6) |
 | `@Skipl1` (Dimas) | Ollama preload/inventory, streaming generation, TTFT, model digest and GPU-placement review | Runtime boundary review and optional observation hosts |
 
 CODEOWNERS reflects the module ownership. Shared schemas and methodology still
@@ -97,7 +97,7 @@ the frozen model tags, prompt files, or benchmark configuration.
 
 ## Hardware Coordination
 
-The RTX 5060 and RTX 4060 acceptance runs use the committed host configs and
+The RTX 5060 and RTX 4060 Ti acceptance runs use the committed host configs and
 the `pilot-v1-code` tag described in `docs/pilot-baseline.md`. Contributors may
 prepare a host and run `doctor` earlier, but a result is comparable only after
 the commit, prompt hash, Ollama version and model digest are frozen and

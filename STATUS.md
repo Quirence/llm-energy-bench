@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-25
+Last updated: 2026-09-26
 
 ## Current Milestone
 
@@ -15,7 +15,7 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
   into `main` while preserving both contributors' commits.
 - CODEOWNERS plus reproducible bug, experiment, and pull-request templates
   enforce the two-author review workflow in the repository.
-- The versioned collaboration guide maps `@Qcsteeven` to NVML/RTX 4060 work
+- The versioned collaboration guide maps `@Qcsteeven` to NVML/RTX 4060 Ti work
   and `@Skipl1` (Dimas) to the Ollama runtime boundary and Issue #7.
 - Public GitHub milestones `M0 Bootstrap`, `M1 Measured Pilot`, `M2 Two-GPU
   Study`, and `M3 Paper Dataset` track the delivery stages.
@@ -51,6 +51,12 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 - Its local RTX 5060 acceptance check completed with 18/18 valid measured
   requests, cache baseline 20, excess cache 0, and quality score 1.0. The raw
   artifact remains unpublished until the reviewed branch is merged and tagged.
+- The same branch passes `doctor` on the RTX 4060 Ti desktop host (driver
+  560.94, 160 W limit, full placement, total-energy counter) and three local
+  `pilot-v1` runs produced 54/54 valid requests with quality 1.0. Run-level CV
+  is 1.0–1.5% for the `short` and `long` categories, but 23.5% for tok/J in
+  `scored`, whose two-token requests span only two telemetry samples. The
+  artifacts remain local; see the experiment log.
 
 ## In Progress
 
@@ -62,7 +68,7 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 ## Next
 
 - Merge the stabilization pull request, tag its merge commit `pilot-v1-code`,
-  and run the committed RTX 5060 and RTX 4060 host configs independently.
+  and run the committed RTX 5060 and RTX 4060 Ti host configs independently.
 
 ## Blockers
 

@@ -22,6 +22,95 @@ run repeated from the reviewed, merged implementation.
 
 ## Environment Probes
 
+### 2026-09-26 — RTX 4060 Ti desktop benchmark-v1 observation
+
+- Contributor: Qcsteeven
+- Scope: one local `benchmark-v1` run and three calibration launches on the
+  unmerged stabilization branch (`a683a57`, PR #17). This is **not** a
+  publishable dataset: the code is untagged, and every run contains requests
+  rejected by the validity rule. It used a local copy of
+  `configs/benchmark-v1.toml` that differs only by
+  `host_id = "rtx4060-desktop"`. Calibration used the same prompts and
+  controls with `llama3.2:3b-instruct-q4_K_M` only. Artifacts stay local.
+- GPU and runtime: RTX 4060 Ti 8 GiB, driver 560.94, 160 W limit, Ollama
+  0.34.2. Digests: `qwen3:4b-instruct-2507-q4_K_M` `0edcdef34593…`,
+  `qwen3:4b-instruct-2507-q8_0` `aa7252f68dda…`, `llama3.2:3b-instruct-q4_K_M`
+  `a80c4f17acd5…`, `llama3.2:3b-instruct-q8_0` `e410b836fe61…`. All four loaded
+  fully on the GPU.
+- Conditions: the wallpaper renderer was closed first, and idle power was
+  8.8 W before the benchmark. Idle readings taken immediately after a run were
+  17–28 W because the GPU had not yet settled.
+- Validity: 456/480 benchmark requests valid; calibration 110, 114 and 116 of
+  120. Every rejection has the same cause, one cached prompt token above the
+  template baseline (4 vs 3 for qwen3, 21 vs 20 for llama3.2). For qwen3 the
+  first UUID character matched the previous request's, and qwen3 tokenizes
+  digits individually. For llama3.2 the extra token appears mostly when a
+  letter-led marker follows a digit-led one. The excess is a tokenization
+  boundary effect of `uuid_prefix_v1`, not reuse of prompt content, but it
+  makes an all-valid 480-request run practically unreachable (about 0.95^480).
+- Calibration CV (`max(CV_speed, CV_energy)` over three runs): short 1.0%,
+  long 1.3%, scored 3.9%. The resulting thresholds are 5.0%, 5.0% and 11.8%.
+- Rank-inversion evaluation (PR #18 analysis, valid requests only): speed
+  and energy produced the **same full ordering** in all three blocks.
+  `llama3.2:3b-instruct-q4_K_M` led every block, ahead of the runner-up by
+  26–52% in tok/s and 23–27% in tok/J. No inversion exists, so on this single
+  host the hypothesis would be reported as unsupported. The pre-registered
+  verdict still needs both hosts and publishable runs.
+- Mechanism: mean GPU power was 109.9 W for both Q4 models and 93.6–95.1 W for
+  the Q8 models. Q8 saved 13–15% power but lost 35–36% throughput, so
+  energy per token (1.09, 1.38, 1.45, 1.85 J/token) followed speed.
+- Quality: qwen3 Q4 and Q8 scored 1.0, `llama3.2` Q4 0.8125, and `llama3.2` Q8
+  0.75, exactly at the inclusive floor.
+
+### 2026-09-26 — RTX 4060 Ti desktop pilot-v1 observation
+
+- Contributor: Qcsteeven
+- Scope: three independently launched `pilot-v1` runs on the unmerged
+  stabilization branch (`a683a57`, PR #17). They are **not** publishable runs:
+  the code is not yet tagged `pilot-v1-code`. The runs used a local copy of
+  `configs/pilot-rtx4060.toml` that differs only by
+  `host_id = "rtx4060ti-desktop"`; the frozen `rtx4060-desktop` ID names this
+  same machine. Artifacts stay local and are not committed.
+- GPU: NVIDIA GeForce RTX 4060 Ti, 8 GiB; driver 560.94; enforced power limit
+  160 W. This is the intended desktop host of Issue #5; earlier documents
+  named it "RTX 4060", a 115 W part that is not interchangeable with it.
+- Runtime: Ollama 0.34.2 (portable build); model
+  `llama3.2:3b-instruct-q4_K_M`, digest `a80c4f17acd5…`, pulled by hand.
+- Preflight: `doctor --json` returned `ok: true` with the frozen version and
+  digest, `fully_on_gpu: true`, `gpu_fraction: 1.0`, and
+  `energy_source: total_energy_counter`.
+- Result: 54/54 measured requests valid across the three runs, every
+  `validation.json` reports `ok: true`, quality 1.0 in every run, template
+  cache baseline 20, 21 and 20 tokens, excess cache 0 on every request.
+- Energy source: 48 requests used the total-energy counter; 6 fell back to
+  instantaneous-power integration because the counter produced no positive
+  delta. All six fallbacks record their reason.
+- Run-level repeatability (ratio of sums per run, three runs):
+
+  | Category | tok/s per run | CV | tok/J per run | CV | Threshold |
+  | --- | --- | ---: | --- | ---: | ---: |
+  | short | 99.9, 101.8, 98.7 | 1.5% | 0.940, 0.928, 0.918 | 1.1% | 5.0% |
+  | long | 90.3, 89.7, 87.9 | 1.4% | 0.836, 0.832, 0.819 | 1.0% | 5.0% |
+  | scored | 46.0, 42.4, 40.5 | 6.6% | 0.291, 0.334, 0.454 | 23.5% | 70.4% |
+
+- Finding: scored utility requests produce two output tokens in about 40–50
+  ms, which spans only two 100 ms telemetry samples. Their energy is therefore
+  at the resolution limit of the sampler, the energy CV reaches 23.5%, and
+  single requests imply average power up to 184 W against the 160 W limit. The
+  `scored` block can gate quality, but its energy ranking cannot support a
+  material-inversion claim. Decode-heavy `short` and prefill-heavy `long`
+  blocks are stable to about 1–1.5%.
+- Background load: a desktop wallpaper renderer kept about 21% GPU 3D
+  utilization during the session, and the idle GPU drew a median 22.8 W in
+  P0–P3 instead of settling in a low-power state. NVML reports whole-GPU
+  power, so these energies include that background share, and the renderer
+  also competes for the GPU. The publishable run must close GPU-active
+  desktop applications first and record idle power before starting.
+- Finding: output length varies between repetitions of the same prompt at
+  temperature 0 and seed 42 (for example 122, 105 and 135 tokens), consistent
+  with the per-repetition UUID marker changing the prompt. Ratio-of-sums
+  metrics absorb this, but per-request comparisons across repetitions do not.
+
 ### 2026-09-25 — RTX 5060 Laptop NVML reliability check
 
 - Contributor: Quirence/Codex

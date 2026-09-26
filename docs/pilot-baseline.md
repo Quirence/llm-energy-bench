@@ -51,7 +51,7 @@ ollama pull llama3.2:3b-instruct-q4_K_M
 | Contributor | Host | Config | Result branch |
 | --- | --- | --- | --- |
 | Quirence | RTX 5060 Laptop | `configs/pilot-rtx5060.toml` | `experiment/rtx5060-pilot-v1` |
-| Qcsteeven | RTX 4060 desktop | `configs/pilot-rtx4060.toml` | `experiment/rtx4060-pilot-v1` |
+| Qcsteeven | RTX 4060 Ti desktop (`host_id` `rtx4060-desktop`) | `configs/pilot-rtx4060.toml` | `experiment/rtx4060-pilot-v1` |
 | Skipl1 | other GPU | copy of the closest pilot config, clearly labelled observation-only | `experiment/<gpu>-observation` |
 
 ## Preflight and run

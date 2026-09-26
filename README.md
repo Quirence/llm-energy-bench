@@ -19,7 +19,7 @@ Does the preferred local LLM configuration change when comparing models, quantiz
 The repository now contains the tested building blocks for the MVP:
 
 - a Python 3.12 package and CLI shell with `doctor`, `run`, and `report`
-  subcommands plus frozen RTX 5060 and RTX 4060 pilot configs;
+  subcommands plus frozen RTX 5060 and RTX 4060 Ti pilot configs;
 - strict TOML configuration and JSONL prompt contracts;
 - the six-prompt one-model acceptance protocol;
 - immutable JSON/JSONL/gzip result storage, checksums, privacy checks, and
