@@ -22,6 +22,65 @@ run repeated from the reviewed, merged implementation.
 
 ## Environment Probes
 
+### 2026-09-26 — GTX 1080 observation host: benchmark-v1
+
+- Contributor: Skipl1 (Dimas)
+- Scope: one local `benchmark-v1` run with all four configurations on the
+  same stabilization code (source tree identical to `a683a57`; the manifest
+  records this branch's commit `cd47ca8`). This is **not** a publishable
+  dataset: the GTX 1080 is outside the research matrix, the code is untagged,
+  and the run contains requests rejected by the validity rule. It used a local
+  copy of `configs/benchmark-v1.toml` that differs only by
+  `host_id = "gtx1080-observation"`. The three calibration launches in the
+  entry below supply the thresholds. Artifacts stay local.
+- Models: the three missing models were pulled by hand once the registry
+  storage became reachable. Digests: `qwen3:4b-instruct-2507-q4_K_M`
+  `0edcdef34593…`, `qwen3:4b-instruct-2507-q8_0` `aa7252f68dda…`,
+  `llama3.2:3b-instruct-q4_K_M` `a80c4f17acd5…`, `llama3.2:3b-instruct-q8_0`
+  `e410b836fe61…`, identical to the RTX 4060 Ti observation. A `doctor` pass
+  over the benchmark config returned `ok: true` with all four models at
+  context 4096 and `gpu_fraction: 1.0`.
+- Conditions: the Wallpaper Engine renderer stayed closed; idle power was
+  8.7 W before the run. The 480 measured requests took 16 minutes.
+- Validity: 454/480 valid. Every rejection is exactly one cached prompt token
+  above the template baseline (qwen3 Q4: 2, qwen3 Q8: 8, llama3.2 Q4: 7,
+  llama3.2 Q8: 9). Baselines were 3 for both qwen3 models and 20 for both
+  llama3.2 models, and none was inflated. No runtime failure or model reload
+  occurred, and all 480 requests used the total-energy counter.
+- Cache-marker pairs (#20): for qwen3 the extra token appeared in all 10
+  consecutive pairs whose markers share the first token (the same leading
+  digit, or the same leading letter run) and in none of the other 230 pairs,
+  including two that share only the first letter of a longer letter run. On
+  this host the qwen3 excess is therefore fully explained by a repeated first
+  token, and guaranteeing a different first token (option 2 in #20) would
+  remove it. For llama3.2, 16 of 240 requests (6.7%) carried the extra token,
+  11 of them with different first characters, so its boundary effect has a
+  separate cause.
+- Rank-inversion evaluation (PR #18 analysis, valid requests only; thresholds
+  11.3% `short`, 5.0% `long`, 8.2% `scored`): speed and energy selected the
+  same leader, `llama3.2:3b-instruct-q4_K_M`, in all three blocks, ahead of
+  the runner-up by 22–50% in tok/s and 15–39% in tok/J. No material inversion
+  exists, so on this single host the hypothesis would be reported as
+  unsupported. The pre-registered verdict still needs both matrix hosts and
+  publishable runs.
+- Unlike the RTX 4060 Ti, the full ordering is not identical in every block.
+  In `short`, `qwen3:4b-instruct-2507-q4_K_M` is second by speed (60.35 vs
+  59.24 tok/s, +1.9%) while `llama3.2:3b-instruct-q8_0` is second by energy
+  (0.350 vs 0.336 tok/J, +4.0%). Both differences are below the 5% floor and
+  the 11.3% threshold, and the swap is below the leader, so it is not a
+  decision-level inversion.
+- Mechanism: mean GPU power was 178.6 and 180.5 W for the Q4 models and 164.9
+  and 169.2 W for the Q8 models. Q8 saved 6–8% power but lost 20–23%
+  throughput, so energy per token (2.54 J for `llama3.2` Q4, 2.97 J for
+  `llama3.2` Q8, 3.16 J for `qwen3` Q4, 3.79 J for `qwen3` Q8) followed speed
+  except where two configurations were within a few percent of each other.
+  On the RTX 4060 Ti, Q8 saved 13–15% power at a 35–36% throughput loss; the
+  GTX 1080 runs every configuration close to its 200 W limit, so quantization
+  saves proportionally less power there. The leader needs 2.54 J per token on
+  the GTX 1080 against 1.09 J on the RTX 4060 Ti.
+- Quality: qwen3 Q4 and Q8 1.0, `llama3.2` Q4 0.85 and `llama3.2` Q8 0.775,
+  all above the 0.75 floor (RTX 4060 Ti: 0.8125 and 0.75 for `llama3.2`).
+
 ### 2026-09-26 — GTX 1080 observation host: pilot-v1 and calibration
 
 - Contributor: Skipl1 (Dimas)
@@ -34,10 +93,9 @@ run repeated from the reviewed, merged implementation.
   differ only by `host_id = "gtx1080-observation"`; calibration used the
   `benchmark-v1` prompts and controls with `llama3.2:3b-instruct-q4_K_M` only.
   Prompt-set hashes `c7c4ae95e164…` (pilot) and `41331de11824…` (benchmark).
-  Artifacts stay local and are not committed. A four-configuration
-  `benchmark-v1` run is not part of this entry: the three missing models could
-  not be downloaded on this host, because every blob request to the registry's
-  storage failed its TLS handshake.
+  Artifacts stay local and are not committed. The four-configuration
+  `benchmark-v1` run followed later, once the three missing models could be
+  downloaded; it is recorded in the entry above.
 - GPU and runtime: NVIDIA GeForce GTX 1080, 8 GiB, compute capability 6.1;
   driver 582.66; enforced power limit 200 W; the GPU also drives the display.
   Ollama 0.34.2; model `llama3.2:3b-instruct-q4_K_M`, digest `a80c4f17acd5…`.

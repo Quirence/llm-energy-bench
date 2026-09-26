@@ -63,7 +63,9 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
   failure every rejection is the one-token cache excess of #20, and one pilot
   baseline was itself inflated to 21. After that runner crash Ollama reloaded
   the model inside the next measured request, which still passed validation.
-  The artifacts remain local; see the experiment log.
+  A local four-configuration `benchmark-v1` run gave 454/480 valid requests,
+  and speed and energy selected the same leader in all three blocks, as on
+  the RTX 4060 Ti. The artifacts remain local; see the experiment log.
 
 ## In Progress
 
