@@ -57,6 +57,15 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
   is 1.0–1.5% for the `short` and `long` categories, but 23.5% for tok/J in
   `scored`, whose two-token requests span only two telemetry samples. The
   artifacts remain local; see the experiment log.
+- On the GTX 1080 observation host (outside the matrix, driver 582.66, 200 W
+  limit) the same code passes `doctor`. Three `pilot-v1` runs gave 52/54 valid
+  requests and three calibration launches 337/360; apart from one CUDA runtime
+  failure every rejection is the one-token cache excess of #20, and one pilot
+  baseline was itself inflated to 21. After that runner crash Ollama reloaded
+  the model inside the next measured request, which still passed validation.
+  A local four-configuration `benchmark-v1` run gave 454/480 valid requests,
+  and speed and energy selected the same leader in all three blocks, as on
+  the RTX 4060 Ti. The artifacts remain local; see the experiment log.
 
 ## In Progress
 

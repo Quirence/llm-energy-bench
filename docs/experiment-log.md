@@ -22,6 +22,147 @@ run repeated from the reviewed, merged implementation.
 
 ## Environment Probes
 
+### 2026-09-26 — GTX 1080 observation host: benchmark-v1
+
+- Contributor: Skipl1 (Dimas)
+- Scope: one local `benchmark-v1` run with all four configurations on the
+  same stabilization code (source tree identical to `a683a57`; the manifest
+  records this branch's commit `cd47ca8`). This is **not** a publishable
+  dataset: the GTX 1080 is outside the research matrix, the code is untagged,
+  and the run contains requests rejected by the validity rule. It used a local
+  copy of `configs/benchmark-v1.toml` that differs only by
+  `host_id = "gtx1080-observation"`. The three calibration launches in the
+  entry below supply the thresholds. Artifacts stay local.
+- Models: the three missing models were pulled by hand once the registry
+  storage became reachable. Digests: `qwen3:4b-instruct-2507-q4_K_M`
+  `0edcdef34593…`, `qwen3:4b-instruct-2507-q8_0` `aa7252f68dda…`,
+  `llama3.2:3b-instruct-q4_K_M` `a80c4f17acd5…`, `llama3.2:3b-instruct-q8_0`
+  `e410b836fe61…`, identical to the RTX 4060 Ti observation. A `doctor` pass
+  over the benchmark config returned `ok: true` with all four models at
+  context 4096 and `gpu_fraction: 1.0`.
+- Conditions: the Wallpaper Engine renderer stayed closed; idle power was
+  8.7 W before the run. The 480 measured requests took 16 minutes.
+- Validity: 454/480 valid. Every rejection is exactly one cached prompt token
+  above the template baseline (qwen3 Q4: 2, qwen3 Q8: 8, llama3.2 Q4: 7,
+  llama3.2 Q8: 9). Baselines were 3 for both qwen3 models and 20 for both
+  llama3.2 models, and none was inflated. No runtime failure or model reload
+  occurred, and all 480 requests used the total-energy counter.
+- Cache-marker pairs (#20): for qwen3 the extra token appeared in all 10
+  consecutive pairs whose markers share the first token (the same leading
+  digit, or the same leading letter run) and in none of the other 230 pairs,
+  including two that share only the first letter of a longer letter run. On
+  this host the qwen3 excess is therefore fully explained by a repeated first
+  token, and guaranteeing a different first token (option 2 in #20) would
+  remove it. For llama3.2, 16 of 240 requests (6.7%) carried the extra token,
+  11 of them with different first characters, so its boundary effect has a
+  separate cause.
+- Rank-inversion evaluation (PR #18 analysis, valid requests only; thresholds
+  11.3% `short`, 5.0% `long`, 8.2% `scored`): speed and energy selected the
+  same leader, `llama3.2:3b-instruct-q4_K_M`, in all three blocks, ahead of
+  the runner-up by 22–50% in tok/s and 15–39% in tok/J. No material inversion
+  exists, so on this single host the hypothesis would be reported as
+  unsupported. The pre-registered verdict still needs both matrix hosts and
+  publishable runs.
+- Unlike the RTX 4060 Ti, the full ordering is not identical in every block.
+  In `short`, `qwen3:4b-instruct-2507-q4_K_M` is second by speed (60.35 vs
+  59.24 tok/s, +1.9%) while `llama3.2:3b-instruct-q8_0` is second by energy
+  (0.350 vs 0.336 tok/J, +4.0%). Both differences are below the 5% floor and
+  the 11.3% threshold, and the swap is below the leader, so it is not a
+  decision-level inversion.
+- Mechanism: mean GPU power was 178.6 and 180.5 W for the Q4 models and 164.9
+  and 169.2 W for the Q8 models. Q8 saved 6–8% power but lost 20–23%
+  throughput, so energy per token (2.54 J for `llama3.2` Q4, 2.97 J for
+  `llama3.2` Q8, 3.16 J for `qwen3` Q4, 3.79 J for `qwen3` Q8) followed speed
+  except where two configurations were within a few percent of each other.
+  On the RTX 4060 Ti, Q8 saved 13–15% power at a 35–36% throughput loss; the
+  GTX 1080 runs every configuration close to its 200 W limit, so quantization
+  saves proportionally less power there. The leader needs 2.54 J per token on
+  the GTX 1080 against 1.09 J on the RTX 4060 Ti.
+- Quality: qwen3 Q4 and Q8 1.0, `llama3.2` Q4 0.85 and `llama3.2` Q8 0.775,
+  all above the 0.75 floor (RTX 4060 Ti: 0.8125 and 0.75 for `llama3.2`).
+
+### 2026-09-26 — GTX 1080 observation host: pilot-v1 and calibration
+
+- Contributor: Skipl1 (Dimas)
+- Scope: three independently launched `pilot-v1` runs and three
+  `benchmark-v1` calibration launches on the unmerged stabilization code. The
+  source tree is identical to `a683a57` (PR #17); the manifests record the
+  branch commit `337c7fc`. This is **not** a publishable run: the GTX 1080 is
+  outside the research matrix and the code is untagged. The runs used local
+  copies of `configs/pilot-rtx4060.toml` and `configs/benchmark-v1.toml` that
+  differ only by `host_id = "gtx1080-observation"`; calibration used the
+  `benchmark-v1` prompts and controls with `llama3.2:3b-instruct-q4_K_M` only.
+  Prompt-set hashes `c7c4ae95e164…` (pilot) and `41331de11824…` (benchmark).
+  Artifacts stay local and are not committed. The four-configuration
+  `benchmark-v1` run followed later, once the three missing models could be
+  downloaded; it is recorded in the entry above.
+- GPU and runtime: NVIDIA GeForce GTX 1080, 8 GiB, compute capability 6.1;
+  driver 582.66; enforced power limit 200 W; the GPU also drives the display.
+  Ollama 0.34.2; model `llama3.2:3b-instruct-q4_K_M`, digest `a80c4f17acd5…`.
+- Preflight: `doctor --json` returned `ok: true` with the frozen version and
+  digest, `fully_on_gpu: true`, `gpu_fraction: 1.0`, and
+  `energy_source: total_energy_counter`.
+- Conditions: the Wallpaper Engine renderer was closed before the session.
+  Idle power was a median 8.5 W in P8 over 30 s, and 8.8–9.2 W (ten-sample
+  median) before each of the six runs. Peak GPU temperature stayed within
+  42–63 °C.
+- Validity: `pilot-v1` 18/18, 18/18 and 16/18 valid (52/54); calibration 112,
+  112 and 113 of 120 (337/360). Apart from one runtime failure (below), every
+  rejection is exactly one cached prompt token above a baseline of 20. Four of
+  the six runs therefore fail validation and the CLI returns exit code 4, as
+  designed.
+- Template baseline: 20, 21 and 20 tokens in the three pilot runs, the same
+  pattern as on the RTX 4060 Ti, and 20 in every calibration run. In the run
+  with baseline 21, 17 of 18 measured requests reported 20 cached tokens: the
+  final warm-up itself carried the extra token. The one measured request with
+  21 cached tokens was accepted only because of that inflated baseline; under
+  a baseline of 20 it would have been rejected like the others (#20).
+- Cache-marker pairs (#20): of 413 measured `llama3.2` requests with a cache
+  count, 25 (6.1%) carried the extra token. When consecutive markers began
+  with the same letter run, it appeared in 2 of 2 cases, as a shared first
+  token would. Otherwise the rate was 3.7% (digit to digit), 8.7% (digit to
+  letter), 4.9% (letter to digit) and 5.9% (letter to letter), so on this host
+  the first-character class of the marker does not predict the boundary
+  token.
+- Runtime failure: in calibration run 2 one request failed with HTTP 500,
+  `CUDA error: an illegal instruction was encountered`. Ollama's llama-server
+  process terminated (exit status `0xc0000409`) and was restarted; the failed
+  request is recorded as invalid (`runtime:http_error`). The **next** measured
+  request carried the model reload: `load_duration` 3.06 s, latency 6.16 s
+  instead of about 2.9 s, TTFT 3.15 s and 677 J. It passed every validity
+  rule, because none of them checks `load_duration` or re-verifies placement
+  after a runner restart. Excluding it moves that run's `short` throughput
+  from 73.1 to 75.1 tok/s and the `short` calibration CV from 3.8% to about
+  2.2%. This was the only runner restart in the session's server log.
+- Energy source: all 414 measured requests used the total-energy counter with
+  no fallback. As in the Issue #7 observation, the counter is self-consistent
+  on this driver.
+- Run-level repeatability (ratio of sums per run, three runs each; the same
+  values come from `calibration_repeatability()` in PR #18):
+
+  | Runs | Category | tok/s per run | CV | tok/J per run | CV | Threshold |
+  | --- | --- | --- | ---: | --- | ---: | ---: |
+  | pilot | short | 78.0, 74.9, 77.4 | 2.1% | 0.423, 0.410, 0.417 | 1.6% | 6.4% |
+  | pilot | long | 58.4, 58.2, 58.6 | 0.3% | 0.319, 0.320, 0.318 | 0.2% | 5.0% |
+  | pilot | scored | 22.3, 21.7, 21.3 | 2.3% | 0.127, 0.122, 0.125 | 2.3% | 7.0% |
+  | calibration | short | 77.9, 73.1, 78.2 | 3.8% | 0.420, 0.411, 0.420 | 1.3% | 11.3% |
+  | calibration | long | 67.7, 65.9, 68.0 | 1.7% | 0.371, 0.366, 0.369 | 0.7% | 5.0% |
+  | calibration | scored | 54.8, 55.3, 57.7 | 2.7% | 0.307, 0.312, 0.319 | 2.0% | 8.2% |
+
+- Power and efficiency: the GPU drew a mean 180–186 W during `short` and
+  `long` requests, 90–93% of its limit. On the same `pilot-v1` prompts and
+  model the RTX 4060 Ti reached about 100 tok/s and 0.93 tok/J in `short`; the
+  GTX 1080 reached about 77 tok/s and 0.42 tok/J, so it is about 1.3 times
+  slower and needs about 2.2 times more GPU energy per token.
+- Scored prompts: two-token requests again span only two telemetry samples,
+  and single requests imply up to 213 W against the 200 W limit. Unlike the
+  RTX 4060 Ti (23.5%), the pilot `scored` tok/J CV here was 2.3%; every request
+  on this host used the counter, while six of the 4060 Ti requests fell back
+  to power integration.
+- Quality: 1.0 in every pilot run; 0.8125, 0.85 and 0.85 in the calibration
+  runs, against 0.8125 for the same model in the RTX 4060 Ti `benchmark-v1`
+  observation.
+
 ### 2026-09-26 — RTX 4060 Ti desktop benchmark-v1 observation
 
 - Contributor: Qcsteeven
