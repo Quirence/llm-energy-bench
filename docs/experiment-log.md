@@ -53,11 +53,11 @@ run repeated from the reviewed, merged implementation.
 - Rank-inversion evaluation (PR #18 analysis, valid requests only): speed
   and energy produced the **same full ordering** in all three blocks.
   `llama3.2:3b-instruct-q4_K_M` led every block, ahead of the runner-up by
-  26–28% in tok/s and 23–27% in tok/J. No inversion exists, so on this single
+  26–52% in tok/s and 23–27% in tok/J. No inversion exists, so on this single
   host the hypothesis would be reported as unsupported. The pre-registered
   verdict still needs both hosts and publishable runs.
 - Mechanism: mean GPU power was 109.9 W for both Q4 models and 93.6–95.1 W for
-  the Q8 models. Q8 saved about 15% power but lost 36–40% throughput, so
+  the Q8 models. Q8 saved 13–15% power but lost 35–36% throughput, so
   energy per token (1.09, 1.38, 1.45, 1.85 J/token) followed speed.
 - Quality: qwen3 Q4 and Q8 scored 1.0, `llama3.2` Q4 0.8125, and `llama3.2` Q8
   0.75, exactly at the inclusive floor.
