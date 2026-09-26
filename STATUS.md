@@ -15,7 +15,7 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
   into `main` while preserving both contributors' commits.
 - CODEOWNERS plus reproducible bug, experiment, and pull-request templates
   enforce the two-author review workflow in the repository.
-- The versioned collaboration guide maps `@Qcsteeven` to NVML/RTX 4060 work
+- The versioned collaboration guide maps `@Qcsteeven` to NVML/RTX 4060 Ti work
   and `@Skipl1` (Dimas) to the Ollama runtime boundary and Issue #7.
 - Public GitHub milestones `M0 Bootstrap`, `M1 Measured Pilot`, `M2 Two-GPU
   Study`, and `M3 Paper Dataset` track the delivery stages.
@@ -62,7 +62,7 @@ M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
 ## Next
 
 - Merge the stabilization pull request, tag its merge commit `pilot-v1-code`,
-  and run the committed RTX 5060 and RTX 4060 host configs independently.
+  and run the committed RTX 5060 and RTX 4060 Ti host configs independently.
 
 ## Blockers
 

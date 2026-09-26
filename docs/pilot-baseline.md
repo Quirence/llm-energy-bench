@@ -51,7 +51,7 @@ ollama pull llama3.2:3b-instruct-q4_K_M
 | Contributor | Host | Config | Result branch |
 | --- | --- | --- | --- |
 | Quirence | RTX 5060 Laptop | `configs/pilot-rtx5060.toml` | `experiment/rtx5060-pilot-v1` |
-| Qcsteeven | RTX 4060 desktop | `configs/pilot-rtx4060.toml` | `experiment/rtx4060-pilot-v1` |
+| Qcsteeven | RTX 4060 Ti desktop | `configs/pilot-rtx4060ti.toml` | `experiment/rtx4060ti-pilot-v1` |
 | Skipl1 | other GPU | copy of the closest pilot config, clearly labelled observation-only | `experiment/<gpu>-observation` |
 
 ## Preflight and run
@@ -63,7 +63,7 @@ Use the host's committed config in both commands:
 .venv\Scripts\python -m llm_energy_bench run --config configs/pilot-rtx5060.toml
 ```
 
-Qcsteeven substitutes `configs/pilot-rtx4060.toml`. A run is publishable only
+Qcsteeven substitutes `configs/pilot-rtx4060ti.toml`. A run is publishable only
 when `doctor` confirms the frozen runtime, digest and full placement, the CLI
 returns success, `validation.json` reports `ok: true`, and all 18 measured
 requests are valid. Raw output must retain the energy source and any fallback

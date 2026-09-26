@@ -19,7 +19,7 @@ The primary comparison covers two Windows hosts:
 
 - MAIBENBEN X16C with RTX 5060 Laptop GPU as the main development and
   experiment host;
-- RTX 4060 desktop as the second host.
+- RTX 4060 Ti desktop as the second host.
 
 The currently available RTX 3050 Laptop GPU is used only for a technical
 smoke run. It is not part of the main research conclusions.
