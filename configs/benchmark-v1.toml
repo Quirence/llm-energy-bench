@@ -1,5 +1,5 @@
 # Frozen two-host study protocol. Change host_id only when copying this file
-# for the RTX 4060 Ti host; all measurement controls must remain identical.
+# for the RTX 4060 host; all measurement controls must remain identical.
 #
 # 24 prompts x 5 repetitions x 4 configurations = 480 measured requests.
 

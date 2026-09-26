@@ -27,9 +27,10 @@ run repeated from the reviewed, merged implementation.
 - Contributor: Qcsteeven
 - Scope: three independently launched `pilot-v1` runs on the unmerged
   stabilization branch (`a683a57`, PR #17). They are **not** publishable runs:
-  the code is not yet tagged `pilot-v1-code`. The runs used exactly the
-  settings of `configs/pilot-rtx4060ti.toml` (`host_id =
-  "rtx4060ti-desktop"`). Artifacts stay local and are not committed.
+  the code is not yet tagged `pilot-v1-code`. The runs used a local copy of
+  `configs/pilot-rtx4060.toml` that differs only by
+  `host_id = "rtx4060ti-desktop"`; the frozen `rtx4060-desktop` ID names this
+  same machine. Artifacts stay local and are not committed.
 - GPU: NVIDIA GeForce RTX 4060 Ti, 8 GiB; driver 560.94; enforced power limit
   160 W. This is the intended desktop host of Issue #5; earlier documents
   named it "RTX 4060", a 115 W part that is not interchangeable with it.

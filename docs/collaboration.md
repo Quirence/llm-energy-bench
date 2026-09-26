@@ -60,7 +60,7 @@ git pull --ff-only
 git switch -c feat/<issue-number>-<short-name>
 ```
 
-Examples are `feat/5-rtx4060ti-study` and
+Examples are `feat/5-rtx4060-study` and
 `feat/7-ollama-runtime-validation`. Never develop directly on `main`.
 
 ## Pull Request Contract

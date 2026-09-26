@@ -1,9 +1,9 @@
-# Frozen one-model acceptance run for the RTX 4060 Ti desktop comparison host (160 W power limit).
+# Frozen one-model acceptance run for the RTX 4060 desktop comparison host.
 # It differs from pilot-rtx5060.toml only by host_id and this comment.
 
 [experiment]
 id = "pilot-v1"
-host_id = "rtx4060ti-desktop"
+host_id = "rtx4060-desktop"
 output_dir = "../experiments/runs"
 repetitions = 3
 warmup_requests = 2
