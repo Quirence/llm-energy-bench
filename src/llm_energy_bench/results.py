@@ -33,6 +33,14 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any
 
+from llm_energy_bench.analysis import (
+    AnalysisError,
+    HypothesisVerdict,
+    blocks_from_records,
+    calibration_repeatability,
+    evaluate_hypothesis,
+)
+
 MAX_ARTIFACT_BYTES = 25 * 1024 * 1024
 
 MANIFEST = "manifest.json"
@@ -77,19 +85,54 @@ class ReportPaths:
     validation_ok: bool
 
 
-def build_report(run_dirs: tuple[Path, ...]) -> ReportPaths:
-    """Validate raw runs and generate deterministic CSV and Markdown summaries."""
+def build_report(
+    run_dirs: tuple[Path, ...], calibration_dirs: tuple[Path, ...] = ()
+) -> ReportPaths:
+    """Validate raw runs and generate deterministic CSV and Markdown summaries.
+
+    ``calibration_dirs`` are the independently launched repeatability runs.
+    They are validated and supply the rank-inversion threshold, but never
+    enter the ranked aggregates.
+    """
     if not run_dirs:
         raise ResultsError("at least one run directory is required")
 
     resolved = tuple(Path(run_dir) for run_dir in run_dirs)
-    validations = tuple(validate_run(run_dir) for run_dir in resolved)
+    calibration = tuple(Path(run_dir) for run_dir in calibration_dirs)
+    validations = tuple(validate_run(run_dir) for run_dir in resolved + calibration)
     for validation in validations:
         write_json(validation.run_dir / VALIDATION, validation.to_dict())
 
+    records, manifests = _load_valid_records(resolved)
+    calibration_records, calibration_manifests = _load_valid_records(calibration)
+
+    rows = _aggregate_report_rows(records, manifests)
+    _assign_ranks(rows)
+    try:
+        verdict = evaluate_hypothesis(
+            blocks_from_records(records, manifests),
+            calibration_repeatability(calibration_records, calibration_manifests),
+        )
+    except AnalysisError as error:
+        raise ResultsError(str(error)) from error
+
+    summary_path = resolved[0] / SUMMARY
+    report_path = resolved[0] / REPORT
+    write_text(summary_path, _render_summary_csv(rows))
+    write_text(report_path, _render_report(rows, validations, verdict))
+    return ReportPaths(
+        summary_csv=summary_path,
+        report_markdown=report_path,
+        validation_ok=all(validation.ok for validation in validations),
+    )
+
+
+def _load_valid_records(
+    run_dirs: tuple[Path, ...],
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
     records: list[dict[str, Any]] = []
     manifests: dict[str, dict[str, Any]] = {}
-    for run_dir in resolved:
+    for run_dir in run_dirs:
         try:
             manifest = json.loads((run_dir / MANIFEST).read_text(encoding=_ENCODING))
         except (OSError, json.JSONDecodeError) as error:
@@ -101,19 +144,7 @@ def build_report(run_dirs: tuple[Path, ...]) -> ReportPaths:
         for record in read_jsonl(run_dir / OUTPUTS):
             if record.get("valid") is True and isinstance(record.get("metrics"), dict):
                 records.append({"run_id": run_id, **record})
-
-    rows = _aggregate_report_rows(records, manifests)
-    _assign_ranks(rows)
-
-    summary_path = resolved[0] / SUMMARY
-    report_path = resolved[0] / REPORT
-    write_text(summary_path, _render_summary_csv(rows))
-    write_text(report_path, _render_report(rows, validations))
-    return ReportPaths(
-        summary_csv=summary_path,
-        report_markdown=report_path,
-        validation_ok=all(validation.ok for validation in validations),
-    )
+    return records, manifests
 
 
 _SUMMARY_FIELDS = (
@@ -290,7 +321,11 @@ def _render_summary_csv(rows: list[dict[str, Any]]) -> str:
     return buffer.getvalue()
 
 
-def _render_report(rows: list[dict[str, Any]], validations: tuple[ValidationReport, ...]) -> str:
+def _render_report(
+    rows: list[dict[str, Any]],
+    validations: tuple[ValidationReport, ...],
+    verdict: HypothesisVerdict | None = None,
+) -> str:
     valid_count = sum(validation.ok for validation in validations)
     inversions = [
         row
@@ -307,8 +342,7 @@ def _render_report(rows: list[dict[str, Any]], validations: tuple[ValidationRepo
         lines.extend(
             [
                 "Speed and energy rankings differ in at least one aggregate workload block.",
-                "This is descriptive only; statistical rank-inversion criteria are "
-                "evaluated separately.",
+                "The statistical criteria below decide whether that difference matters.",
                 "",
             ]
         )
@@ -336,6 +370,8 @@ def _render_report(rows: list[dict[str, Any]], validations: tuple[ValidationRepo
             )
         )
     lines.extend(["", "GPU energy and cost figures are GPU-only estimates, not wall energy.", ""])
+    if verdict is not None:
+        lines.append(verdict.render())
     return "\n".join(lines)
 
 
