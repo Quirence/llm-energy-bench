@@ -60,6 +60,12 @@ run repeated from the reviewed, merged implementation.
   `scored` block can gate quality, but its energy ranking cannot support a
   material-inversion claim. Decode-heavy `short` and prefill-heavy `long`
   blocks are stable to about 1–1.5%.
+- Background load: a desktop wallpaper renderer kept about 21% GPU 3D
+  utilization during the session, and the idle GPU drew a median 22.8 W in
+  P0–P3 instead of settling in a low-power state. NVML reports whole-GPU
+  power, so these energies include that background share, and the renderer
+  also competes for the GPU. The publishable run must close GPU-active
+  desktop applications first and record idle power before starting.
 - Finding: output length varies between repetitions of the same prompt at
   temperature 0 and seed 42 (for example 122, 105 and 135 tokens), consistent
   with the per-repetition UUID marker changing the prompt. Ratio-of-sums
