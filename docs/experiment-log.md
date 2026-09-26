@@ -22,6 +22,46 @@ run repeated from the reviewed, merged implementation.
 
 ## Environment Probes
 
+### 2026-09-26 — RTX 4060 Ti desktop benchmark-v1 observation
+
+- Contributor: Qcsteeven
+- Scope: one local `benchmark-v1` run and three calibration launches on the
+  unmerged stabilization branch (`a683a57`, PR #17). This is **not** a
+  publishable dataset: the code is untagged, and every run contains requests
+  rejected by the validity rule. It used a local copy of
+  `configs/benchmark-v1.toml` that differs only by
+  `host_id = "rtx4060-desktop"`. Calibration used the same prompts and
+  controls with `llama3.2:3b-instruct-q4_K_M` only. Artifacts stay local.
+- GPU and runtime: RTX 4060 Ti 8 GiB, driver 560.94, 160 W limit, Ollama
+  0.34.2. Digests: `qwen3:4b-instruct-2507-q4_K_M` `0edcdef34593…`,
+  `qwen3:4b-instruct-2507-q8_0` `aa7252f68dda…`, `llama3.2:3b-instruct-q4_K_M`
+  `a80c4f17acd5…`, `llama3.2:3b-instruct-q8_0` `e410b836fe61…`. All four loaded
+  fully on the GPU.
+- Conditions: the wallpaper renderer was closed first, and idle power was
+  8.8 W before the benchmark. Idle readings taken immediately after a run were
+  17–28 W because the GPU had not yet settled.
+- Validity: 456/480 benchmark requests valid; calibration 110, 114 and 116 of
+  120. Every rejection has the same cause, one cached prompt token above the
+  template baseline (4 vs 3 for qwen3, 21 vs 20 for llama3.2). For qwen3 the
+  first UUID character matched the previous request's, and qwen3 tokenizes
+  digits individually. For llama3.2 the extra token appears mostly when a
+  letter-led marker follows a digit-led one. The excess is a tokenization
+  boundary effect of `uuid_prefix_v1`, not reuse of prompt content, but it
+  makes an all-valid 480-request run practically unreachable (about 0.95^480).
+- Calibration CV (`max(CV_speed, CV_energy)` over three runs): short 1.0%,
+  long 1.3%, scored 3.9%. The resulting thresholds are 5.0%, 5.0% and 11.8%.
+- Rank-inversion evaluation (PR #18 analysis, valid requests only): speed
+  and energy produced the **same full ordering** in all three blocks.
+  `llama3.2:3b-instruct-q4_K_M` led every block, ahead of the runner-up by
+  26–28% in tok/s and 23–27% in tok/J. No inversion exists, so on this single
+  host the hypothesis would be reported as unsupported. The pre-registered
+  verdict still needs both hosts and publishable runs.
+- Mechanism: mean GPU power was 109.9 W for both Q4 models and 93.6–95.1 W for
+  the Q8 models. Q8 saved about 15% power but lost 36–40% throughput, so
+  energy per token (1.09, 1.38, 1.45, 1.85 J/token) followed speed.
+- Quality: qwen3 Q4 and Q8 scored 1.0, `llama3.2` Q4 0.8125, and `llama3.2` Q8
+  0.75, exactly at the inclusive floor.
+
 ### 2026-09-26 — RTX 4060 Ti desktop pilot-v1 observation
 
 - Contributor: Qcsteeven
