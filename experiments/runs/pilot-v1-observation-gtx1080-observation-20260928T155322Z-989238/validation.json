@@ -1,0 +1,33 @@
+{
+  "checksums": {
+    "config.resolved.toml": "58b255cfdb4aca238d62943f1447b5cd0a060c8e15bb26c96514d410a6dcdf75",
+    "manifest.json": "eac96b2be2b01ae3d44dd5fe36acdb1a37c67fde9922bccc01026c2c70ca1263",
+    "outputs.jsonl": "adae01d5d56908c9926d53ce277ae279480101cccb6ca8aa9f7a7efb34b959f8",
+    "requests.jsonl": "e87b08dd65ea0253b6a9b06a5b0044e687c127471a7013b95572b5e3132ba3ba",
+    "telemetry.jsonl.gz": "dc8391d5a8ae28ea15baf2e4e595b6def65a0ea0032ebdb5ff97a2be6d9cc712",
+    "warmups.jsonl": "900291d75ed0a127c761c3a6d6f1ab3cbfb89eb76d740fed40c61f80434d395c"
+  },
+  "errors": [],
+  "ok": true,
+  "record_counts": {
+    "outputs.jsonl": 18,
+    "requests.jsonl": 18,
+    "telemetry.jsonl.gz": 191,
+    "warmups.jsonl": 4
+  },
+  "run_id": "pilot-v1-observation-gtx1080-observation-20260928T155322Z-989238",
+  "sizes": {
+    "config.resolved.toml": 715,
+    "manifest.json": 3355,
+    "outputs.jsonl": 45610,
+    "requests.jsonl": 23988,
+    "telemetry.jsonl.gz": 8225,
+    "warmups.jsonl": 1459
+  },
+  "status": "completed",
+  "warnings": [
+    "validation.json has not been generated yet",
+    "summary.csv has not been generated yet",
+    "report.md has not been generated yet"
+  ]
+}
