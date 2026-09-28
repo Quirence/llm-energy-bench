@@ -224,7 +224,7 @@ request metrics for latency, throughput, power, energy, efficiency, and cost.
 - Create or append `docs/experiment-log.md`
 - Update `STATUS.md`
 
-- [ ] Tag the reviewed PR #17 merge commit as `pilot-v1-code`.
+- [x] Tag the reviewed PR #17 merge commit as `pilot-v1-code`.
 - [ ] Install and record Ollama 0.34.2 on every host without mid-campaign
   updates; pull the pinned Q4 model manually.
 - [ ] Run `doctor` with each committed host config and confirm version, digest,
