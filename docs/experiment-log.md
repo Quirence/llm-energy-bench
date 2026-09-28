@@ -638,3 +638,28 @@ decision blocks.
 - Anomalies: none affecting validity. The two-token `scored` answers last
   about 40–50 ms and span only about two 100 ms telemetry samples, explaining
   that block's high energy CV.
+
+### 2026-09-29 — RTX 5060 tagged repeatability pilot
+
+- Contributor: Quirence/Codex.
+- Revision: annotated tag `pilot-v1-code`, commit
+  `0ffc091b4747533e6a2b9015a1c0a49ada88c1c1`.
+- Environment: MAIBENBEN X16C, RTX 5060 Laptop GPU, driver 591.66, reported
+  80 W power limit, AC power, Ollama 0.34.2.
+- Model: `llama3.2:3b-instruct-q4_K_M`, digest
+  `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72`,
+  fully placed on the GPU for every launch.
+- Runs: three independently launched `pilot-v1` directories, each with four
+  excluded warm-ups and 18/18 valid measured requests. Validation recorded no
+  errors or warnings; telemetry sample counts were 136, 137, and 135.
+- Repeatability: run-level end-to-end throughput CV was 0.35% for `short`,
+  1.57% for `long`, and 7.72% for `scored`. Output-token efficiency CV was
+  4.78%, 2.99%, and 6.03%, respectively.
+- Preregistered material-effect thresholds are therefore 14.32% (`short`),
+  8.96% (`long`), and 23.16% (`scored`).
+- Energy-source audit: the three launches selected instantaneous-power
+  integration for 11, 18, and 14 requests, and retained the total-energy
+  counter for 7, 0, and 4 requests. The source mix is explicit in raw outputs
+  and derived summaries and must remain visible in later analysis.
+- Scope: primary-host repeatability evidence. It does not test a speed-versus-
+  energy rank inversion because only the Q4 pilot model is present.
