@@ -23,7 +23,7 @@ from llm_energy_bench.nvml import (
     TelemetrySample,
 )
 from llm_energy_bench.ollama import InferenceRequest, InferenceResult, RunningModel
-from llm_energy_bench.results import read_gzip_jsonl, read_jsonl
+from llm_energy_bench.results import WARMUPS, read_gzip_jsonl, read_jsonl
 from llm_energy_bench.runner import (
     RunnerError,
     RunnerPreflightError,
@@ -40,7 +40,7 @@ NOW = datetime(2026, 9, 19, 12, 0, tzinfo=UTC)
 def make_config(
     tmp_path: Path,
     *,
-    warmups: int = 2,
+    warmups: int = 4,
     repetitions: int = 2,
     tariff: float | None = None,
 ) -> ExperimentConfig:
@@ -88,6 +88,8 @@ def make_config(
         tariff_per_kwh=tariff,
         currency="RUB" if tariff is not None else None,
         source_path=source,
+        expected_runtime_version="0.99.0-test",
+        expected_model_digests={MODEL: DIGEST},
     )
 
 
@@ -143,6 +145,7 @@ def result(
     cached_tokens: int | None = 0,
     output_tokens: int = 4,
     valid: bool = True,
+    load_duration_ns: int | None = 10_000_000,
 ) -> InferenceResult:
     return InferenceResult(
         request_id=request_id,
@@ -165,7 +168,7 @@ def result(
         prompt_eval_cached_count=cached_tokens,
         eval_count=output_tokens,
         total_duration_ns=2_000_000_000,
-        load_duration_ns=10_000_000,
+        load_duration_ns=load_duration_ns,
         prompt_eval_duration_ns=2_000_000_000,
         eval_duration_ns=1_000_000_000,
         valid=valid,
@@ -181,10 +184,16 @@ class FakeClient:
         fully_on_gpu: bool | None = True,
         interrupt_at: int | None = None,
         cached_counts: tuple[int | None, ...] | None = None,
+        load_durations: tuple[int, ...] | None = None,
+        runtime_version: str = "0.99.0-test",
+        digest: str = DIGEST,
     ) -> None:
         self.fully_on_gpu = fully_on_gpu
         self.interrupt_at = interrupt_at
         self.cached_counts = cached_counts
+        self.load_durations = load_durations
+        self.runtime_version = runtime_version
+        self.digest = digest
         self.requests: list[InferenceRequest] = []
         self.preload_options: list[dict[str, Any] | None] = []
         self.closed = False
@@ -196,7 +205,7 @@ class FakeClient:
         self.closed = True
 
     def version(self) -> str:
-        return "0.99.0-test"
+        return self.runtime_version
 
     def preload(self, model: str, *, options: dict[str, Any] | None = None) -> RunningModel:
         self.preload_options.append(options)
@@ -205,7 +214,7 @@ class FakeClient:
         return RunningModel(
             name=model,
             model=model,
-            digest=DIGEST,
+            digest=self.digest,
             size_bytes=size,
             size_vram_bytes=size_vram,
             quantization="Q4_K_M",
@@ -221,7 +230,15 @@ class FakeClient:
         cached_tokens = 0
         if self.cached_counts is not None:
             cached_tokens = self.cached_counts[len(self.requests) - 1]
-        return result(request.request_id, cached_tokens=cached_tokens)
+        load_duration_ns = 10_000_000
+        if self.load_durations is not None:
+            load_duration_ns = self.load_durations[len(self.requests) - 1]
+        generated = result(
+            request.request_id,
+            cached_tokens=cached_tokens,
+            load_duration_ns=load_duration_ns,
+        )
+        return replace(generated, model_digest=self.digest)
 
 
 class FakeSampler:
@@ -472,12 +489,30 @@ def test_cached_prompt_count_at_the_template_baseline_is_valid() -> None:
     assert metrics.valid is True
     assert metrics.template_cache_baseline_tokens == 20
     assert metrics.excess_cached_prompt_tokens == 0
+    assert metrics.uncached_prompt_tokens == 6
     assert metrics.prefill_tokens_per_second == pytest.approx(3.0)
 
 
-def test_cached_prompt_count_above_the_template_baseline_is_invalid() -> None:
+def test_one_cached_marker_token_above_the_template_floor_is_valid() -> None:
     metrics = derive_request_metrics(
         result(cached_tokens=21),
+        (
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+            sample("request-1", 0.1, energy_j=101.2, instant_w=14.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+        template_cache_baseline_tokens=20,
+    )
+
+    assert metrics.valid is True
+    assert metrics.excess_cached_prompt_tokens == 1
+
+
+def test_two_cached_tokens_above_the_template_floor_are_invalid() -> None:
+    metrics = derive_request_metrics(
+        result(cached_tokens=22),
         (
             sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
             sample("request-1", 1.0, energy_j=112.0, instant_w=14.0),
@@ -489,8 +524,84 @@ def test_cached_prompt_count_above_the_template_baseline_is_invalid() -> None:
     )
 
     assert metrics.valid is False
-    assert "cached_prompt_tokens_above_template_baseline" in metrics.invalid_reasons
-    assert metrics.excess_cached_prompt_tokens == 1
+    assert "cached_prompt_tokens_above_allowed_excess" in metrics.invalid_reasons
+    assert metrics.excess_cached_prompt_tokens == 2
+
+
+def test_decreasing_telemetry_timestamps_are_invalid() -> None:
+    metrics = derive_request_metrics(
+        result(),
+        (
+            sample("request-1", 1.0, energy_j=112.0, instant_w=14.0),
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.valid is False
+    assert "telemetry_timestamp_order" in metrics.invalid_reasons
+
+
+def test_a_model_reload_is_invalid() -> None:
+    metrics = derive_request_metrics(
+        result(load_duration_ns=3_000_000_000),
+        (
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+            sample("request-1", 1.0, energy_j=112.0, instant_w=14.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.valid is False
+    assert "model_reloaded" in metrics.invalid_reasons
+
+
+def test_a_missing_load_duration_is_invalid() -> None:
+    metrics = derive_request_metrics(
+        result(load_duration_ns=None),
+        (
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+            sample("request-1", 0.1, energy_j=101.2, instant_w=14.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.valid is False
+    assert "load_duration_missing" in metrics.invalid_reasons
+
+
+@pytest.mark.parametrize(
+    ("field", "reason"),
+    [
+        ("prompt_eval_count", "prompt_tokens_missing"),
+        ("total_duration_ns", "total_duration_missing"),
+        ("prompt_eval_duration_ns", "prompt_eval_duration_missing"),
+        ("eval_duration_ns", "eval_duration_missing"),
+        ("ttft_s", "ttft_missing"),
+    ],
+)
+def test_missing_required_runtime_metrics_are_invalid(field: str, reason: str) -> None:
+    inference = replace(result(), **{field: None})
+
+    metrics = derive_request_metrics(
+        inference,
+        (
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+            sample("request-1", 0.1, energy_j=101.2, instant_w=14.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.valid is False
+    assert reason in metrics.invalid_reasons
 
 
 def test_run_order_is_deterministic_and_warmups_are_excluded(tmp_path: Path) -> None:
@@ -514,7 +625,8 @@ def test_run_order_is_deterministic_and_warmups_are_excluded(tmp_path: Path) -> 
     )
     second_requests = read_jsonl(second_dir / "requests.jsonl")
 
-    assert len(first_client.requests) == 6  # 2 warm-ups + 2 prompts x 2 repetitions
+    assert len(first_client.requests) == 8  # 4 warm-ups + 2 prompts x 2 repetitions
+    assert len(read_jsonl(first_dir / WARMUPS)) == 4
     assert len(first_requests) == 4
     assert len(read_jsonl(first_dir / "outputs.jsonl")) == 4
     assert len(read_gzip_jsonl(first_dir / "telemetry.jsonl.gz")) == 8
@@ -551,7 +663,12 @@ def test_every_generation_has_a_unique_leading_cache_buster(tmp_path: Path) -> N
 
 
 def test_measured_cache_marker_is_stable_across_model_configurations(tmp_path: Path) -> None:
-    config = replace(make_config(tmp_path), models=(MODEL, "llama3.2:3b-instruct-q8_0"))
+    second_model = "llama3.2:3b-instruct-q8_0"
+    config = replace(
+        make_config(tmp_path),
+        models=(MODEL, second_model),
+        expected_model_digests={MODEL: DIGEST, second_model: DIGEST},
+    )
 
     run_dir = run_experiment(
         config,
@@ -571,10 +688,10 @@ def test_measured_cache_marker_is_stable_across_model_configurations(tmp_path: P
     assert manifest["cache_buster_policy"] == "uuid_prefix_v1"
 
 
-def test_run_requires_two_warmups_to_establish_a_cache_baseline(tmp_path: Path) -> None:
-    config = make_config(tmp_path, warmups=1)
+def test_run_requires_four_warmups_to_establish_a_cache_floor(tmp_path: Path) -> None:
+    config = make_config(tmp_path, warmups=3)
 
-    with pytest.raises(RunnerPreflightError, match="two warm-up"):
+    with pytest.raises(RunnerPreflightError, match="four warm-up"):
         run_experiment(
             config,
             client_factory=lambda _url: FakeClient(),
@@ -584,8 +701,8 @@ def test_run_requires_two_warmups_to_establish_a_cache_baseline(tmp_path: Path) 
     assert not config.output_dir.exists()
 
 
-def test_final_warmup_cache_count_is_applied_to_measured_requests(tmp_path: Path) -> None:
-    client = FakeClient(cached_counts=(20, 21, 21, 20, 21, 20))
+def test_minimum_post_cold_warmup_cache_count_is_the_floor(tmp_path: Path) -> None:
+    client = FakeClient(cached_counts=(40, 21, 20, 21, 21, 20, 21, 20))
 
     run_dir = run_experiment(
         make_config(tmp_path),
@@ -595,17 +712,37 @@ def test_final_warmup_cache_count_is_applied_to_measured_requests(tmp_path: Path
 
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     outputs = read_jsonl(run_dir / "outputs.jsonl")
-    assert manifest["models"][0]["template_cache_baseline_tokens"] == 21
+    warmups = read_jsonl(run_dir / WARMUPS)
+    assert manifest["models"][0]["template_cache_baseline_tokens"] == 20
+    assert [record["prompt_eval_cached_count"] for record in warmups] == [40, 21, 20, 21]
     assert all(record["valid"] is True for record in outputs)
-    assert {record["metrics"]["template_cache_baseline_tokens"] for record in outputs} == {21}
-    assert {record["metrics"]["excess_cached_prompt_tokens"] for record in outputs} == {0}
+    assert {record["metrics"]["template_cache_baseline_tokens"] for record in outputs} == {20}
+    assert {record["metrics"]["excess_cached_prompt_tokens"] for record in outputs} == {0, 1}
 
 
-def test_missing_final_warmup_cache_count_aborts_before_measurement(tmp_path: Path) -> None:
-    client = FakeClient(cached_counts=(0, None))
+def test_missing_baseline_warmup_cache_count_aborts_before_measurement(tmp_path: Path) -> None:
+    client = FakeClient(cached_counts=(0, 20, None, 20))
     config = make_config(tmp_path)
 
     with pytest.raises(RunnerError, match="prompt_eval_cached_count"):
+        run_experiment(
+            config,
+            client_factory=lambda _url: client,
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+
+    assert len(client.requests) == 4
+    run_dir = next(config.output_dir.iterdir())
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+    assert manifest["started_requests"] == 0
+
+
+def test_reloaded_baseline_warmup_aborts_before_measurement(tmp_path: Path) -> None:
+    client = FakeClient(load_durations=(10_000_000, 3_000_000_000, 10_000_000, 10_000_000))
+    config = make_config(tmp_path)
+
+    with pytest.raises(RunnerError, match="reloaded during cache-floor warm-up"):
         run_experiment(
             config,
             client_factory=lambda _url: client,
@@ -640,7 +777,7 @@ def test_preflight_requires_confirmed_full_gpu_placement(
 
 def test_interrupt_stops_telemetry_and_preserves_partial_run(tmp_path: Path) -> None:
     config = make_config(tmp_path, repetitions=1)
-    client = FakeClient(interrupt_at=3)
+    client = FakeClient(interrupt_at=5)
     sampler = FakeSampler()
 
     with pytest.raises(KeyboardInterrupt):
@@ -674,7 +811,7 @@ def test_completed_run_writes_auditable_manifest_and_validation(tmp_path: Path) 
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     validation = json.loads((run_dir / "validation.json").read_text(encoding="utf-8"))
     outputs = read_jsonl(run_dir / "outputs.jsonl")
-    assert manifest["schema_version"] == 1
+    assert manifest["schema_version"] == 2
     assert manifest["status"] == "completed"
     assert manifest["runtime"]["name"] == "ollama"
     assert manifest["runtime"]["version"] == "0.99.0-test"
@@ -685,6 +822,7 @@ def test_completed_run_writes_auditable_manifest_and_validation(tmp_path: Path) 
     assert manifest["prompt_set_sha256"]
     assert set(manifest["artifact_sha256"]) == {
         "config.resolved.toml",
+        "warmups.jsonl",
         "requests.jsonl",
         "outputs.jsonl",
         "telemetry.jsonl.gz",
@@ -692,3 +830,47 @@ def test_completed_run_writes_auditable_manifest_and_validation(tmp_path: Path) 
     assert validation["ok"] is True
     assert all(record["valid"] is True for record in outputs)
     assert all(record["metrics"]["gpu_energy_joules"] == 1.2 for record in outputs)
+
+
+def test_runtime_version_and_digest_pins_are_enforced_before_artifacts(tmp_path: Path) -> None:
+    config = replace(
+        make_config(tmp_path),
+        expected_runtime_version="0.34.2",
+        expected_model_digests={MODEL: DIGEST},
+    )
+
+    with pytest.raises(RunnerPreflightError, match="runtime version"):
+        run_experiment(
+            config,
+            client_factory=lambda _url: FakeClient(runtime_version="0.34.1"),
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+    assert not config.output_dir.exists()
+
+    with pytest.raises(RunnerPreflightError, match="digest"):
+        run_experiment(
+            config,
+            client_factory=lambda _url: FakeClient(runtime_version="0.34.2", digest="f" * 64),
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+    assert not config.output_dir.exists()
+
+
+def test_measured_model_reload_is_written_then_aborts_the_run(tmp_path: Path) -> None:
+    config = make_config(tmp_path, repetitions=1)
+    client = FakeClient(load_durations=(10_000_000,) * 4 + (3_000_000_000,))
+
+    with pytest.raises(RunnerError, match="reloaded"):
+        run_experiment(
+            config,
+            client_factory=lambda _url: client,
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+
+    run_dir = next(config.output_dir.iterdir())
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    outputs = read_jsonl(run_dir / "outputs.jsonl")
+    assert manifest["status"] == "failed"
+    assert len(outputs) == 1
+    assert outputs[0]["valid"] is False
+    assert "model_reloaded" in outputs[0]["invalid_reasons"]

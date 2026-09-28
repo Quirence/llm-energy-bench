@@ -89,6 +89,11 @@ def doctor_environment(
                         record = running.to_dict()
                         record["requested"] = model_name
                         record["installed"] = True
+                        expected_digest = config.expected_model_digests.get(model_name)
+                        record["expected_digest"] = expected_digest
+                        record["digest_matches_expected"] = (
+                            expected_digest is not None and running.digest == expected_digest
+                        )
                         record["error"] = None
                     except ModelNotFound as error:
                         record = {
@@ -122,12 +127,19 @@ def doctor_environment(
         model.get("installed") is True
         and model.get("fully_on_gpu") is True
         and bool(model.get("digest"))
+        and model.get("digest_matches_expected") is True
         for model in models
+    )
+    runtime["expected_version"] = config.expected_runtime_version
+    runtime["version_matches_expected"] = (
+        config.expected_runtime_version is not None
+        and runtime["version"] == config.expected_runtime_version
     )
     report = {
         "schema_version": 1,
         "ok": (
             runtime["available"] is True
+            and runtime["version_matches_expected"] is True
             and gpu.get("available") is True
             and gpu.get("energy_source") != EnergySource.UNAVAILABLE.value
             and models_ok
@@ -157,7 +169,7 @@ def _default_config_path() -> Path:
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     try:
-        config = load_config(_default_config_path())
+        config = load_config(args.config or _default_config_path())
     except ConfigError as error:
         raise UsageError(str(error)) from error
 
@@ -271,6 +283,12 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = subparsers.add_parser(
         "doctor",
         help="Check Ollama, GPU, NVML capabilities, and model placement.",
+    )
+    doctor.add_argument(
+        "--config",
+        type=Path,
+        metavar="<experiment.toml>",
+        help="Experiment configuration file; defaults to configs/pilot.toml.",
     )
     doctor.add_argument(
         "--json",

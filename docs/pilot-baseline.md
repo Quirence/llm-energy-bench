@@ -12,7 +12,7 @@ may run `doctor`, but must not publish experimental artifacts.
 - Required digest:
   `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72`
 - Context: 4096; temperature: 0; seed: 42; concurrency: 1
-- Warm-ups: 2; measured repetitions: 3
+- Warm-ups: 4 (one cold exclusion plus three floor probes); measured repetitions: 3
 - Prompt set: `prompts/pilot-v1.jsonl` at the hash recorded in each manifest
 - Placement: `fully_on_gpu == true` and `gpu_fraction == 1.0`
 
@@ -59,7 +59,7 @@ ollama pull llama3.2:3b-instruct-q4_K_M
 Use the host's committed config in both commands:
 
 ```text
-.venv\Scripts\python -m llm_energy_bench doctor --json
+.venv\Scripts\python -m llm_energy_bench doctor --config configs/pilot-rtx5060.toml --json
 .venv\Scripts\python -m llm_energy_bench run --config configs/pilot-rtx5060.toml
 ```
 
@@ -67,7 +67,10 @@ Qcsteeven substitutes `configs/pilot-rtx4060.toml`. A run is publishable only
 when `doctor` confirms the frozen runtime, digest and full placement, the CLI
 returns success, `validation.json` reports `ok: true`, and all 18 measured
 requests are valid. Raw output must retain the energy source and any fallback
-reason for every request.
+reason for every request. The four raw warm-up records must support the
+manifest floor, cached-token excess must be at most one, and no measured
+`load_duration` may exceed 100 ms. Warm-ups two through four must also stay at
+or below 100 ms so the cache floor cannot be established across a model reload.
 
 Create the result branch from the tag before adding artifacts:
 

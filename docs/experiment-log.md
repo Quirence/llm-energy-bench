@@ -178,3 +178,41 @@ run repeated from the reviewed, merged implementation.
 - Scope: ignored local acceptance artifact from the unmerged stabilization
   branch. It verifies the correction but is not the publishable research run;
   the run must be repeated from the reviewed `pilot-v1-code` tag.
+
+### 2026-09-28 — Schema-v2 validity correction
+
+- New evidence: RTX 4060 Ti and GTX 1080 local observations found intermittent
+  cache counts exactly one token above the recorded floor. The GTX 1080 also
+  showed that one final-warm-up baseline can be inflated and that the request
+  following a CUDA/runtime crash can include a multi-second model reload while
+  passing the old validator.
+- Superseding decision: use four excluded warm-ups. Treat the first as the
+  cold-start exclusion and define the template floor as the minimum cached
+  count across warm-ups two through four. Persist every warm-up record.
+- Cache validity: allow at most one cached token above the floor. This bounded
+  tolerance covers the observed unique-marker tokenizer boundary; two or more
+  excess tokens remain invalid.
+- Runtime validity: a measured `load_duration` above 100 ms is a model reload.
+  Persist the invalid request, abort the launch, and restart the complete run.
+- Schema decision: emit schema v2, retain the original zero-cache validator for
+  schema v1, and reject missing or unknown schema versions.
+- Reporting correction: aggregate prefill uses persisted uncached prompt tokens;
+  invalid runs contribute no aggregate ranks or claims.
+- Scope: methodology and synthetic-test correction on PR #17. Earlier local
+  observations remain outside the dataset and are summarized in
+  `docs/diagnostic-observations.md`.
+
+### 2026-09-28 — RTX 5060 schema-v2 preflight
+
+- Contributor: Quirence/Codex.
+- Command: `doctor --config configs/pilot-rtx5060.toml --json` from the final
+  stabilization working tree; no experiment run directory was created.
+- GPU/NVML: NVIDIA GeForce RTX 5060 Laptop GPU, driver 591.66, 80 W reported
+  power limit, total-energy/instantaneous/legacy power fields available.
+- Model: `llama3.2:3b-instruct-q4_K_M`, full frozen digest matched, context
+  4096, `size_vram == size == 2,554,708,622`, GPU fraction 1.0.
+- Runtime gate: the installed Ollama reported 0.34.4, while the approved pilot
+  config requires 0.34.2. `doctor` correctly returned `ok: false`.
+- Decision: do not launch or publish the pilot under mixed runtime versions.
+  Use the frozen 0.34.2 runtime on every host, or approve one protocol-wide
+  amendment and repeat preflight everywhere.

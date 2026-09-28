@@ -16,7 +16,7 @@ research comparison begins.
 - runtime: Ollama;
 - model: `llama3.2:3b-instruct-q4_K_M`;
 - prompts: two short/decode, two long/prefill, and two scored utility prompts;
-- two excluded warm-up requests and three measured repetitions;
+- four excluded warm-up requests and three measured repetitions;
 - 18 measured requests in total.
 
 ### Main Matrix
@@ -96,17 +96,22 @@ counter therefore failed the consistency rule and the tool selected
 model-inference experiment.
 
 Ollama's reusable chat-template preamble is controlled separately from prompt
-contamination. Every model performs at least two excluded warm-ups; the final
-warm-up's `prompt_eval_cached_count` becomes the per-model, per-digest template
-baseline recorded in the manifest. Every generated prompt starts with a
+contamination. Every model performs four excluded warm-ups. The first is a
+cold-start exclusion; the minimum `prompt_eval_cached_count` across the next
+three becomes the per-model, per-digest template floor recorded in the
+manifest. Every generated prompt starts with a
 deterministic UUID-form marker derived from a run-specific logical request key,
 followed by an instruction to ignore that metadata. The same prompt and
 repetition use the same marker across model configurations in one run. A
-measured request is eligible only when its cached count is present and does not
-exceed the baseline. All cached tokens, including the accepted template floor,
-are subtracted from the prefill-token numerator. The raw count, applied
-baseline, excess and cache-buster policy are stored so validation can reproduce
-the decision independently.
+measured request is eligible only when its cached count is present and exceeds
+the floor by at most one token. The tolerance covers the observed tokenizer
+boundary of the unique marker; it does not permit prompt-body reuse. All cached
+tokens are subtracted from the prefill-token numerator. Raw warm-ups, the raw
+measured count, applied floor, excess, uncached count and cache-buster policy
+are stored so validation can reproduce the decision independently. A measured
+`load_duration` above 100 ms in cache-floor warm-ups or measured requests is
+treated as a model reload and aborts the run;
+the whole launch must be repeated rather than mixing cold and warm requests.
 
 ## Main Failure Condition
 

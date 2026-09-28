@@ -6,12 +6,14 @@ id = "pilot-v1"
 host_id = "rtx4060-desktop"
 output_dir = "../experiments/runs"
 repetitions = 3
-warmup_requests = 2
+warmup_requests = 4
 order_seed = 42
 
 [runtime]
 ollama_url = "http://127.0.0.1:11434"
 models = ["llama3.2:3b-instruct-q4_K_M"]
+expected_version = "0.34.2"
+expected_digests = { "llama3.2:3b-instruct-q4_K_M" = "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72" }
 
 [gpu]
 index = 0

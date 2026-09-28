@@ -11,6 +11,7 @@ import pytest
 from llm_energy_bench.results import (
     MAX_ARTIFACT_BYTES,
     REQUIRED_RAW_ARTIFACTS,
+    WARMUPS,
     GzipJsonlWriter,
     JsonlWriter,
     PrivacyError,
@@ -245,6 +246,11 @@ def test_the_current_username_is_rejected_even_in_an_unusual_place() -> None:
         assert_public_safe({"note": f"run performed by {user}"})
 
 
+def test_credentials_in_a_url_are_rejected_by_the_public_artifact_scanner() -> None:
+    with pytest.raises(PrivacyError, match="URL credentials"):
+        assert_public_safe({"ollama_url": "http://alice:secret@example.test:11434"})
+
+
 def test_a_clean_manifest_passes() -> None:
     assert_public_safe(
         {
@@ -295,39 +301,70 @@ def test_a_run_identifier_carries_no_private_data(tmp_path: Path) -> None:
 
 def complete_run(tmp_path: Path, status: RunStatus = RunStatus.COMPLETED) -> Path:
     run_dir = create_run_dir(tmp_path, "e", "h")
-    write_json(run_dir / "manifest.json", {"run_id": run_dir.name, "status": status.value})
-    write_text(run_dir / "config.resolved.toml", '[experiment]\nid = "e"\n')
-    with JsonlWriter(run_dir / "requests.jsonl") as writer:
-        writer.write({"request_id": "r0", "valid": True})
-    with JsonlWriter(run_dir / "outputs.jsonl") as writer:
-        writer.write({"request_id": "r0", "text": "hello"})
-    with GzipJsonlWriter(run_dir / "telemetry.jsonl.gz") as writer:
-        writer.write({"request_id": "r0", "power_instant_watts": 45.0})
-    return run_dir
-
-
-def schema_v1_run(tmp_path: Path) -> Path:
-    run_dir = complete_run(tmp_path)
     digest = "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
     write_json(
         run_dir / "manifest.json",
         {
             "schema_version": 1,
             "run_id": run_dir.name,
-            "status": "completed",
-            "prompt_cache_policy": "template_floor_v1",
-            "cache_buster_policy": "uuid_prefix_v1",
+            "status": status.value,
             "models": [
                 {
                     "name": "llama3.2:3b-instruct-q4_K_M",
                     "digest": digest,
                     "fully_on_gpu": True,
-                    "template_cache_baseline_tokens": 20,
                 }
             ],
         },
     )
-    (run_dir / "outputs.jsonl").unlink()
+    write_text(run_dir / "config.resolved.toml", '[experiment]\nid = "e"\n')
+    with JsonlWriter(run_dir / "requests.jsonl") as writer:
+        writer.write({"request_id": "r0", "valid": True})
+    with JsonlWriter(run_dir / "outputs.jsonl") as writer:
+        writer.write(
+            {
+                "request_id": "r0",
+                "model": "llama3.2:3b-instruct-q4_K_M",
+                "model_digest": digest,
+                "valid": True,
+                "prompt_eval_cached_count": 0,
+                "metrics": {
+                    "gpu_energy_joules": 12.0,
+                    "max_telemetry_gap_seconds": 0.1,
+                },
+            }
+        )
+    with GzipJsonlWriter(run_dir / "telemetry.jsonl.gz") as writer:
+        writer.write({"request_id": "r0", "monotonic_s": 0.0})
+        writer.write({"request_id": "r0", "monotonic_s": 0.1})
+    return run_dir
+
+
+def schema_v1_run(tmp_path: Path) -> Path:
+    return complete_run(tmp_path)
+
+
+def schema_v2_run(tmp_path: Path) -> Path:
+    run_dir = create_run_dir(tmp_path, "e", "h")
+    digest = "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+    write_text(run_dir / "config.resolved.toml", '[experiment]\nid = "e"\n')
+    with JsonlWriter(run_dir / WARMUPS) as writer:
+        for index, cached in enumerate((40, 21, 20, 21), start=1):
+            writer.write(
+                {
+                    "request_id": f"w{index}",
+                    "model": "llama3.2:3b-instruct-q4_K_M",
+                    "model_digest": digest,
+                    "warmup_index": index,
+                    "prompt_id": "p0",
+                    "valid": True,
+                    "prompt_eval_count": 50,
+                    "prompt_eval_cached_count": cached,
+                    "load_duration_ns": 10_000_000,
+                }
+            )
+    with JsonlWriter(run_dir / "requests.jsonl") as writer:
+        writer.write({"request_id": "r0", "model_digest": digest})
     with JsonlWriter(run_dir / "outputs.jsonl") as writer:
         writer.write(
             {
@@ -336,20 +373,73 @@ def schema_v1_run(tmp_path: Path) -> Path:
                 "model_digest": digest,
                 "valid": True,
                 "invalid_reasons": [],
-                "prompt_eval_cached_count": 20,
+                "latency_s": 2.0,
+                "ttft_s": 0.2,
+                "prompt_eval_count": 26,
+                "prompt_eval_cached_count": 21,
+                "eval_count": 4,
+                "total_duration_ns": 2_000_000_000,
+                "load_duration_ns": 10_000_000,
+                "prompt_eval_duration_ns": 1_000_000_000,
+                "eval_duration_ns": 900_000_000,
                 "metrics": {
                     "gpu_energy_joules": 12.0,
                     "telemetry_sample_count": 2,
                     "max_telemetry_gap_seconds": 0.1,
                     "template_cache_baseline_tokens": 20,
-                    "excess_cached_prompt_tokens": 0,
+                    "excess_cached_prompt_tokens": 1,
+                    "uncached_prompt_tokens": 5,
                 },
             }
         )
-    (run_dir / "telemetry.jsonl.gz").unlink()
     with GzipJsonlWriter(run_dir / "telemetry.jsonl.gz") as writer:
         writer.write({"request_id": "r0", "monotonic_s": 0.0})
         writer.write({"request_id": "r0", "monotonic_s": 0.1})
+    manifest = {
+        "schema_version": 2,
+        "run_id": run_dir.name,
+        "status": "completed",
+        "host_id": "host-a",
+        "runtime": {"name": "ollama", "version": "0.34.2"},
+        "prompt_cache_policy": "template_floor_v2",
+        "cache_buster_policy": "uuid_prefix_v1",
+        "max_cache_excess_tokens": 1,
+        "max_measured_load_duration_ns": 100_000_000,
+        "prompt_count": 1,
+        "repetitions": 1,
+        "completed_warmups": 4,
+        "started_requests": 1,
+        "completed_requests": 1,
+        "valid_requests": 1,
+        "models": [
+            {
+                "name": "llama3.2:3b-instruct-q4_K_M",
+                "digest": digest,
+                "fully_on_gpu": True,
+                "template_cache_baseline_tokens": 20,
+            }
+        ],
+        "controls": {
+            "models": ["llama3.2:3b-instruct-q4_K_M"],
+            "warmup_requests": 4,
+            "repetitions": 1,
+            "expected_runtime_version": "0.34.2",
+            "expected_model_digests": {"llama3.2:3b-instruct-q4_K_M": digest},
+        },
+        "config_sha256": sha256_file(run_dir / "config.resolved.toml"),
+        "artifact_sha256": {},
+    }
+    manifest["artifact_sha256"] = {
+        name: sha256_file(run_dir / name)
+        for name in (
+            "config.resolved.toml",
+            WARMUPS,
+            "requests.jsonl",
+            "outputs.jsonl",
+            "telemetry.jsonl.gz",
+        )
+    }
+    write_json(run_dir / "manifest.json", manifest)
     return run_dir
 
 
@@ -439,8 +529,31 @@ def test_schema_v1_run_passes_semantic_validation(tmp_path: Path) -> None:
     assert report.errors == ()
 
 
+def test_schema_v2_run_passes_semantic_validation(tmp_path: Path) -> None:
+    report = validate_run(schema_v2_run(tmp_path))
+
+    assert report.ok is True
+    assert report.errors == ()
+
+
+@pytest.mark.parametrize("schema", [None, 999])
+def test_missing_or_unknown_schema_version_fails_closed(tmp_path: Path, schema: int | None) -> None:
+    run_dir = complete_run(tmp_path)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    if schema is None:
+        manifest.pop("schema_version")
+    else:
+        manifest["schema_version"] = schema
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("schema_version" in error for error in report.errors)
+
+
 def test_partial_gpu_offload_fails_semantic_validation(tmp_path: Path) -> None:
-    run_dir = schema_v1_run(tmp_path)
+    run_dir = schema_v2_run(tmp_path)
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     manifest["models"][0]["fully_on_gpu"] = False
     write_json(run_dir / "manifest.json", manifest)
@@ -452,7 +565,7 @@ def test_partial_gpu_offload_fails_semantic_validation(tmp_path: Path) -> None:
 
 
 def test_a_changed_model_digest_fails_semantic_validation(tmp_path: Path) -> None:
-    run_dir = schema_v1_run(tmp_path)
+    run_dir = schema_v2_run(tmp_path)
     outputs = read_jsonl(run_dir / "outputs.jsonl")
     outputs[0]["model_digest"] = "different"
     (run_dir / "outputs.jsonl").unlink()
@@ -465,13 +578,14 @@ def test_a_changed_model_digest_fails_semantic_validation(tmp_path: Path) -> Non
     assert any("digest" in error for error in report.errors)
 
 
-def test_cached_prompt_tokens_above_the_template_baseline_fail_validation(
+def test_cached_prompt_tokens_above_the_allowed_excess_fail_validation(
     tmp_path: Path,
 ) -> None:
-    run_dir = schema_v1_run(tmp_path)
+    run_dir = schema_v2_run(tmp_path)
     outputs = read_jsonl(run_dir / "outputs.jsonl")
-    outputs[0]["prompt_eval_cached_count"] = 21
-    outputs[0]["metrics"]["excess_cached_prompt_tokens"] = 1
+    outputs[0]["prompt_eval_cached_count"] = 22
+    outputs[0]["metrics"]["excess_cached_prompt_tokens"] = 2
+    outputs[0]["metrics"]["uncached_prompt_tokens"] = 4
     (run_dir / "outputs.jsonl").unlink()
     with JsonlWriter(run_dir / "outputs.jsonl") as writer:
         writer.write(outputs[0])
@@ -479,11 +593,11 @@ def test_cached_prompt_tokens_above_the_template_baseline_fail_validation(
     report = validate_run(run_dir)
 
     assert report.ok is False
-    assert any("template baseline" in error for error in report.errors)
+    assert any("allowed excess" in error for error in report.errors)
 
 
 def test_cache_baseline_in_output_must_match_the_manifest(tmp_path: Path) -> None:
-    run_dir = schema_v1_run(tmp_path)
+    run_dir = schema_v2_run(tmp_path)
     outputs = read_jsonl(run_dir / "outputs.jsonl")
     outputs[0]["metrics"]["template_cache_baseline_tokens"] = 19
     (run_dir / "outputs.jsonl").unlink()
@@ -496,8 +610,8 @@ def test_cache_baseline_in_output_must_match_the_manifest(tmp_path: Path) -> Non
     assert any("cache baseline" in error for error in report.errors)
 
 
-def test_schema_v1_requires_the_declared_template_cache_policy(tmp_path: Path) -> None:
-    run_dir = schema_v1_run(tmp_path)
+def test_schema_v2_requires_the_declared_template_cache_policy(tmp_path: Path) -> None:
+    run_dir = schema_v2_run(tmp_path)
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     manifest.pop("prompt_cache_policy")
     write_json(run_dir / "manifest.json", manifest)
@@ -508,8 +622,8 @@ def test_schema_v1_requires_the_declared_template_cache_policy(tmp_path: Path) -
     assert any("prompt cache policy" in error for error in report.errors)
 
 
-def test_schema_v1_requires_the_declared_cache_buster_policy(tmp_path: Path) -> None:
-    run_dir = schema_v1_run(tmp_path)
+def test_schema_v2_requires_the_declared_cache_buster_policy(tmp_path: Path) -> None:
+    run_dir = schema_v2_run(tmp_path)
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     manifest.pop("cache_buster_policy")
     write_json(run_dir / "manifest.json", manifest)
@@ -521,7 +635,7 @@ def test_schema_v1_requires_the_declared_cache_buster_policy(tmp_path: Path) -> 
 
 
 def test_a_telemetry_gap_above_500_ms_fails_semantic_validation(tmp_path: Path) -> None:
-    run_dir = schema_v1_run(tmp_path)
+    run_dir = schema_v2_run(tmp_path)
     outputs = read_jsonl(run_dir / "outputs.jsonl")
     outputs[0]["metrics"]["max_telemetry_gap_seconds"] = 0.75
     (run_dir / "outputs.jsonl").unlink()
@@ -535,7 +649,7 @@ def test_a_telemetry_gap_above_500_ms_fails_semantic_validation(tmp_path: Path) 
 
 
 def test_missing_request_telemetry_fails_semantic_validation(tmp_path: Path) -> None:
-    run_dir = schema_v1_run(tmp_path)
+    run_dir = schema_v2_run(tmp_path)
     (run_dir / "telemetry.jsonl.gz").unlink()
     with GzipJsonlWriter(run_dir / "telemetry.jsonl.gz") as writer:
         writer.write({"request_id": "another-request", "monotonic_s": 0.0})
@@ -544,3 +658,128 @@ def test_missing_request_telemetry_fails_semantic_validation(tmp_path: Path) -> 
 
     assert report.ok is False
     assert any("no telemetry" in error for error in report.errors)
+
+
+def test_schema_v2_rejects_tampered_artifact_hashes(tmp_path: Path) -> None:
+    run_dir = schema_v2_run(tmp_path)
+    with (run_dir / "requests.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write('{"request_id":"r1"}\n')
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("checksum" in error for error in report.errors)
+
+
+def test_schema_v2_rejects_incomplete_request_counts(tmp_path: Path) -> None:
+    run_dir = schema_v2_run(tmp_path)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["prompt_count"] = 2
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("expected 2 measured requests" in error for error in report.errors)
+
+
+def test_schema_v2_requires_exact_frozen_model_digest_coverage(tmp_path: Path) -> None:
+    run_dir = schema_v2_run(tmp_path)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["controls"]["expected_model_digests"]["unexpected:model"] = "f" * 64
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("frozen model digest coverage" in error for error in report.errors)
+
+
+def test_schema_v2_rejects_a_warmup_floor_not_supported_by_raw_records(tmp_path: Path) -> None:
+    run_dir = schema_v2_run(tmp_path)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["models"][0]["template_cache_baseline_tokens"] = 21
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("warm-up" in error and "floor" in error for error in report.errors)
+
+
+def test_schema_v2_rejects_a_reloaded_cache_floor_warmup(tmp_path: Path) -> None:
+    run_dir = schema_v2_run(tmp_path)
+    warmups = list(read_jsonl(run_dir / WARMUPS))
+    warmups[1]["load_duration_ns"] = 3_000_000_000
+    (run_dir / WARMUPS).unlink()
+    with JsonlWriter(run_dir / WARMUPS) as writer:
+        for record in warmups:
+            writer.write(record)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["artifact_sha256"][WARMUPS] = sha256_file(run_dir / WARMUPS)
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("reloaded during cache-floor warm-up" in error for error in report.errors)
+
+
+def test_schema_v2_rejects_a_measured_model_reload(tmp_path: Path) -> None:
+    run_dir = schema_v2_run(tmp_path)
+    outputs = list(read_jsonl(run_dir / "outputs.jsonl"))
+    outputs[0]["load_duration_ns"] = 3_000_000_000
+    (run_dir / "outputs.jsonl").unlink()
+    with JsonlWriter(run_dir / "outputs.jsonl") as writer:
+        writer.write(outputs[0])
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["artifact_sha256"]["outputs.jsonl"] = sha256_file(run_dir / "outputs.jsonl")
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("reloaded" in error for error in report.errors)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "prompt_eval_count",
+        "total_duration_ns",
+        "prompt_eval_duration_ns",
+        "eval_duration_ns",
+        "ttft_s",
+    ],
+)
+def test_schema_v2_rejects_missing_required_runtime_metrics(tmp_path: Path, field: str) -> None:
+    run_dir = schema_v2_run(tmp_path)
+    outputs = list(read_jsonl(run_dir / "outputs.jsonl"))
+    outputs[0][field] = None
+    (run_dir / "outputs.jsonl").unlink()
+    with JsonlWriter(run_dir / "outputs.jsonl") as writer:
+        writer.write(outputs[0])
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["artifact_sha256"]["outputs.jsonl"] = sha256_file(run_dir / "outputs.jsonl")
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("required runtime metric" in error for error in report.errors)
+
+
+def test_schema_v2_rejects_decreasing_raw_telemetry_timestamps(tmp_path: Path) -> None:
+    run_dir = schema_v2_run(tmp_path)
+    (run_dir / "telemetry.jsonl.gz").unlink()
+    with GzipJsonlWriter(run_dir / "telemetry.jsonl.gz") as writer:
+        writer.write({"request_id": "r0", "monotonic_s": 0.1})
+        writer.write({"request_id": "r0", "monotonic_s": 0.0})
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["artifact_sha256"]["telemetry.jsonl.gz"] = sha256_file(run_dir / "telemetry.jsonl.gz")
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("timestamp order" in error for error in report.errors)

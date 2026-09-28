@@ -71,14 +71,12 @@ template preamble, not contamination. In the observation run all three
 measured requests were rejected with `cached_prompt_tokens`, so the run
 produced zero requests eligible for primary analysis.
 
-**Resolution in Issue #13.** At least two warm-up requests are required. The
-cached count from the final warm-up is recorded with the model and digest as
-the template baseline. A measured request is invalid only when the count is
-missing or exceeds that baseline; counts at or below the floor remain valid.
-The output stores both the applied baseline and excess, and semantic
-validation recomputes the decision from raw fields. This policy is covered by
-hardware-independent tests but still requires confirmation with Ollama on the
-RTX 5060 host.
+**Superseded resolution.** Issue #13 originally required two warm-ups and used
+the final cached count. Later RTX 4060 Ti and GTX 1080 observations showed both
+one-token marker-boundary excess and an occasionally inflated final warm-up.
+Schema v2 therefore records four warm-ups, excludes the first as cold, uses the
+minimum of warm-ups two through four as the floor, and accepts at most one
+excess marker token. Semantic validation recomputes the rule from raw records.
 
 ## 4. The cache buster now puts entropy first
 
@@ -154,9 +152,8 @@ was touched.
 
 ## Follow-up change under Issue #13
 
-The runner and validator now implement the template-floor policy above, record
-the baseline and excess in derived metrics, require two warm-ups, and abort
-before measured requests when the baseline cannot be established. The prompt
-nonce also moved ahead of every static character. These are methodology fixes
-derived from this observation; they do not turn the GTX 1080 observation into
-an experimental run.
+The runner and validator now implement the schema-v2 template-floor policy
+above, record every warm-up plus the floor/excess/uncached counts, and abort
+before measured requests when the floor cannot be established. The prompt
+nonce also moved ahead of every static character. These methodology fixes do
+not turn the GTX 1080 observation into an experimental run.

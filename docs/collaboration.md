@@ -103,3 +103,9 @@ prepare a host and run `doctor` earlier, but a result is comparable only after
 the commit, prompt hash, Ollama version and model digest are frozen and
 recorded. Invalid requests remain in raw artifacts with explicit reasons and
 are excluded from primary aggregates.
+
+Contributor observations made before the tag belong in
+`docs/diagnostic-observations.md`; they are not dataset rows. Do not reuse the
+frozen `rtx4060-desktop` host ID for an RTX 4060 Ti or another GPU. Create an
+explicit observation-only host ID unless a reviewed protocol amendment changes
+the primary matrix.

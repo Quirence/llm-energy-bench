@@ -1,89 +1,75 @@
 # Project Status
 
-Last updated: 2026-09-25
+Last updated: 2026-09-28
 
 ## Current Milestone
 
-M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
+M1 — Measured Pilot. The implementation is in final stabilization on PR #17;
+no publishable dataset exists yet.
 
 ## Done
 
-- Research question and failure condition documented.
-- MVP architecture and data flow approved.
-- Initial model and quantization matrix fixed.
-- Parallel implementation from Qcsteeven and Dimas reviewed and integrated
-  into `main` while preserving both contributors' commits.
-- CODEOWNERS plus reproducible bug, experiment, and pull-request templates
-  enforce the two-author review workflow in the repository.
-- The versioned collaboration guide maps `@Qcsteeven` to NVML/RTX 4060 work
-  and `@Skipl1` (Dimas) to the Ollama runtime boundary and Issue #7.
-- Public GitHub milestones `M0 Bootstrap`, `M1 Measured Pilot`, `M2 Two-GPU
-  Study`, and `M3 Paper Dataset` track the delivery stages.
-- `main` requires a pull request, one approval, successful Windows and Linux
-  CI, resolved conversations, and linear history. The cross-review CODEOWNERS
-  map is included in the stabilization branch; code-owner enforcement can be
-  enabled after that branch merges without creating an ownership deadlock.
-- Detailed implementation plan prepared.
-- Task 1 (Qcsteeven): package shell, `doctor`/`run`/`report` parsing, fixed
-  exit codes, packaging, and Windows/Linux CI.
-- Task 2 (Qcsteeven): strict experiment config and prompt-set contracts plus
-  the six-prompt RTX 3050 pilot inputs.
-- Task 3 (Qcsteeven): atomic raw-result writers, gzip telemetry, checksums,
-  privacy guards, run directories, and basic validation.
-- Task 4 (Dimas): read-only Ollama inventory/preload and streaming inference
-  measurements, including TTFT, placement, digests, and partial failures.
-- Task 5 (Qcsteeven): NVML capability probe and request-scoped telemetry
-  sampler with total-energy/instant-power/legacy-power fallback.
-- Task 6: deterministic warm experiment runner, cache contamination handling,
-  request metrics, partial-run preservation, and semantic validation.
-- Task 7: read-only environment diagnosis, CLI execution path, validation
-  summaries, aggregate CSV/Markdown reports, quality floor, and speed/energy
-  ranking comparison.
-- Task 9: frozen four-configuration `benchmark-v1` matrix, 24-prompt workload,
-  repeatability CV, bootstrap materiality rule, and explicit negative-result
-  decision criterion.
-- Issue #7 (Dimas): the Ollama runtime path is validated against a live
-  Ollama 0.34.2 server. `doctor` reports the real version, digest and
-  full-VRAM placement, and a streaming request completes end to end. The
-  observation is recorded in `docs/ollama-runtime-observations.md`.
-- The consolidated stabilization branch passes 258 tests plus `ruff check` and
-  `ruff format --check` on Python 3.12 without requiring NVIDIA hardware.
-- Its local RTX 5060 acceptance check completed with 18/18 valid measured
-  requests, cache baseline 20, excess cache 0, and quality score 1.0. The raw
-  artifact remains unpublished until the reviewed branch is merged and tagged.
+- The Python 3.12 CLI implements `doctor`, `run`, and `report` with stable exit
+  codes and Windows/Linux hardware-independent tests.
+- Strict TOML and prompt contracts, Ollama streaming/TTFT, full-GPU placement,
+  request-scoped NVML telemetry, power-source fallbacks, atomic artifacts,
+  privacy guards, and aggregate reports are implemented.
+- The pilot model is pinned to Ollama 0.34.2 and digest
+  `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72`.
+- Schema v2 records four excluded warm-ups. The first is a cold-start
+  exclusion; the minimum cached count from the next three is the auditable
+  template floor.
+- At most one cache token above that floor is accepted for the unique marker
+  boundary. Raw, cached, and uncached prompt-token counts remain distinct.
+- A model load longer than 100 ms in a cache-floor warm-up or measured request
+  is invalid and aborts the launch; runtime failures also abort instead of
+  contaminating later requests.
+- Validation fails closed on unknown schemas and independently checks frozen
+  runtime/digests, placement, warm-up floor, request counts, manifest counters,
+  hashes, telemetry order/coverage, cache excess, load duration, and energy.
+- Reports exclude entire invalid runs and rank configurations only within one
+  `host_id × prompt category` block.
+- Contributions from Qcsteeven and Dimas are integrated and attributed in
+  `docs/project-state-for-owner.md`. Their later hardware observations are
+  preserved separately as diagnostic evidence.
 
 ## In Progress
 
-- Review the single stabilization pull request that supersedes PRs #9, #12,
-  and #14--#16. Its code combines doctor path resolution, cross-review owners,
-  full-GPU placement, NVML sanity checks, the template floor and the verified
-  UUID cache marker.
+- PR #17 must receive collaborator approval and green Windows/Linux CI after
+  the final stabilization commits are pushed.
+- The 2026-09-28 RTX 5060 preflight passed NVML, digest and full-placement
+  checks but found Ollama 0.34.4 instead of the frozen 0.34.2. The host must use
+  the frozen runtime, or the protocol version must be amended for every host
+  before any publishable pilot is launched.
+- PRs #18, #19, and #22 were reviewed as non-mergeable in their current form:
+  #18 can draw a formal conclusion from invalid/incomparable campaigns; #19
+  silently substitutes an RTX 4060 Ti for the frozen RTX 4060 host; #22 is
+  stacked on #19 and includes a calibration launch contaminated by a model
+  reload. Their useful requirements/evidence are preserved in Issues and docs.
 
-## Next
+## Next Acceptance Gate
 
-- Merge the stabilization pull request, tag its merge commit `pilot-v1-code`,
-  and run the committed RTX 5060 and RTX 4060 host configs independently.
+1. Merge PR #17 by squash after one collaborator approval and both CI jobs.
+2. Tag the exact merge commit `pilot-v1-code`.
+3. Have Quirence and the second primary-host owner pull that tag and execute
+   the committed pilot config without code or protocol changes.
+4. Accept only runs with `validation.json: ok=true` and all 18 measured
+   requests valid.
+5. Freeze all four benchmark model digests before enabling `benchmark-v1`.
 
-## Blockers
+## Open Research Work
 
-- The stabilization branch still needs one collaborator approval and green
-  Windows/Linux CI before it can become the tagged baseline.
-- Publishable end-to-end experimental validation remains pending. The local
-  acceptance run validates the implementation, but comparable artifacts must
-  come from the reviewed tag on both primary hosts.
-- Real NVML probing succeeds on the RTX 3050 and exposes all requested fields.
-  Driver 572.83 reports an inconsistent total-energy counter, so the new
-  per-request sanity check correctly falls back to instantaneous power
-  integration; this still needs validation under model load.
-- RTX 5060 Laptop driver 591.66 exposes a state-dependent total-energy
-  counter: it can be physically inconsistent at idle or return no positive
-  request delta, while most inference intervals agree reasonably with power
-  integration. The per-request sanity gate and explicit fallback are therefore
-  still required. External-meter validation remains out of MVP scope.
+- RTX 5060 publishable pilot and three independent calibration launches.
+- A confirmed second primary GPU. The original protocol says RTX 4060 desktop;
+  the observed RTX 4060 Ti remains a distinct observation host until an
+  explicit protocol amendment is reviewed.
+- A corrected implementation of the rank-inversion analysis after clean,
+  compatible campaign data exists. PR #18 is not the frozen implementation.
+- External wattmeter validation remains outside MVP; all reported energy and
+  cost values are GPU-only estimates.
 
 ## Latest Validated Run
 
-No publishable experimental runs yet. The latest local acceptance check is the
-RTX 5060 18-request stabilization run documented in the experiment log; it is
-valid as implementation evidence but intentionally excluded from the dataset
-because its branch has not been reviewed, merged, and tagged.
+No publishable run yet. RTX 5060 Laptop, RTX 4060 Ti, and GTX 1080 local runs
+were useful diagnostics, but they predate the final schema-v2 tag or contain
+known validity failures and therefore are excluded from the research dataset.

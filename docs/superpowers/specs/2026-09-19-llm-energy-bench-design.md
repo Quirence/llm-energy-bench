@@ -78,7 +78,8 @@ For each experiment the runner:
 3. Probes Ollama, the GPU, NVML capabilities, and model placement.
 4. Rejects missing models and partial CPU offload instead of pulling models
    or silently changing the workload.
-5. Preloads each model and performs two excluded warm-up requests.
+5. Preloads each model and performs four excluded warm-up requests: one cold
+   exclusion and three auditable cache-floor probes.
 6. Executes measured prompts in a deterministic shuffled order.
 7. Starts telemetry before each request and stops it after the final response
    chunk.
@@ -99,7 +100,7 @@ temperature = 0
 seed = 42
 concurrency = 1
 kv_cache = f16
-warmup_requests = 2
+warmup_requests = 4
 telemetry_interval_ms = 100
 ```
 
@@ -121,6 +122,7 @@ Each run directory contains:
 ```text
 manifest.json
 config.resolved.toml
+warmups.jsonl
 requests.jsonl
 outputs.jsonl
 telemetry.jsonl.gz
@@ -142,7 +144,7 @@ Required request metrics are:
 
 - end-to-end latency and TTFT;
 - Ollama total, load, prompt-evaluation, and evaluation durations;
-- prompt, cached-prompt, and output token counts;
+- prompt, cached-prompt, uncached-prompt, and output token counts;
 - prefill, decode, and end-to-end output throughput;
 - average and maximum observed GPU power;
 - GPU energy per request;

@@ -187,7 +187,7 @@ atomic result writers.
 **Produces:** `run_experiment(config: ExperimentConfig) -> Path` and derived
 request metrics for latency, throughput, power, energy, efficiency, and cost.
 
-- [x] Write failing tests for deterministic order, two excluded warm-ups,
+- [x] Write failing tests for deterministic order, four excluded warm-ups,
   unique leading cache-buster IDs, full-GPU preflight, telemetry cleanup,
   total-energy preference, trapezoidal fallback, and partial-run status.
 - [x] Add formula tests for J/token, token/J, and optional tariff cost.
@@ -227,7 +227,8 @@ request metrics for latency, throughput, power, energy, efficiency, and cost.
 - [ ] Install and record one Ollama version without enabling mid-campaign
   updates.
 - [ ] Pull `llama3.2:3b-instruct-q4_K_M` manually.
-- [ ] Run `python -m llm_energy_bench doctor --json` and confirm 100% GPU.
+- [ ] Run `python -m llm_energy_bench doctor --config configs/pilot.toml --json`
+  and confirm 100% GPU.
 - [ ] Run `python -m llm_energy_bench run --config configs/pilot.toml`.
 - [ ] Verify 18 measured request records, positive energy for valid requests,
   telemetry coverage, hashes, and validation status.

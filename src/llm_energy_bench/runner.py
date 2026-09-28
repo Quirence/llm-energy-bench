@@ -42,6 +42,7 @@ from llm_energy_bench.results import (
     RESOLVED_CONFIG,
     TELEMETRY,
     VALIDATION,
+    WARMUPS,
     GzipJsonlWriter,
     JsonlWriter,
     RunStatus,
@@ -55,6 +56,8 @@ from llm_energy_bench.results import (
 )
 
 MAX_TELEMETRY_GAP_S = 0.5
+MAX_CACHE_EXCESS_TOKENS = 1
+MAX_MEASURED_LOAD_DURATION_NS = 100_000_000
 # Consumer drivers can expose a callable total-energy field whose values are
 # nevertheless physically implausible. Keep this deliberately permissive: the
 # check rejects broken counters, not ordinary sampling error around short peaks.
@@ -91,6 +94,7 @@ class RequestMetrics:
     ttft_seconds: float | None
     prompt_tokens: int | None
     cached_prompt_tokens: int | None
+    uncached_prompt_tokens: int | None
     template_cache_baseline_tokens: int
     excess_cached_prompt_tokens: int | None
     output_tokens: int | None
@@ -145,6 +149,13 @@ def derive_request_metrics(
     currency: str | None = None,
 ) -> RequestMetrics:
     """Derive one request's rates, energy, efficiency, and optional cost."""
+    if any(
+        right.monotonic_s < left.monotonic_s
+        for left, right in zip(samples, samples[1:], strict=False)
+    ):
+        timestamp_order_invalid = True
+    else:
+        timestamp_order_invalid = False
     ordered = tuple(sorted(samples, key=lambda item: item.monotonic_s))
     reasons: list[str] = []
 
@@ -152,6 +163,24 @@ def derive_request_metrics(
         reasons.append(f"runtime:{_enum_value(result.invalid_kind) or 'invalid'}")
     if any(item.request_id != result.request_id for item in ordered):
         reasons.append("telemetry_request_id")
+    if timestamp_order_invalid:
+        reasons.append("telemetry_timestamp_order")
+    if result.load_duration_ns is None:
+        reasons.append("load_duration_missing")
+    elif result.load_duration_ns < 0:
+        reasons.append("load_duration_invalid")
+    elif result.load_duration_ns > MAX_MEASURED_LOAD_DURATION_NS:
+        reasons.append("model_reloaded")
+    if result.total_duration_ns is None or result.total_duration_ns <= 0:
+        reasons.append("total_duration_missing")
+    if result.prompt_eval_duration_ns is None or result.prompt_eval_duration_ns <= 0:
+        reasons.append("prompt_eval_duration_missing")
+    if result.eval_duration_ns is None or result.eval_duration_ns <= 0:
+        reasons.append("eval_duration_missing")
+    if result.ttft_s is None or result.ttft_s < 0:
+        reasons.append("ttft_missing")
+    if result.latency_s <= 0:
+        reasons.append("latency_invalid")
 
     max_gap = _max_gap(ordered)
     if len(ordered) < 2:
@@ -175,10 +204,12 @@ def derive_request_metrics(
         reasons.append("cached_prompt_tokens_missing")
     else:
         excess_cached_tokens = max(0, cached_tokens - template_cache_baseline_tokens)
-        if excess_cached_tokens > 0:
-            reasons.append("cached_prompt_tokens_above_template_baseline")
+        if excess_cached_tokens > MAX_CACHE_EXCESS_TOKENS:
+            reasons.append("cached_prompt_tokens_above_allowed_excess")
 
     prompt_tokens = result.prompt_eval_count
+    if prompt_tokens is None or prompt_tokens < 0:
+        reasons.append("prompt_tokens_missing")
     uncached_prompt_tokens = prompt_tokens
     if prompt_tokens is not None and cached_tokens is not None:
         uncached_prompt_tokens = prompt_tokens - cached_tokens
@@ -215,6 +246,7 @@ def derive_request_metrics(
         ttft_seconds=result.ttft_s,
         prompt_tokens=prompt_tokens,
         cached_prompt_tokens=cached_tokens,
+        uncached_prompt_tokens=uncached_prompt_tokens,
         template_cache_baseline_tokens=template_cache_baseline_tokens,
         excess_cached_prompt_tokens=excess_cached_tokens,
         output_tokens=output_tokens,
@@ -252,9 +284,9 @@ def run_experiment(
     Factories are injectable only to keep hardware-independent tests honest;
     normal callers use the one-argument public contract.
     """
-    if config.warmup_requests < 2:
+    if config.warmup_requests < 4:
         raise RunnerPreflightError(
-            "at least two warm-up requests are required to establish the template cache baseline"
+            "at least four warm-up requests are required to establish the template cache floor"
         )
 
     prompts = load_prompts(config.prompt_path)
@@ -268,7 +300,19 @@ def run_experiment(
             interval_ms=config.telemetry_interval_ms,
         ) as sampler,
     ):
+        if config.expected_runtime_version is None:
+            raise RunnerPreflightError("the experiment has no frozen runtime version")
+        if set(config.expected_model_digests) != set(config.models):
+            raise RunnerPreflightError("the experiment has no frozen digest for every model")
         runtime_version = client.version()
+        if (
+            config.expected_runtime_version is not None
+            and runtime_version != config.expected_runtime_version
+        ):
+            raise RunnerPreflightError(
+                f"runtime version {runtime_version!r} does not match the frozen version "
+                f"{config.expected_runtime_version!r}"
+            )
         capabilities = sampler.probe(config.gpu_index)
         if capabilities.energy_source is EnergySource.UNAVAILABLE:
             raise RunnerPreflightError(
@@ -280,6 +324,13 @@ def run_experiment(
             _preflight_model(client.preload(model, options=load_options), model)
             for model in config.models
         )
+        for requested_name, model in zip(config.models, models, strict=True):
+            expected_digest = config.expected_model_digests[requested_name]
+            if model.digest != expected_digest:
+                raise RunnerPreflightError(
+                    f"model {requested_name!r} digest {model.digest!r} does not match the frozen "
+                    f"digest {expected_digest!r}"
+                )
 
         run_dir = create_run_dir(config.output_dir, config.experiment_id, config.host_id)
         resolved_config = _resolved_config_toml(config, prompts_fingerprint(prompts))
@@ -353,6 +404,7 @@ def _execute_requests(
     with (
         JsonlWriter(run_dir / REQUESTS) as request_writer,
         JsonlWriter(run_dir / OUTPUTS) as output_writer,
+        JsonlWriter(run_dir / WARMUPS) as warmup_writer,
         GzipJsonlWriter(run_dir / TELEMETRY) as telemetry_writer,
     ):
         measured_index = 0
@@ -369,6 +421,7 @@ def _execute_requests(
                     f"{expected_model.digest} -> {active_model.digest}"
                 )
 
+            warmup_results: list[InferenceResult] = []
             for warmup_index in range(config.warmup_requests):
                 prompt = prompts[warmup_index % len(prompts)]
                 request_id = f"{run_dir.name}-warmup-m{model_index + 1}-w{warmup_index + 1}"
@@ -379,25 +432,56 @@ def _execute_requests(
                     options=options,
                 )
                 warmup_result = client.generate_stream(warmup)
+                warmup_record = {
+                    "request_id": request_id,
+                    "model": model_name,
+                    "model_digest": warmup_result.model_digest,
+                    "warmup_index": warmup_index + 1,
+                    "prompt_id": prompt.prompt_id,
+                    "valid": warmup_result.valid,
+                    "prompt_eval_count": warmup_result.prompt_eval_count,
+                    "prompt_eval_cached_count": warmup_result.prompt_eval_cached_count,
+                    "load_duration_ns": warmup_result.load_duration_ns,
+                }
+                assert_public_safe(warmup_record)
+                warmup_writer.write(warmup_record)
                 if not warmup_result.valid:
                     raise RunnerError(
                         f"warm-up {warmup_index + 1} for {model_name!r} failed: "
                         f"{warmup_result.invalid_reason or 'invalid result'}"
                     )
+                if warmup_result.model_digest != expected_model.digest:
+                    raise RunnerError(
+                        f"model {model_name!r} digest changed during warm-up: "
+                        f"{expected_model.digest} -> {warmup_result.model_digest}"
+                    )
+                if warmup_index > 0 and (
+                    warmup_result.load_duration_ns is None
+                    or warmup_result.load_duration_ns < 0
+                    or warmup_result.load_duration_ns > MAX_MEASURED_LOAD_DURATION_NS
+                ):
+                    raise RunnerError(
+                        f"model {model_name!r} reloaded during cache-floor warm-up "
+                        f"{warmup_index + 1}"
+                    )
                 manifest["completed_warmups"] += 1
+                warmup_results.append(warmup_result)
 
-            template_cache_baseline = warmup_result.prompt_eval_cached_count
-            warmup_prompt_tokens = warmup_result.prompt_eval_count
-            if (
-                template_cache_baseline is None
-                or template_cache_baseline < 0
-                or warmup_prompt_tokens is None
-                or template_cache_baseline > warmup_prompt_tokens
-            ):
+            baseline_candidates: list[int] = []
+            for baseline_result in warmup_results[1:]:
+                cached = baseline_result.prompt_eval_cached_count
+                prompt_count = baseline_result.prompt_eval_count
+                if cached is None or cached < 0 or prompt_count is None or cached > prompt_count:
+                    raise RunnerError(
+                        f"a baseline warm-up for {model_name!r} did not report a usable "
+                        "prompt_eval_cached_count; measured requests were not started"
+                    )
+                baseline_candidates.append(cached)
+            if not baseline_candidates:
                 raise RunnerError(
-                    f"the final warm-up for {model_name!r} did not report a usable "
-                    "prompt_eval_cached_count; measured requests were not started"
+                    f"no baseline warm-up observations were available for {model_name!r}"
                 )
+            template_cache_baseline = min(baseline_candidates)
             manifest["models"][model_index]["template_cache_baseline_tokens"] = (
                 template_cache_baseline
             )
@@ -469,6 +553,14 @@ def _execute_requests(
                 manifest["completed_requests"] += 1
                 if metrics.valid:
                     manifest["valid_requests"] += 1
+                if not inference.valid:
+                    raise RunnerError(
+                        f"runtime failure during {request_id}; the run is not resumable"
+                    )
+                if "model_reloaded" in metrics.invalid_reasons:
+                    raise RunnerError(
+                        f"model reloaded during {request_id}; restart the complete run"
+                    )
 
 
 def _energy_metrics(
@@ -711,7 +803,7 @@ def _initial_manifest(
     models: tuple[RunningModel, ...],
 ) -> dict[str, Any]:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "run_id": run_dir.name,
         "status": RunStatus.RUNNING.value,
         "started_utc": datetime.now(UTC).isoformat(),
@@ -726,8 +818,10 @@ def _initial_manifest(
         "runtime": {"name": "ollama", "version": runtime_version},
         "gpu": capabilities.to_dict(),
         "models": [{**model.to_dict(), "template_cache_baseline_tokens": None} for model in models],
-        "prompt_cache_policy": "template_floor_v1",
+        "prompt_cache_policy": "template_floor_v2",
         "cache_buster_policy": "uuid_prefix_v1",
+        "max_cache_excess_tokens": MAX_CACHE_EXCESS_TOKENS,
+        "max_measured_load_duration_ns": MAX_MEASURED_LOAD_DURATION_NS,
         "controls": config.to_dict(),
         "host": {
             "os": platform.system(),
@@ -750,7 +844,7 @@ def _write_manifest(run_dir: Path, manifest: dict[str, Any]) -> None:
 
 def _artifact_hashes(run_dir: Path) -> dict[str, str]:
     hashes: dict[str, str] = {}
-    for name in (RESOLVED_CONFIG, REQUESTS, OUTPUTS, TELEMETRY):
+    for name in (RESOLVED_CONFIG, WARMUPS, REQUESTS, OUTPUTS, TELEMETRY):
         path = run_dir / name
         if path.is_file():
             hashes[name] = sha256_file(path)
@@ -794,7 +888,12 @@ def _resolved_config_toml(config: ExperimentConfig, prompt_hash: str) -> str:
         ),
         (
             "runtime",
-            (("ollama_url", config.ollama_url), ("models", list(config.models))),
+            (
+                ("ollama_url", config.ollama_url),
+                ("models", list(config.models)),
+                ("expected_version", config.expected_runtime_version),
+                ("expected_digests", config.expected_model_digests or None),
+            ),
         ),
         (
             "gpu",
@@ -846,4 +945,7 @@ def _toml_value(value: Any) -> str:
         return json.dumps(value, ensure_ascii=False)
     if isinstance(value, list | tuple):
         return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+    if isinstance(value, dict):
+        pairs = (f"{_toml_value(key)} = {_toml_value(item)}" for key, item in sorted(value.items()))
+        return "{ " + ", ".join(pairs) + " }"
     raise TypeError(f"unsupported TOML value: {type(value).__name__}")

@@ -37,6 +37,7 @@ MAX_ARTIFACT_BYTES = 25 * 1024 * 1024
 
 MANIFEST = "manifest.json"
 RESOLVED_CONFIG = "config.resolved.toml"
+WARMUPS = "warmups.jsonl"
 REQUESTS = "requests.jsonl"
 OUTPUTS = "outputs.jsonl"
 TELEMETRY = "telemetry.jsonl.gz"
@@ -46,7 +47,7 @@ REPORT = "report.md"
 
 REQUIRED_RAW_ARTIFACTS = (MANIFEST, RESOLVED_CONFIG, REQUESTS, OUTPUTS, TELEMETRY)
 DERIVED_ARTIFACTS = (VALIDATION, SUMMARY, REPORT)
-RUN_ARTIFACTS = REQUIRED_RAW_ARTIFACTS + DERIVED_ARTIFACTS
+RUN_ARTIFACTS = REQUIRED_RAW_ARTIFACTS + (WARMUPS,) + DERIVED_ARTIFACTS
 
 _ENCODING = "utf-8"
 
@@ -89,7 +90,7 @@ def build_report(run_dirs: tuple[Path, ...]) -> ReportPaths:
 
     records: list[dict[str, Any]] = []
     manifests: dict[str, dict[str, Any]] = {}
-    for run_dir in resolved:
+    for run_dir, validation in zip(resolved, validations, strict=True):
         try:
             manifest = json.loads((run_dir / MANIFEST).read_text(encoding=_ENCODING))
         except (OSError, json.JSONDecodeError) as error:
@@ -98,6 +99,8 @@ def build_report(run_dirs: tuple[Path, ...]) -> ReportPaths:
             raise ResultsError(f"{run_dir.name}/{MANIFEST} must contain a JSON object")
         run_id = str(manifest.get("run_id") or run_dir.name)
         manifests[run_id] = manifest
+        if not validation.ok:
+            continue
         for record in read_jsonl(run_dir / OUTPUTS):
             if record.get("valid") is True and isinstance(record.get("metrics"), dict):
                 records.append({"run_id": run_id, **record})
@@ -128,6 +131,7 @@ _SUMMARY_FIELDS = (
     "ttft_median_seconds",
     "ttft_iqr_seconds",
     "prompt_tokens",
+    "uncached_prompt_tokens",
     "output_tokens",
     "prefill_tokens_per_second",
     "decode_tokens_per_second",
@@ -188,6 +192,13 @@ def _aggregate_report_rows(
             item.get("prompt_tokens", record.get("prompt_eval_count"))
             for record, item in zip(group, metrics, strict=True)
         )
+        uncached_prompt_tokens = _numbers(
+            item.get(
+                "uncached_prompt_tokens",
+                item.get("prompt_tokens", record.get("prompt_eval_count")),
+            )
+            for record, item in zip(group, metrics, strict=True)
+        )
         prompt_durations = _numbers(record.get("prompt_eval_duration_ns") for record in group)
         decode_durations = _numbers(record.get("eval_duration_ns") for record in group)
         average_power = _numbers(item.get("average_gpu_power_watts") for item in metrics)
@@ -209,6 +220,7 @@ def _aggregate_report_rows(
         total_latency = sum(latencies)
         total_tokens = sum(tokens)
         total_prompt_tokens = sum(prompt_tokens)
+        total_uncached_prompt_tokens = sum(uncached_prompt_tokens)
         total_energy = sum(energies)
         score = config_quality.get((run_id, model, digest))
         manifest = manifests.get(run_id, {})
@@ -225,9 +237,10 @@ def _aggregate_report_rows(
                 "ttft_median_seconds": _median(ttfts),
                 "ttft_iqr_seconds": _iqr(ttfts),
                 "prompt_tokens": total_prompt_tokens,
+                "uncached_prompt_tokens": total_uncached_prompt_tokens,
                 "output_tokens": total_tokens,
                 "prefill_tokens_per_second": _safe_ratio(
-                    total_prompt_tokens, sum(prompt_durations) / 1e9
+                    total_uncached_prompt_tokens, sum(prompt_durations) / 1e9
                 ),
                 "decode_tokens_per_second": _safe_ratio(total_tokens, sum(decode_durations) / 1e9),
                 "average_gpu_power_median_watts": _median(average_power),
@@ -254,10 +267,14 @@ def _aggregate_report_rows(
 
 
 def _assign_ranks(rows: list[dict[str, Any]]) -> None:
-    categories = sorted({str(row["prompt_category"]) for row in rows})
-    for category in categories:
+    blocks = sorted({(str(row["host_id"]), str(row["prompt_category"])) for row in rows})
+    for host_id, category in blocks:
         eligible = [
-            row for row in rows if row["prompt_category"] == category and row["ranking_eligible"]
+            row
+            for row in rows
+            if row["host_id"] == host_id
+            and row["prompt_category"] == category
+            and row["ranking_eligible"]
         ]
         speed = sorted(
             eligible,
@@ -303,7 +320,15 @@ def _render_report(rows: list[dict[str, Any]], validations: tuple[ValidationRepo
         f"Validated runs: {valid_count}/{len(validations)}.",
         "",
     ]
-    if inversions:
+    if not rows:
+        lines.extend(
+            [
+                "No validated run contributed aggregate measurements.",
+                "Fix validation errors before interpreting performance or energy rankings.",
+                "",
+            ]
+        )
+    elif inversions:
         lines.extend(
             [
                 "Speed and energy rankings differ in at least one aggregate workload block.",
@@ -610,6 +635,10 @@ _PRIVATE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("a Windows user directory", re.compile(r"[A-Za-z]:[\\/]+Users[\\/]+", re.IGNORECASE)),
     ("a Windows absolute path", re.compile(r"\b[A-Za-z]:\\")),
     ("a POSIX home directory", re.compile(r"/(?:home|Users)/[^/\s]+")),
+    (
+        "URL credentials",
+        re.compile(r"https?://[^\s/@:]+(?::[^\s/@]*)?@", re.IGNORECASE),
+    ),
     ("a raw GPU UUID", re.compile(r"\bGPU-[0-9a-f]{8}-", re.IGNORECASE)),
     ("a GitHub token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{16,}")),
     ("a GitHub fine-grained token", re.compile(r"\bgithub_pat_[A-Za-z0-9_]{16,}")),
@@ -754,7 +783,7 @@ def validate_run(run_dir: Path) -> ValidationReport:
 
     if status is RunStatus.COMPLETED and not errors:
         _cross_check_counts(counts, warnings)
-        _validate_schema_v1(run_dir, errors)
+        _validate_completed_schema(run_dir, counts, checksums, errors)
     elif status is not RunStatus.COMPLETED:
         warnings.append(f"the run ended with status {status.value}; its data is partial")
 
@@ -791,7 +820,7 @@ def _read_status(run_dir: Path, errors: list[str]) -> RunStatus:
 def _count_records(
     run_dir: Path, counts: dict[str, int], errors: list[str], tolerate_truncation: bool
 ) -> None:
-    for name in (REQUESTS, OUTPUTS):
+    for name in (WARMUPS, REQUESTS, OUTPUTS):
         path = run_dir / name
         if path.is_file():
             try:
@@ -817,44 +846,27 @@ def _cross_check_counts(counts: dict[str, int], warnings: list[str]) -> None:
 
 
 def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
-    """Validate the measurement invariants introduced by runner schema v1."""
+    """Validate the original schema-v1 zero-cache measurement contract."""
     try:
         manifest = json.loads((run_dir / MANIFEST).read_text(encoding=_ENCODING))
     except (OSError, json.JSONDecodeError):
         return  # The structural validation above already reports this.
-    if manifest.get("schema_version") != 1:
-        return
-    if manifest.get("prompt_cache_policy") != "template_floor_v1":
-        errors.append(f"{MANIFEST} schema v1 has no recognized prompt cache policy")
-    if manifest.get("cache_buster_policy") != "uuid_prefix_v1":
-        errors.append(f"{MANIFEST} schema v1 has no recognized cache buster policy")
-
     models = manifest.get("models")
     if not isinstance(models, list) or not models:
         errors.append(f"{MANIFEST} schema v1 has no model records")
         return
 
     expected_digests: dict[str, str] = {}
-    expected_cache_baselines: dict[str, int] = {}
     for model in models:
         if not isinstance(model, dict):
             errors.append(f"{MANIFEST} schema v1 contains a malformed model record")
             continue
         name = model.get("name")
         digest = model.get("digest")
-        cache_baseline = model.get("template_cache_baseline_tokens")
         if model.get("fully_on_gpu") is not True:
             errors.append(f"model {name!r} is not confirmed fully on GPU")
         if isinstance(name, str) and isinstance(digest, str) and digest:
             expected_digests[name] = digest
-            if (
-                isinstance(cache_baseline, int)
-                and not isinstance(cache_baseline, bool)
-                and cache_baseline >= 0
-            ):
-                expected_cache_baselines[name] = cache_baseline
-            else:
-                errors.append(f"model {name!r} has no valid template cache baseline")
 
     try:
         requests = read_jsonl(run_dir / REQUESTS)
@@ -889,15 +901,8 @@ def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
             errors.append(f"request {label} model digest does not match the manifest")
 
         cached = output.get("prompt_eval_cached_count")
-        cache_baseline = expected_cache_baselines.get(model_name)
-        cached_is_valid = isinstance(cached, int) and not isinstance(cached, bool) and cached >= 0
-        if not cached_is_valid:
-            errors.append(f"request {label} has no valid cached prompt token count")
-        elif cache_baseline is not None and cached > cache_baseline:
-            errors.append(
-                f"request {label} used {cached} cached prompt tokens above "
-                f"the template baseline of {cache_baseline}"
-            )
+        if isinstance(cached, int) and not isinstance(cached, bool) and cached > 0:
+            errors.append(f"request {label} used {cached} cached prompt tokens")
 
         metrics = output.get("metrics")
         if not isinstance(metrics, dict):
@@ -906,15 +911,6 @@ def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
         energy = metrics.get("gpu_energy_joules")
         if not isinstance(energy, int | float) or isinstance(energy, bool) or energy <= 0:
             errors.append(f"request {label} has no positive GPU energy")
-        if metrics.get("template_cache_baseline_tokens") != cache_baseline:
-            errors.append(f"request {label} cache baseline does not match the manifest")
-        expected_excess = (
-            max(0, cached - cache_baseline)
-            if cached_is_valid and cache_baseline is not None
-            else None
-        )
-        if metrics.get("excess_cached_prompt_tokens") != expected_excess:
-            errors.append(f"request {label} cached prompt excess is inconsistent")
         gap = metrics.get("max_telemetry_gap_seconds")
         if isinstance(gap, int | float) and not isinstance(gap, bool) and gap > 0.5:
             errors.append(f"request {label} has a telemetry gap above 500 ms")
@@ -922,5 +918,320 @@ def _validate_schema_v1(run_dir: Path, errors: list[str]) -> None:
         times = sorted(telemetry_times.get(request_id, []))
         if len(times) < 2:
             errors.append(f"request {label} has no telemetry coverage")
+        elif any(right - left > 0.5 for left, right in zip(times, times[1:], strict=False)):
+            errors.append(f"request {label} raw telemetry has a gap above 500 ms")
+
+
+def _validate_completed_schema(
+    run_dir: Path,
+    counts: dict[str, int],
+    checksums: dict[str, str],
+    errors: list[str],
+) -> None:
+    try:
+        manifest = json.loads((run_dir / MANIFEST).read_text(encoding=_ENCODING))
+    except (OSError, json.JSONDecodeError):
+        return
+    schema = manifest.get("schema_version")
+    if schema == 1:
+        _validate_schema_v1(run_dir, errors)
+    elif schema == 2:
+        _validate_schema_v2(run_dir, manifest, counts, checksums, errors)
+    else:
+        errors.append(f"{MANIFEST} has unsupported schema_version {schema!r}")
+
+
+def _validate_schema_v2(
+    run_dir: Path,
+    manifest: dict[str, Any],
+    counts: dict[str, int],
+    checksums: dict[str, str],
+    errors: list[str],
+) -> None:
+    """Validate the auditable warm-cache schema-v2 contract independently."""
+    if manifest.get("prompt_cache_policy") != "template_floor_v2":
+        errors.append(f"{MANIFEST} schema v2 has no recognized prompt cache policy")
+    if manifest.get("cache_buster_policy") != "uuid_prefix_v1":
+        errors.append(f"{MANIFEST} schema v2 has no recognized cache buster policy")
+    if manifest.get("max_cache_excess_tokens") != 1:
+        errors.append(f"{MANIFEST} schema v2 has an unexpected cache excess limit")
+    if manifest.get("max_measured_load_duration_ns") != 100_000_000:
+        errors.append(f"{MANIFEST} schema v2 has an unexpected model reload threshold")
+
+    for name in (WARMUPS, REQUESTS, OUTPUTS, TELEMETRY):
+        if not (run_dir / name).is_file():
+            errors.append(f"{name} is required by schema v2")
+
+    declared_hashes = manifest.get("artifact_sha256")
+    expected_hashed = (RESOLVED_CONFIG, WARMUPS, REQUESTS, OUTPUTS, TELEMETRY)
+    if not isinstance(declared_hashes, dict):
+        errors.append(f"{MANIFEST} schema v2 has no artifact checksums")
+    else:
+        for name in expected_hashed:
+            declared = declared_hashes.get(name)
+            actual = checksums.get(name)
+            if not isinstance(declared, str) or declared != actual:
+                errors.append(f"{name} checksum does not match {MANIFEST}")
+    if manifest.get("config_sha256") != checksums.get(RESOLVED_CONFIG):
+        errors.append(f"{RESOLVED_CONFIG} checksum does not match config_sha256")
+
+    models = manifest.get("models")
+    if not isinstance(models, list) or not models:
+        errors.append(f"{MANIFEST} schema v2 has no model records")
+        return
+    controls = manifest.get("controls")
+    if not isinstance(controls, dict):
+        errors.append(f"{MANIFEST} schema v2 has no controls")
+        return
+    runtime = manifest.get("runtime")
+    expected_runtime = controls.get("expected_runtime_version")
+    if not isinstance(expected_runtime, str) or not expected_runtime:
+        errors.append(f"{MANIFEST} schema v2 has no frozen runtime version")
+    elif not isinstance(runtime, dict) or runtime.get("version") != expected_runtime:
+        errors.append("runtime version does not match the frozen control")
+    expected_control_digests = controls.get("expected_model_digests")
+    if not isinstance(expected_control_digests, dict):
+        errors.append(f"{MANIFEST} schema v2 has no frozen model digests")
+        expected_control_digests = {}
+
+    expected_digests: dict[str, str] = {}
+    expected_cache_floors: dict[str, int] = {}
+    manifest_model_names: list[str] = []
+    for model in models:
+        if not isinstance(model, dict):
+            errors.append(f"{MANIFEST} schema v2 contains a malformed model record")
+            continue
+        name = model.get("name")
+        digest = model.get("digest")
+        floor = model.get("template_cache_baseline_tokens")
+        if model.get("fully_on_gpu") is not True:
+            errors.append(f"model {name!r} is not confirmed fully on GPU")
+        if not isinstance(name, str) or not isinstance(digest, str) or not digest:
+            errors.append(f"{MANIFEST} schema v2 contains an unidentified model")
+            continue
+        manifest_model_names.append(name)
+        expected_digests[name] = digest
+        if expected_control_digests.get(name) != digest:
+            errors.append(f"model {name!r} digest does not match the frozen control")
+        if isinstance(floor, int) and not isinstance(floor, bool) and floor >= 0:
+            expected_cache_floors[name] = floor
+        else:
+            errors.append(f"model {name!r} has no valid template cache floor")
+    configured_models = controls.get("models")
+    exact_names = (
+        len(manifest_model_names) == len(set(manifest_model_names))
+        and isinstance(configured_models, list)
+        and configured_models == manifest_model_names
+        and set(expected_control_digests) == set(manifest_model_names)
+    )
+    if not exact_names:
+        errors.append(f"{MANIFEST} schema v2 has inconsistent frozen model digest coverage")
+
+    try:
+        warmups = read_jsonl(run_dir / WARMUPS)
+        requests = read_jsonl(run_dir / REQUESTS)
+        outputs = read_jsonl(run_dir / OUTPUTS)
+        telemetry = read_gzip_jsonl(run_dir / TELEMETRY)
+    except ResultsError:
+        return
+
+    expected_request_count = _expected_request_count(manifest)
+    if expected_request_count is None:
+        errors.append(f"{MANIFEST} schema v2 has invalid campaign counts")
+    else:
+        for name in (REQUESTS, OUTPUTS):
+            if counts.get(name) != expected_request_count:
+                errors.append(
+                    f"{name} has {counts.get(name)} records; expected "
+                    f"{expected_request_count} measured requests"
+                )
+        for counter in ("started_requests", "completed_requests", "valid_requests"):
+            if manifest.get(counter) != expected_request_count:
+                errors.append(f"{MANIFEST} {counter} does not match expected request count")
+    expected_warmups = controls.get("warmup_requests")
+    if isinstance(expected_warmups, int) and not isinstance(expected_warmups, bool):
+        expected_warmup_count = expected_warmups * len(models)
+        if counts.get(WARMUPS) != expected_warmup_count:
+            errors.append(f"{WARMUPS} does not contain the expected warm-up count")
+        if manifest.get("completed_warmups") != expected_warmup_count:
+            errors.append(f"{MANIFEST} completed_warmups does not match raw warm-ups")
+    else:
+        errors.append(f"{MANIFEST} schema v2 has no valid warmup_requests control")
+
+    _validate_warmup_floors(warmups, expected_digests, expected_cache_floors, errors)
+    _validate_measured_records(
+        requests, outputs, telemetry, expected_digests, expected_cache_floors, errors
+    )
+
+
+def _expected_request_count(manifest: dict[str, Any]) -> int | None:
+    prompt_count = manifest.get("prompt_count")
+    repetitions = manifest.get("repetitions")
+    models = manifest.get("models")
+    if (
+        isinstance(prompt_count, int)
+        and not isinstance(prompt_count, bool)
+        and prompt_count > 0
+        and isinstance(repetitions, int)
+        and not isinstance(repetitions, bool)
+        and repetitions > 0
+        and isinstance(models, list)
+        and models
+    ):
+        return prompt_count * repetitions * len(models)
+    return None
+
+
+def _validate_warmup_floors(
+    warmups: tuple[dict[str, Any], ...],
+    expected_digests: dict[str, str],
+    expected_floors: dict[str, int],
+    errors: list[str],
+) -> None:
+    by_model: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for record in warmups:
+        model = record.get("model")
+        if isinstance(model, str):
+            by_model[model].append(record)
+    for model, digest in expected_digests.items():
+        records = sorted(by_model.get(model, []), key=lambda item: item.get("warmup_index", -1))
+        if len(records) < 4:
+            errors.append(f"model {model!r} has fewer than four auditable warm-up records")
+            continue
+        indices = [record.get("warmup_index") for record in records]
+        if indices != list(range(1, len(records) + 1)):
+            errors.append(f"model {model!r} warm-up order is inconsistent")
+        candidates: list[int] = []
+        for record in records:
+            if record.get("valid") is not True or record.get("model_digest") != digest:
+                errors.append(f"model {model!r} has an invalid warm-up record")
+            cached = record.get("prompt_eval_cached_count")
+            prompt_count = record.get("prompt_eval_count")
+            if (
+                not isinstance(cached, int)
+                or isinstance(cached, bool)
+                or not isinstance(prompt_count, int)
+                or isinstance(prompt_count, bool)
+                or cached < 0
+                or cached > prompt_count
+            ):
+                errors.append(f"model {model!r} has unusable warm-up cache counters")
+            elif record.get("warmup_index") != 1:
+                candidates.append(cached)
+            if record.get("warmup_index") != 1:
+                load_duration = record.get("load_duration_ns")
+                if (
+                    not isinstance(load_duration, int)
+                    or isinstance(load_duration, bool)
+                    or load_duration < 0
+                    or load_duration > 100_000_000
+                ):
+                    errors.append(
+                        f"model {model!r} reloaded during cache-floor warm-up "
+                        f"{record.get('warmup_index')!r}"
+                    )
+        if candidates and expected_floors.get(model) != min(candidates):
+            errors.append(
+                f"model {model!r} warm-up records do not support the declared cache floor"
+            )
+
+
+def _validate_measured_records(
+    requests: tuple[dict[str, Any], ...],
+    outputs: tuple[dict[str, Any], ...],
+    telemetry: tuple[dict[str, Any], ...],
+    expected_digests: dict[str, str],
+    expected_floors: dict[str, int],
+    errors: list[str],
+) -> None:
+    request_ids = [record.get("request_id") for record in requests]
+    output_ids = [record.get("request_id") for record in outputs]
+    if len(request_ids) != len(set(request_ids)):
+        errors.append(f"{REQUESTS} contains duplicate request IDs")
+    if set(request_ids) != set(output_ids):
+        errors.append(f"{REQUESTS} and {OUTPUTS} do not describe the same request IDs")
+
+    telemetry_times: dict[str, list[float]] = defaultdict(list)
+    for record in telemetry:
+        request_id = record.get("request_id")
+        timestamp = record.get("monotonic_s")
+        if isinstance(request_id, str) and isinstance(timestamp, int | float):
+            telemetry_times[request_id].append(float(timestamp))
+
+    for output in outputs:
+        request_id = output.get("request_id")
+        label = repr(request_id)
+        if output.get("valid") is not True:
+            errors.append(f"request {label} is invalid for primary analysis")
+        model = output.get("model")
+        digest = expected_digests.get(model)
+        if digest is None or output.get("model_digest") != digest:
+            errors.append(f"request {label} model digest does not match the manifest")
+        required_runtime_metrics = {
+            "latency_s": (int, float),
+            "ttft_s": (int, float),
+            "prompt_eval_count": (int,),
+            "eval_count": (int,),
+            "total_duration_ns": (int,),
+            "prompt_eval_duration_ns": (int,),
+            "eval_duration_ns": (int,),
+        }
+        for field, expected_types in required_runtime_metrics.items():
+            value = output.get(field)
+            valid_number = isinstance(value, expected_types) and not isinstance(value, bool)
+            if not valid_number or value < 0 or (field != "ttft_s" and value == 0):
+                errors.append(f"request {label} has no valid required runtime metric {field}")
+        load_duration = output.get("load_duration_ns")
+        if (
+            not isinstance(load_duration, int)
+            or isinstance(load_duration, bool)
+            or load_duration < 0
+            or load_duration > 100_000_000
+        ):
+            errors.append(f"request {label} reloaded the model or has no valid load duration")
+
+        cached = output.get("prompt_eval_cached_count")
+        prompt_count = output.get("prompt_eval_count")
+        floor = expected_floors.get(model)
+        cached_valid = isinstance(cached, int) and not isinstance(cached, bool) and cached >= 0
+        if not cached_valid:
+            errors.append(f"request {label} has no valid cached prompt token count")
+        elif (
+            not isinstance(prompt_count, int)
+            or isinstance(prompt_count, bool)
+            or cached > prompt_count
+        ):
+            errors.append(f"request {label} cached prompt tokens exceed the prompt token count")
+        elif floor is not None and cached > floor + 1:
+            errors.append(f"request {label} used cached tokens above the allowed excess")
+
+        metrics = output.get("metrics")
+        if not isinstance(metrics, dict):
+            errors.append(f"request {label} has no derived metrics")
+            continue
+        energy = metrics.get("gpu_energy_joules")
+        if not isinstance(energy, int | float) or isinstance(energy, bool) or energy <= 0:
+            errors.append(f"request {label} has no positive GPU energy")
+        if metrics.get("template_cache_baseline_tokens") != floor:
+            errors.append(f"request {label} cache baseline does not match the manifest")
+        expected_excess = max(0, cached - floor) if cached_valid and floor is not None else None
+        if metrics.get("excess_cached_prompt_tokens") != expected_excess:
+            errors.append(f"request {label} cached prompt excess is inconsistent")
+        expected_uncached = (
+            prompt_count - cached
+            if isinstance(prompt_count, int) and cached_valid and prompt_count >= cached
+            else None
+        )
+        if metrics.get("uncached_prompt_tokens") != expected_uncached:
+            errors.append(f"request {label} uncached prompt token count is inconsistent")
+        gap = metrics.get("max_telemetry_gap_seconds")
+        if isinstance(gap, int | float) and not isinstance(gap, bool) and gap > 0.5:
+            errors.append(f"request {label} has a telemetry gap above 500 ms")
+
+        times = telemetry_times.get(request_id, [])
+        if len(times) < 2:
+            errors.append(f"request {label} has no telemetry coverage")
+        elif any(right < left for left, right in zip(times, times[1:], strict=False)):
+            errors.append(f"request {label} raw telemetry timestamp order is decreasing")
         elif any(right - left > 0.5 for left, right in zip(times, times[1:], strict=False)):
             errors.append(f"request {label} raw telemetry has a gap above 500 ms")
