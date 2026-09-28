@@ -1,0 +1,102 @@
+{
+  "artifact_sha256": {
+    "config.resolved.toml": "58b255cfdb4aca238d62943f1447b5cd0a060c8e15bb26c96514d410a6dcdf75",
+    "outputs.jsonl": "adae01d5d56908c9926d53ce277ae279480101cccb6ca8aa9f7a7efb34b959f8",
+    "requests.jsonl": "e87b08dd65ea0253b6a9b06a5b0044e687c127471a7013b95572b5e3132ba3ba",
+    "telemetry.jsonl.gz": "dc8391d5a8ae28ea15baf2e4e595b6def65a0ea0032ebdb5ff97a2be6d9cc712",
+    "warmups.jsonl": "900291d75ed0a127c761c3a6d6f1ab3cbfb89eb76d740fed40c61f80434d395c"
+  },
+  "cache_buster_policy": "uuid_prefix_v1",
+  "completed_requests": 18,
+  "completed_warmups": 4,
+  "config_sha256": "58b255cfdb4aca238d62943f1447b5cd0a060c8e15bb26c96514d410a6dcdf75",
+  "controls": {
+    "concurrency": 1,
+    "currency": null,
+    "expected_model_digests": {
+      "llama3.2:3b-instruct-q4_K_M": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+    },
+    "expected_runtime_version": "0.34.2",
+    "experiment_id": "pilot-v1-observation",
+    "gpu_index": 0,
+    "host_id": "gtx1080-observation",
+    "models": [
+      "llama3.2:3b-instruct-q4_K_M"
+    ],
+    "ollama_url": "http://127.0.0.1:11434",
+    "options": {
+      "kv_cache": "f16",
+      "num_ctx": 4096,
+      "num_gpu": 999,
+      "num_predict": 256,
+      "seed": 42,
+      "temperature": 0.0
+    },
+    "order_seed": 42,
+    "repetitions": 3,
+    "tariff_per_kwh": null,
+    "telemetry_interval_ms": 100,
+    "warmup_requests": 4
+  },
+  "ended_utc": "2026-09-28T15:53:45.687516+00:00",
+  "experiment_id": "pilot-v1-observation",
+  "failure": null,
+  "git_commit": "0ffc091b4747533e6a2b9015a1c0a49ada88c1c1",
+  "gpu": {
+    "driver_version": "582.66",
+    "energy_fallback_reason": null,
+    "energy_source": "total_energy_counter",
+    "field_errors": {},
+    "gpu_fingerprint": "f38122daceae19f4",
+    "gpu_index": 0,
+    "name": "NVIDIA GeForce GTX 1080",
+    "power_limit_watts": 200.0,
+    "supports_clocks": true,
+    "supports_power_instant": true,
+    "supports_power_legacy": true,
+    "supports_power_limit": true,
+    "supports_temperature": true,
+    "supports_total_energy": true,
+    "supports_utilization": true,
+    "unsupported_fields": [],
+    "vram_total_bytes": 8589934592
+  },
+  "host": {
+    "architecture": "AMD64",
+    "os": "Windows",
+    "os_release": "11"
+  },
+  "host_id": "gtx1080-observation",
+  "max_cache_excess_tokens": 1,
+  "max_measured_load_duration_ns": 100000000,
+  "models": [
+    {
+      "context_length": 4096,
+      "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "family": "llama",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "llama3.2:3b-instruct-q4_K_M",
+      "name": "llama3.2:3b-instruct-q4_K_M",
+      "parameter_size": "3.2B",
+      "quantization": "Q4_K_M",
+      "size_bytes": 2554708622,
+      "size_vram_bytes": 2554708622,
+      "template_cache_baseline_tokens": 20
+    }
+  ],
+  "prompt_cache_policy": "template_floor_v2",
+  "prompt_count": 6,
+  "prompt_set_sha256": "c7c4ae95e16441f28227e7614308de06b412ef7f7d3a7fbf7880a9982c03e9d7",
+  "repetitions": 3,
+  "run_id": "pilot-v1-observation-gtx1080-observation-20260928T155322Z-989238",
+  "runtime": {
+    "name": "ollama",
+    "version": "0.34.2"
+  },
+  "schema_version": 2,
+  "started_requests": 18,
+  "started_utc": "2026-09-28T15:53:22.573042+00:00",
+  "status": "completed",
+  "valid_requests": 18
+}

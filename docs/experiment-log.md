@@ -17,8 +17,47 @@ section below and are never counted as experimental runs.
 
 ## Validated Experimental Runs
 
-None yet. The first publishable entry will be the RTX 5060 Laptop `pilot-v1`
-run repeated from the reviewed, merged implementation.
+No primary-matrix run has been published yet. The first such entry will be the
+RTX 5060 Laptop `pilot-v1` run repeated from the reviewed, merged implementation.
+Observation-only launches are recorded below but cannot enter the primary
+decision blocks.
+
+### 2026-09-28 — GTX 1080 pilot-v1 observation launch (before the tag)
+
+- Contributor: Skipl1 (Dimas)
+- Host role: **observation-only**, outside the primary two-host matrix. It
+  must not enter the primary decision blocks.
+- Code: `0ffc091`, the squash-merge commit of PR #17, whose tree is identical
+  to the approved head `9c8a5d9`. **The run was made before `pilot-v1-code`
+  was tagged**: `git tag --points-at HEAD` returned nothing. If the tag is
+  placed on `0ffc091`, this run used the tagged code; otherwise it has to be
+  repeated from the tag.
+- GPU: NVIDIA GeForce GTX 1080, 8 GiB; driver 582.66; power limit 200 W.
+- Runtime and model: Ollama 0.34.2; `llama3.2:3b-instruct-q4_K_M`, digest
+  `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72`.
+- Config and prompts: committed `configs/pilot-gtx1080-observation.toml`,
+  config hash `58b255cfdb4a…`, prompt-set hash `c7c4ae95e164…`.
+- Preflight: `doctor --config configs/pilot-gtx1080-observation.toml --json`
+  returned `ok: true`. The runtime version and model digest matched the frozen
+  values, with `fully_on_gpu: true`, `gpu_fraction: 1.0`, and
+  `energy_source: total_energy_counter`.
+- Conditions: desktop on mains power; no wallpaper renderer or other GPU
+  workload running. Idle power was a median 8.3 W in P8 before `doctor`, and
+  10.6 W 30 s after it, immediately before the launch. Peak GPU temperature
+  was 49 °C.
+- Run ID: `pilot-v1-observation-gtx1080-observation-20260928T155322Z-989238`,
+  committed under `experiments/runs/`.
+- Result: the CLI returned success, `validation.json` reports `ok: true`, and
+  18/18 measured requests are valid. The four warm-ups reported 0, 20, 20 and
+  20 cached tokens, giving a floor of 20. Every measured request reported 20
+  cached tokens (excess 0). The largest measured `load_duration` was 2.3 ms,
+  and warm-ups stayed at 1.9–2.1 ms. All 18 requests used the total-energy
+  counter with no fallback. Quality was 1.0.
+- Ratio-of-sums metrics: `short` 78.3 tok/s and 0.420 tok/J, `long` 57.8
+  tok/s and 0.315 tok/J, `scored` 22.5 tok/s and 0.128 tok/J, at a mean GPU
+  power of 176–186 W.
+- Anomalies: none. The pre-launch idle reading was about 2 W above the
+  session idle because `doctor` had just preloaded the model.
 
 ## Environment Probes
 
