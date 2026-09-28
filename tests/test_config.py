@@ -544,12 +544,28 @@ BENCHMARK_MODELS = (
     "llama3.2:3b-instruct-q8_0",
 )
 
+BENCHMARK_DIGESTS = {
+    "qwen3:4b-instruct-2507-q4_K_M": (
+        "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0"
+    ),
+    "qwen3:4b-instruct-2507-q8_0": (
+        "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374"
+    ),
+    "llama3.2:3b-instruct-q4_K_M": (
+        "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+    ),
+    "llama3.2:3b-instruct-q8_0": (
+        "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a"
+    ),
+}
+
 
 def test_benchmark_v1_config_freezes_the_approved_matrix() -> None:
     config = load_config(REPO_ROOT / "configs" / "benchmark-v1.toml")
 
     assert config.experiment_id == "benchmark-v1"
     assert config.models == BENCHMARK_MODELS
+    assert config.expected_model_digests == BENCHMARK_DIGESTS
     assert config.repetitions == 5
     assert config.warmup_requests == 4
     assert config.telemetry_interval_ms == 100
@@ -560,6 +576,20 @@ def test_benchmark_v1_config_freezes_the_approved_matrix() -> None:
     assert config.options.kv_cache == "f16"
     assert config.concurrency == 1
     assert config.cost_reporting_enabled is False
+
+
+def test_benchmark_v1_host_configs_differ_only_by_host_id() -> None:
+    primary = load_config(REPO_ROOT / "configs" / "benchmark-v1.toml")
+    desktop = load_config(REPO_ROOT / "configs" / "benchmark-v1-rtx4060ti.toml")
+
+    assert primary.host_id == "maibenben-x16c"
+    assert desktop.host_id == "rtx4060ti-desktop"
+    primary_controls = primary.to_dict()
+    desktop_controls = desktop.to_dict()
+    primary_controls.pop("host_id")
+    desktop_controls.pop("host_id")
+    assert desktop_controls == primary_controls
+    assert desktop.prompt_path == primary.prompt_path
 
 
 def test_benchmark_v1_has_eight_unique_prompts_per_category() -> None:

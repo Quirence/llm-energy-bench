@@ -1,11 +1,11 @@
-# Frozen RTX 5060 copy of the two-host benchmark-v1 protocol.
-# The RTX 4060 Ti copy differs only by host_id and its leading comment.
+# Frozen RTX 4060 Ti copy of the two-host benchmark-v1 protocol.
+# It differs from benchmark-v1.toml only by host_id and this comment.
 #
 # 24 prompts x 5 repetitions x 4 configurations = 480 measured requests.
 
 [experiment]
 id = "benchmark-v1"
-host_id = "maibenben-x16c"
+host_id = "rtx4060ti-desktop"
 output_dir = "../experiments/runs"
 repetitions = 5
 warmup_requests = 4
