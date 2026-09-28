@@ -19,11 +19,12 @@ Does the preferred local LLM configuration change when comparing models, quantiz
 The repository now contains the tested building blocks for the MVP:
 
 - a Python 3.12 package and CLI shell with `doctor`, `run`, and `report`
-  subcommands;
+  subcommands plus frozen RTX 5060, RTX 4060 Ti, and GTX 1080 observation
+  pilot configs;
 - strict TOML configuration and JSONL prompt contracts;
-- the six-prompt RTX 3050 pilot protocol;
-- immutable JSON/JSONL/gzip result storage, checksums, privacy checks, and
-  basic run validation;
+- the six-prompt one-model acceptance protocol;
+- immutable JSON/JSONL/gzip result storage, checksums, privacy checks, auditable
+  warm-up records, and fail-closed schema-v2 validation;
 - an Ollama client for inventory, preload, placement checks, streaming
   generation, TTFT, token counts, and runtime durations;
 - an NVML capability probe and request-scoped telemetry sampler with explicit
@@ -33,18 +34,15 @@ The repository now contains the tested building blocks for the MVP:
 - human/JSON environment diagnosis plus CSV and Markdown aggregate reports;
 - a frozen 24-prompt, four-configuration `benchmark-v1` protocol for the two
   main GPU hosts;
-- Windows and Linux CI plus 231 hardware-independent tests.
+- Windows and Linux CI with lint, format, and hardware-independent tests.
 
-The software path is complete through Task 7 of the implementation plan. It
-has not yet produced a hardware-validated experimental run; Task 8 is the
-first pilot on a real NVIDIA GPU and remains a separate acceptance gate. Task
-9 protocol preparation is complete, but it does not bypass that gate.
-
-A real-NVML smoke check has succeeded on the RTX 3050 Laptop host. Its driver
-reports an implausible total-energy counter, and the per-request source sanity
-check correctly selects instantaneous-power integration instead. Ollama and
-the pilot model are not installed yet, so this is telemetry validation rather
-than a completed inference experiment.
+Earlier local checks on the RTX 5060 Laptop and contributor GPUs remain
+diagnostic only. They exposed cache-floor variability and an accepted cold
+model reload, so the stabilized policy now records four warm-ups, tolerates at
+most one marker-boundary cache token, and aborts a run after a runtime failure
+or model reload during a cache-floor warm-up or measured request. The first
+publishable pilot must be repeated from the reviewed `pilot-v1-code` tag on
+both primary hosts.
 
 ## Minimal Scope
 
@@ -76,6 +74,7 @@ than a completed inference experiment.
 python -m venv .venv
 .venv\Scripts\python -m pip install ".[dev]"
 .venv\Scripts\python -m ruff check .
+.venv\Scripts\python -m ruff format --check .
 .venv\Scripts\python -m pytest -v
 ```
 
@@ -88,22 +87,26 @@ Python 3.12 can misread the UTF-8 `.pth` created by an editable install when a
 checkout path contains Cyrillic or other non-ASCII characters. Reinstall after
 changing package code; tests continue to import directly from `src/`.
 
-The checked-in pilot is intentionally small: one
-`llama3.2:3b-instruct-q4_K_M` configuration, six prompts, two excluded
-warm-ups, and three measured repetitions (18 measured requests).
+The checked-in host pilots are intentionally small: one
+`llama3.2:3b-instruct-q4_K_M` configuration, six prompts, four excluded
+warm-ups, and three measured repetitions (18 measured requests per host).
 
 ## CLI
 
 ```text
-python -m llm_energy_bench doctor --json
+python -m llm_energy_bench doctor --config configs/pilot-rtx5060.toml --json
 python -m llm_energy_bench run --config configs/pilot.toml
 python -m llm_energy_bench report experiments/runs/<run-id>
 ```
 
 `doctor` is read-only: it checks the configured Ollama instance, NVML energy
-source, installed model digests, and complete GPU placement. `run` never pulls
+source, frozen runtime version, installed model digests, and complete GPU
+placement. `run` never pulls
 models automatically. `report` regenerates derived CSV/Markdown summaries from
 the raw artifacts and returns exit code 4 if any supplied run fails validation.
+The shipped configs send `num_gpu = 999` during both preload and generation so
+Ollama requests every model layer on the GPU. That request is not treated as
+proof: `doctor` and `run` still require `/api/ps` to report complete placement.
 The nominal NVML source shown by `doctor` is revalidated for every request;
 physically inconsistent total-energy counters fall back to power integration
 and the selected source is stored in the request record.
@@ -115,4 +118,8 @@ and the selected source is stored in the request record.
 - [MVP implementation plan](docs/superpowers/plans/2026-09-19-llm-energy-bench-mvp.md)
 - [Initial research plan](docs/research-plan.md)
 - [Contributor roles and workflow](docs/collaboration.md)
+- [Frozen pilot baseline and GPU handoff](docs/pilot-baseline.md)
 - [Append-only experiment log](docs/experiment-log.md)
+- [Diagnostic contributor observations](docs/diagnostic-observations.md)
+- [Project state and contribution report](docs/project-state-for-owner.md)
+- [Paper draft outline and author work split](docs/paper-draft.md)

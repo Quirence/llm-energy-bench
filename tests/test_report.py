@@ -12,9 +12,11 @@ from llm_energy_bench.config import ExperimentConfig, InferenceOptions
 from llm_energy_bench.nvml import EnergySource, GpuCapabilities
 from llm_energy_bench.ollama import ModelNotFound, OllamaUnavailable, RunningModel
 from llm_energy_bench.results import (
+    WARMUPS,
     GzipJsonlWriter,
     JsonlWriter,
     build_report,
+    sha256_file,
     write_json,
     write_text,
 )
@@ -41,6 +43,8 @@ def config(tmp_path: Path) -> ExperimentConfig:
         tariff_per_kwh=None,
         currency=None,
         source_path=tmp_path / "pilot.toml",
+        expected_runtime_version="0.99.0-test",
+        expected_model_digests={MODEL: DIGEST},
     )
 
 
@@ -69,9 +73,19 @@ def gpu(source: EnergySource = EnergySource.POWER_INSTANT_INTEGRATION) -> GpuCap
 
 
 class DoctorClient:
-    def __init__(self, *, missing: bool = False, placement: bool | None = True) -> None:
+    def __init__(
+        self,
+        *,
+        missing: bool = False,
+        placement: bool | None = True,
+        version: str = "0.99.0-test",
+        digest: str = DIGEST,
+    ) -> None:
         self.missing = missing
         self.placement = placement
+        self.runtime_version = version
+        self.digest = digest
+        self.preload_options: list[dict[str, Any] | None] = []
 
     def __enter__(self) -> DoctorClient:
         return self
@@ -80,9 +94,10 @@ class DoctorClient:
         return None
 
     def version(self) -> str:
-        return "0.99.0-test"
+        return self.runtime_version
 
-    def preload(self, model: str) -> RunningModel:
+    def preload(self, model: str, *, options: dict[str, Any] | None = None) -> RunningModel:
+        self.preload_options.append(options)
         if self.missing:
             raise ModelNotFound(f"model {model!r} is not installed")
         size = 3_000_000_000
@@ -90,7 +105,7 @@ class DoctorClient:
         return RunningModel(
             name=model,
             model=model,
-            digest=DIGEST,
+            digest=self.digest,
             size_bytes=size,
             size_vram_bytes=size_vram,
             quantization="Q4_K_M",
@@ -161,11 +176,30 @@ def test_doctor_accepts_power_integration_when_energy_counter_is_unsupported(
     assert report["gpu"]["energy_fallback_reason"]
 
 
+def test_doctor_uses_and_reports_explicit_model_load_controls(tmp_path: Path) -> None:
+    client = DoctorClient()
+
+    report = diagnose(tmp_path, client=client)
+
+    assert client.preload_options == [{"num_ctx": 4096, "num_gpu": 999}]
+    assert report["controls"]["num_gpu"] == 999
+
+
 def test_doctor_rejects_partial_gpu_placement(tmp_path: Path) -> None:
     report = diagnose(tmp_path, client=DoctorClient(placement=False))
 
     assert report["ok"] is False
     assert report["models"][0]["fully_on_gpu"] is False
+
+
+def test_doctor_rejects_runtime_or_digest_drift(tmp_path: Path) -> None:
+    version_report = diagnose(tmp_path, client=DoctorClient(version="0.99.1-test"))
+    digest_report = diagnose(tmp_path, client=DoctorClient(digest="f" * 64))
+
+    assert version_report["ok"] is False
+    assert version_report["runtime"]["version_matches_expected"] is False
+    assert digest_report["ok"] is False
+    assert digest_report["models"][0]["digest_matches_expected"] is False
 
 
 def test_doctor_json_is_sanitized(tmp_path: Path) -> None:
@@ -188,6 +222,8 @@ def output_record(
     quality: float | None = None,
     cost: float | None = None,
     currency: str | None = None,
+    prompt_tokens: int = 40,
+    cached_tokens: int = 0,
 ) -> dict[str, Any]:
     return {
         "request_id": request_id,
@@ -197,13 +233,23 @@ def output_record(
         "prompt_category": category,
         "repetition": 0,
         "valid": True,
-        "prompt_eval_count": 40,
+        "latency_s": latency,
+        "ttft_s": latency / 4,
+        "prompt_eval_count": prompt_tokens,
+        "prompt_eval_cached_count": cached_tokens,
+        "total_duration_ns": int(latency * 1_000_000_000),
+        "load_duration_ns": 10_000_000,
         "prompt_eval_duration_ns": 2_000_000_000,
         "eval_count": output_tokens,
         "eval_duration_ns": 1_000_000_000,
         "metrics": {
             "latency_seconds": latency,
             "ttft_seconds": latency / 4,
+            "prompt_tokens": prompt_tokens,
+            "cached_prompt_tokens": cached_tokens,
+            "uncached_prompt_tokens": prompt_tokens - cached_tokens,
+            "template_cache_baseline_tokens": 0,
+            "excess_cached_prompt_tokens": 0,
             "output_tokens": output_tokens,
             "decode_tokens_per_second": output_tokens / latency,
             "end_to_end_tokens_per_second": output_tokens / latency,
@@ -234,17 +280,23 @@ def make_run(
 ) -> Path:
     run_dir = root / run_id
     run_dir.mkdir(parents=True)
-    write_json(
-        run_dir / "manifest.json",
-        {
-            "run_id": run_id,
-            "status": "completed",
-            "host_id": host_id,
-            "models": [{"name": MODEL, "digest": DIGEST}],
-            "controls": {"tariff_per_kwh": None, "currency": None},
-        },
-    )
+    cache_floor = int(records[0]["metrics"].get("template_cache_baseline_tokens", 0))
     write_text(run_dir / "config.resolved.toml", '[experiment]\nid = "report-test"\n')
+    with JsonlWriter(run_dir / WARMUPS) as writer:
+        for index in range(1, 5):
+            writer.write(
+                {
+                    "request_id": f"w{index}",
+                    "model": MODEL,
+                    "model_digest": DIGEST,
+                    "warmup_index": index,
+                    "prompt_id": "warmup",
+                    "valid": True,
+                    "prompt_eval_count": 20,
+                    "prompt_eval_cached_count": cache_floor,
+                    "load_duration_ns": 10_000_000,
+                }
+            )
     with JsonlWriter(run_dir / "requests.jsonl") as writer:
         for record in records:
             writer.write({"request_id": record["request_id"]})
@@ -254,6 +306,54 @@ def make_run(
     with GzipJsonlWriter(run_dir / "telemetry.jsonl.gz") as writer:
         for record in records:
             writer.write({"request_id": record["request_id"], "monotonic_s": 0.0})
+            writer.write({"request_id": record["request_id"], "monotonic_s": 0.1})
+    manifest = {
+        "schema_version": 2,
+        "run_id": run_id,
+        "status": "completed",
+        "host_id": host_id,
+        "runtime": {"name": "ollama", "version": "0.99.0-test"},
+        "prompt_cache_policy": "template_floor_v2",
+        "cache_buster_policy": "uuid_prefix_v1",
+        "max_cache_excess_tokens": 1,
+        "max_measured_load_duration_ns": 100_000_000,
+        "prompt_count": len(records),
+        "repetitions": 1,
+        "completed_warmups": 4,
+        "started_requests": len(records),
+        "completed_requests": len(records),
+        "valid_requests": len(records),
+        "models": [
+            {
+                "name": MODEL,
+                "digest": DIGEST,
+                "fully_on_gpu": True,
+                "template_cache_baseline_tokens": cache_floor,
+            }
+        ],
+        "controls": {
+            "models": [MODEL],
+            "warmup_requests": 4,
+            "repetitions": 1,
+            "expected_runtime_version": "0.99.0-test",
+            "expected_model_digests": {MODEL: DIGEST},
+            "tariff_per_kwh": None,
+            "currency": None,
+        },
+        "config_sha256": sha256_file(run_dir / "config.resolved.toml"),
+        "artifact_sha256": {},
+    }
+    manifest["artifact_sha256"] = {
+        name: sha256_file(run_dir / name)
+        for name in (
+            "config.resolved.toml",
+            WARMUPS,
+            "requests.jsonl",
+            "outputs.jsonl",
+            "telemetry.jsonl.gz",
+        )
+    }
+    write_json(run_dir / "manifest.json", manifest)
     return run_dir
 
 
@@ -337,6 +437,28 @@ def test_summary_exposes_primary_and_context_metrics(tmp_path: Path) -> None:
     assert float(row["vram_peak_max_bytes"]) == 2_200_000_000
 
 
+def test_aggregate_prefill_throughput_uses_only_uncached_prompt_tokens(tmp_path: Path) -> None:
+    record = output_record(
+        "r1",
+        prompt_id="p1",
+        category="short",
+        latency=2.0,
+        output_tokens=10,
+        energy=20.0,
+        prompt_tokens=26,
+        cached_tokens=20,
+    )
+    record["metrics"]["template_cache_baseline_tokens"] = 20
+    run_dir = make_run(tmp_path, "run-a", [record])
+
+    report = build_report((run_dir,))
+    row = rows(report.summary_csv)[0]
+
+    assert float(row["prompt_tokens"]) == 26
+    assert float(row["uncached_prompt_tokens"]) == 6
+    assert float(row["prefill_tokens_per_second"]) == 3
+
+
 def test_quality_gives_each_prompt_equal_weight_after_repetitions(tmp_path: Path) -> None:
     records = [
         output_record(
@@ -418,7 +540,7 @@ def test_cross_run_speed_and_energy_rankings_can_invert(tmp_path: Path) -> None:
             ),
             quality,
         ],
-        host_id="fast-host",
+        host_id="same-host",
     )
     efficient = make_run(
         tmp_path,
@@ -434,20 +556,94 @@ def test_cross_run_speed_and_energy_rankings_can_invert(tmp_path: Path) -> None:
             ),
             {**quality, "request_id": "quality-efficient"},
         ],
-        host_id="efficient-host",
+        host_id="same-host",
     )
 
     report = build_report((fast, efficient))
     short_rows = {
-        row["run_id"]: row
-        for row in rows(report.summary_csv)
-        if row["prompt_category"] == "short"
+        row["run_id"]: row for row in rows(report.summary_csv) if row["prompt_category"] == "short"
     }
 
     assert short_rows["run-fast"]["speed_rank"] == "1"
     assert short_rows["run-fast"]["energy_rank"] == "2"
     assert short_rows["run-efficient"]["speed_rank"] == "2"
     assert short_rows["run-efficient"]["energy_rank"] == "1"
-    assert "speed and energy rankings differ" in report.report_markdown.read_text(
-        encoding="utf-8"
-    ).lower()
+    assert (
+        "speed and energy rankings differ"
+        in report.report_markdown.read_text(encoding="utf-8").lower()
+    )
+
+
+def test_rankings_are_not_compared_across_hosts(tmp_path: Path) -> None:
+    quality = output_record(
+        "quality-a",
+        prompt_id="quality",
+        category="scored",
+        latency=1,
+        output_tokens=1,
+        energy=1,
+        quality=1.0,
+    )
+    first = make_run(
+        tmp_path,
+        "run-a",
+        [
+            output_record(
+                "short-a",
+                prompt_id="short",
+                category="short",
+                latency=1,
+                output_tokens=10,
+                energy=100,
+            ),
+            quality,
+        ],
+        host_id="host-a",
+    )
+    second = make_run(
+        tmp_path,
+        "run-b",
+        [
+            output_record(
+                "short-b",
+                prompt_id="short",
+                category="short",
+                latency=2,
+                output_tokens=10,
+                energy=10,
+            ),
+            {**quality, "request_id": "quality-b"},
+        ],
+        host_id="host-b",
+    )
+
+    report = build_report((first, second))
+    short_rows = [row for row in rows(report.summary_csv) if row["prompt_category"] == "short"]
+
+    assert {row["speed_rank"] for row in short_rows} == {"1"}
+    assert {row["energy_rank"] for row in short_rows} == {"1"}
+
+
+def test_an_invalid_run_is_excluded_from_aggregate_claims(tmp_path: Path) -> None:
+    run_dir = make_run(
+        tmp_path,
+        "invalid-run",
+        [
+            output_record(
+                "r1",
+                prompt_id="short",
+                category="short",
+                latency=1,
+                output_tokens=10,
+                energy=10,
+            )
+        ],
+    )
+    with (run_dir / "outputs.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write('{"request_id":"tampered"}\n')
+
+    report = build_report((run_dir,))
+
+    assert report.validation_ok is False
+    assert rows(report.summary_csv) == []
+    assert "No validated run contributed" in report.report_markdown.read_text(encoding="utf-8")

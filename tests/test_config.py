@@ -15,18 +15,23 @@ from llm_energy_bench.config import (
     prompts_fingerprint,
 )
 
-VALID_CONFIG = """
+MODEL = "llama3.2:3b-instruct-q4_K_M"
+DIGEST = "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+
+VALID_CONFIG = f"""
 [experiment]
 id = "pilot-rtx3050"
 host_id = "host-a"
 output_dir = "experiments/runs"
 repetitions = 3
-warmup_requests = 2
+warmup_requests = 4
 order_seed = 42
 
 [runtime]
 ollama_url = "http://127.0.0.1:11434"
-models = ["llama3.2:3b-instruct-q4_K_M"]
+models = ["{MODEL}"]
+expected_version = "0.34.2"
+expected_digests = {{ "{MODEL}" = "{DIGEST}" }}
 
 [gpu]
 index = 0
@@ -37,6 +42,7 @@ path = "prompts/pilot-v1.jsonl"
 
 [options]
 num_ctx = 4096
+num_gpu = 999
 temperature = 0.0
 seed = 42
 num_predict = 256
@@ -67,13 +73,20 @@ def test_a_valid_config_loads_every_field(tmp_path: Path) -> None:
     assert config.experiment_id == "pilot-rtx3050"
     assert config.host_id == "host-a"
     assert config.repetitions == 3
-    assert config.warmup_requests == 2
+    assert config.warmup_requests == 4
     assert config.order_seed == 42
     assert config.ollama_url == "http://127.0.0.1:11434"
     assert config.models == ("llama3.2:3b-instruct-q4_K_M",)
+    assert config.expected_runtime_version == "0.34.2"
+    assert config.expected_model_digests == {
+        "llama3.2:3b-instruct-q4_K_M": (
+            "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+        )
+    }
     assert config.gpu_index == 0
     assert config.telemetry_interval_ms == 100
     assert config.options.num_ctx == 4096
+    assert config.options.num_gpu == 999
     assert config.options.temperature == 0.0
     assert config.options.seed == 42
     assert config.options.num_predict == 256
@@ -111,10 +124,11 @@ path = "p.jsonl"
 """
     config = load_config(write_config(tmp_path, minimal))
 
-    assert config.warmup_requests == 2
+    assert config.warmup_requests == 4
     assert config.telemetry_interval_ms == 100
     assert config.concurrency == 1
     assert config.options.num_ctx == 4096
+    assert config.options.num_gpu == 999
     assert config.options.temperature == 0.0
     assert config.options.seed == 42
     assert config.options.kv_cache == "f16"
@@ -184,10 +198,11 @@ def test_a_missing_required_key_is_rejected(tmp_path: Path) -> None:
     ("old", "new", "message"),
     [
         ("repetitions = 3", "repetitions = 0", "repetitions"),
-        ("warmup_requests = 2", "warmup_requests = -1", "warmup_requests"),
+        ("warmup_requests = 4", "warmup_requests = -1", "warmup_requests"),
         ("telemetry_interval_ms = 100", "telemetry_interval_ms = 0", "telemetry_interval_ms"),
         ("index = 0", "index = -1", "index"),
         ("num_ctx = 4096", "num_ctx = 0", "num_ctx"),
+        ("num_gpu = 999", "num_gpu = 0", "num_gpu"),
         ("temperature = 0.0", "temperature = -0.5", "temperature"),
         ("num_predict = 256", "num_predict = 0", "num_predict"),
     ],
@@ -229,6 +244,39 @@ def test_a_non_http_ollama_url_is_rejected(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ConfigError, match="ollama_url"):
+        load_config(write_config(tmp_path, body))
+
+
+def test_credentials_in_the_ollama_url_are_rejected(tmp_path: Path) -> None:
+    body = replace(
+        VALID_CONFIG,
+        'ollama_url = "http://127.0.0.1:11434"',
+        'ollama_url = "http://alice:secret@127.0.0.1:11434"',
+    )
+
+    with pytest.raises(ConfigError, match="credentials"):
+        load_config(write_config(tmp_path, body))
+
+
+def test_expected_digests_must_cover_exactly_the_configured_models(tmp_path: Path) -> None:
+    body = replace(
+        VALID_CONFIG,
+        f'"{MODEL}" = "{DIGEST}"',
+        f'"another-model" = "{DIGEST}"',
+    )
+
+    with pytest.raises(ConfigError, match="expected_digests"):
+        load_config(write_config(tmp_path, body))
+
+
+def test_expected_model_digest_must_be_a_full_sha256(tmp_path: Path) -> None:
+    body = replace(
+        VALID_CONFIG,
+        "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+        "a80c4f17acd5",
+    )
+
+    with pytest.raises(ConfigError, match="SHA-256"):
         load_config(write_config(tmp_path, body))
 
 
@@ -436,7 +484,8 @@ def test_the_shipped_pilot_config_is_valid() -> None:
 
     assert config.repetitions == 3
     assert config.models == ("llama3.2:3b-instruct-q4_K_M",)
-    assert config.warmup_requests == 2
+    assert config.warmup_requests == 4
+    assert config.options.num_gpu == 999
     assert config.cost_reporting_enabled is False
 
 
@@ -457,6 +506,33 @@ def test_the_pilot_produces_the_eighteen_records_task_8_expects() -> None:
     assert len(prompts) * config.repetitions * len(config.models) == 18
 
 
+@pytest.mark.parametrize(
+    ("filename", "experiment_id", "host_id"),
+    [
+        ("pilot-rtx5060.toml", "pilot-v1", "maibenben-x16c-rtx5060"),
+        ("pilot-rtx4060ti.toml", "pilot-v1", "rtx4060ti-desktop"),
+        ("pilot-gtx1080-observation.toml", "pilot-v1-observation", "gtx1080-observation"),
+    ],
+)
+def test_each_confirmed_gpu_has_a_frozen_pilot_config(
+    filename: str, experiment_id: str, host_id: str
+) -> None:
+    config = load_config(REPO_ROOT / "configs" / filename)
+    prompts = load_prompts(config.prompt_path)
+
+    assert config.experiment_id == experiment_id
+    assert config.host_id == host_id
+    assert config.expected_runtime_version == "0.34.2"
+    assert config.expected_model_digests == {
+        "llama3.2:3b-instruct-q4_K_M": DIGEST,
+    }
+    assert len(prompts) * config.repetitions * len(config.models) == 18
+
+
+def test_the_unconfirmed_rtx4060_host_config_is_not_shipped() -> None:
+    assert not (REPO_ROOT / "configs" / "pilot-rtx4060.toml").exists()
+
+
 # --------------------------------------------------------------------------
 # Frozen benchmark-v1 artifacts
 # --------------------------------------------------------------------------
@@ -475,9 +551,10 @@ def test_benchmark_v1_config_freezes_the_approved_matrix() -> None:
     assert config.experiment_id == "benchmark-v1"
     assert config.models == BENCHMARK_MODELS
     assert config.repetitions == 5
-    assert config.warmup_requests == 2
+    assert config.warmup_requests == 4
     assert config.telemetry_interval_ms == 100
     assert config.options.num_ctx == 4096
+    assert config.options.num_gpu == 999
     assert config.options.temperature == 0.0
     assert config.options.seed == 42
     assert config.options.kv_cache == "f16"

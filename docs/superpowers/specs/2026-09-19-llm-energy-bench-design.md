@@ -1,6 +1,7 @@
 # llm-energy-bench MVP Design
 
-Status: approved for implementation planning on 2026-09-19.
+Status: approved for implementation planning on 2026-09-19; host matrix
+amended prospectively on 2026-09-28 before publishable data collection.
 
 ## Purpose
 
@@ -19,10 +20,10 @@ The primary comparison covers two Windows hosts:
 
 - MAIBENBEN X16C with RTX 5060 Laptop GPU as the main development and
   experiment host;
-- RTX 4060 desktop as the second host.
+- RTX 4060 Ti desktop as the second host.
 
-The currently available RTX 3050 Laptop GPU is used only for a technical
-smoke run. It is not part of the main research conclusions.
+RTX 3050 Laptop and GTX 1080 may be used only for technical smoke or
+observation runs. They are not part of the main research conclusions.
 
 The initial runtime is Ollama. llama.cpp may be added only after a validated
 Ollama pilot. vLLM, web dashboards, databases, FastAPI, Django, and external
@@ -37,7 +38,7 @@ The main two-host experiment uses exactly these Ollama tags:
 - `llama3.2:3b-instruct-q4_K_M`;
 - `llama3.2:3b-instruct-q8_0`.
 
-The RTX 3050 smoke run uses only
+The RTX 3050 smoke and GTX 1080 observation runs use only
 `llama3.2:3b-instruct-q4_K_M`. Every run records the resolved model digest;
 model tags alone are not considered sufficient identifiers.
 
@@ -78,7 +79,8 @@ For each experiment the runner:
 3. Probes Ollama, the GPU, NVML capabilities, and model placement.
 4. Rejects missing models and partial CPU offload instead of pulling models
    or silently changing the workload.
-5. Preloads each model and performs two excluded warm-up requests.
+5. Preloads each model and performs four excluded warm-up requests: one cold
+   exclusion and three auditable cache-floor probes.
 6. Executes measured prompts in a deterministic shuffled order.
 7. Starts telemetry before each request and stops it after the final response
    chunk.
@@ -94,13 +96,18 @@ Default experiment controls are:
 
 ```text
 num_ctx = 4096
+num_gpu = 999
 temperature = 0
 seed = 42
 concurrency = 1
 kv_cache = f16
-warmup_requests = 2
+warmup_requests = 4
 telemetry_interval_ms = 100
 ```
+
+`num_gpu = 999` is sent during preload and measured generation to request all
+model layers on the GPU. It is only a request to Ollama: `/api/ps` placement
+data remains authoritative, and any partial CPU offload invalidates the run.
 
 The manifest records OS, GPU name, hashed GPU fingerprint, VRAM, driver,
 runtime version, model digest, quantization, context settings, prompt-set
@@ -116,6 +123,7 @@ Each run directory contains:
 ```text
 manifest.json
 config.resolved.toml
+warmups.jsonl
 requests.jsonl
 outputs.jsonl
 telemetry.jsonl.gz
@@ -137,7 +145,7 @@ Required request metrics are:
 
 - end-to-end latency and TTFT;
 - Ollama total, load, prompt-evaluation, and evaluation durations;
-- prompt, cached-prompt, and output token counts;
+- prompt, cached-prompt, uncached-prompt, and output token counts;
 - prefill, decode, and end-to-end output throughput;
 - average and maximum observed GPU power;
 - GPU energy per request;

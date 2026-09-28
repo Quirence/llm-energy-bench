@@ -11,38 +11,47 @@ research comparison begins.
 
 ### Pilot
 
-- GPU: RTX 3050 Laptop, used only as a smoke/pilot host;
+- GPU: MAIBENBEN X16C RTX 5060 Laptop, the primary measurement host;
+- optional regression host, if still available: RTX 3050 Laptop;
 - runtime: Ollama;
 - model: `llama3.2:3b-instruct-q4_K_M`;
 - prompts: two short/decode, two long/prefill, and two scored utility prompts;
-- two excluded warm-up requests and three measured repetitions;
+- four excluded warm-up requests and three measured repetitions;
 - 18 measured requests in total.
 
 ### Main Matrix
 
-- GPUs: MAIBENBEN X16C RTX 5060 Laptop and RTX 4060 desktop;
+- GPUs: MAIBENBEN X16C RTX 5060 Laptop and RTX 4060 Ti desktop;
 - runtime: Ollama, with one pinned version for the campaign;
 - models/quantizations:
   - `qwen3:4b-instruct-2507-q4_K_M`;
   - `qwen3:4b-instruct-2507-q8_0`;
   - `llama3.2:3b-instruct-q4_K_M`;
   - `llama3.2:3b-instruct-q8_0`;
-- fixed inference settings: context length 4096, temperature 0, seed 42,
-  concurrency 1, and f16 KV cache;
+- fixed inference settings: context length 4096, requested GPU layers 999,
+  temperature 0, seed 42, concurrency 1, and f16 KV cache;
 - `benchmark-v1`: 24 prompts and five measured repetitions per configuration.
 
 Model tags and digests must be checked before the campaign. A run records the
 actual Ollama digest, runtime and driver versions, prompt/config hashes, power
 limit, temperature, VRAM context, and the telemetry source used.
+`num_gpu = 999` asks Ollama to place every layer on the GPU during preload and
+measured generation. It does not replace the `/api/ps` full-placement gate;
+partial CPU offload still invalidates a primary run.
 
 The four tags were rechecked against the official
 [Qwen3](https://ollama.com/library/qwen3/tags) and
 [Llama 3.2](https://ollama.com/library/llama3.2/tags) registries on
 2026-09-19. Tags are configuration names, not immutable identities, so this
 check does not replace the digest captured by each run. The checked-in
-`benchmark-v1.toml` is the MAIBENBEN copy; the RTX 4060 copy changes only
+`benchmark-v1.toml` is the MAIBENBEN copy; the RTX 4060 Ti copy changes only
 `host_id`, while prompt, runtime, model, GPU-sampling, and inference controls
 remain byte-for-byte equivalent.
+
+The originally planned RTX 4060 desktop was replaced prospectively by the
+actually available RTX 4060 Ti desktop on 2026-09-28, before any publishable
+run existed. GTX 1080 uses the same pilot workload only as an observation host;
+it is not included in the primary two-host decision blocks.
 
 ## Core Metrics
 
@@ -90,6 +99,24 @@ instantaneous-power integration reported 23.881 J (11.852 W average). The
 counter therefore failed the consistency rule and the tool selected
 `power_instant_integration`. This is a preflight observation, not a completed
 model-inference experiment.
+
+Ollama's reusable chat-template preamble is controlled separately from prompt
+contamination. Every model performs four excluded warm-ups. The first is a
+cold-start exclusion; the minimum `prompt_eval_cached_count` across the next
+three becomes the per-model, per-digest template floor recorded in the
+manifest. Every generated prompt starts with a
+deterministic UUID-form marker derived from a run-specific logical request key,
+followed by an instruction to ignore that metadata. The same prompt and
+repetition use the same marker across model configurations in one run. A
+measured request is eligible only when its cached count is present and exceeds
+the floor by at most one token. The tolerance covers the observed tokenizer
+boundary of the unique marker; it does not permit prompt-body reuse. All cached
+tokens are subtracted from the prefill-token numerator. Raw warm-ups, the raw
+measured count, applied floor, excess, uncached count and cache-buster policy
+are stored so validation can reproduce the decision independently. A measured
+`load_duration` above 100 ms in cache-floor warm-ups or measured requests is
+treated as a model reload and aborts the run;
+the whole launch must be repeated rather than mixing cold and warm requests.
 
 ## Main Failure Condition
 

@@ -393,6 +393,21 @@ def test_preload_loads_the_model_and_returns_its_placement() -> None:
     assert load == [{"model": MODEL, "stream": False}]  # no prompt: load only
 
 
+def test_preload_sends_explicit_model_load_options() -> None:
+    fake = FakeOllama()
+
+    fake.client().preload(MODEL, options={"num_ctx": 4096, "num_gpu": 999})
+
+    load = [body for method, path, body in fake.requests if path == "/api/generate"]
+    assert load == [
+        {
+            "model": MODEL,
+            "stream": False,
+            "options": {"num_ctx": 4096, "num_gpu": 999},
+        }
+    ]
+
+
 def test_preload_reports_offload_without_rejecting_it() -> None:
     running = FakeOllama(vram_share=0.5).client().preload(MODEL)
 

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import pytest
 
@@ -21,9 +23,11 @@ from llm_energy_bench.nvml import (
     TelemetrySample,
 )
 from llm_energy_bench.ollama import InferenceRequest, InferenceResult, RunningModel
-from llm_energy_bench.results import read_gzip_jsonl, read_jsonl
+from llm_energy_bench.results import WARMUPS, read_gzip_jsonl, read_jsonl
 from llm_energy_bench.runner import (
+    RunnerError,
     RunnerPreflightError,
+    _integrate_power,
     derive_request_metrics,
     run_experiment,
 )
@@ -36,7 +40,7 @@ NOW = datetime(2026, 9, 19, 12, 0, tzinfo=UTC)
 def make_config(
     tmp_path: Path,
     *,
-    warmups: int = 2,
+    warmups: int = 4,
     repetitions: int = 2,
     tariff: float | None = None,
 ) -> ExperimentConfig:
@@ -44,9 +48,7 @@ def make_config(
     prompts.write_text(
         "\n".join(
             (
-                json.dumps(
-                    {"id": "short-01", "category": "short", "prompt": "Say hello."}
-                ),
+                json.dumps({"id": "short-01", "category": "short", "prompt": "Say hello."}),
                 json.dumps(
                     {
                         "id": "scored-01",
@@ -77,6 +79,7 @@ def make_config(
         concurrency=1,
         options=InferenceOptions(
             num_ctx=4096,
+            num_gpu=999,
             temperature=0.0,
             seed=42,
             num_predict=32,
@@ -85,6 +88,8 @@ def make_config(
         tariff_per_kwh=tariff,
         currency="RUB" if tariff is not None else None,
         source_path=source,
+        expected_runtime_version="0.99.0-test",
+        expected_model_digests={MODEL: DIGEST},
     )
 
 
@@ -140,6 +145,7 @@ def result(
     cached_tokens: int | None = 0,
     output_tokens: int = 4,
     valid: bool = True,
+    load_duration_ns: int | None = 10_000_000,
 ) -> InferenceResult:
     return InferenceResult(
         request_id=request_id,
@@ -162,7 +168,7 @@ def result(
         prompt_eval_cached_count=cached_tokens,
         eval_count=output_tokens,
         total_duration_ns=2_000_000_000,
-        load_duration_ns=10_000_000,
+        load_duration_ns=load_duration_ns,
         prompt_eval_duration_ns=2_000_000_000,
         eval_duration_ns=1_000_000_000,
         valid=valid,
@@ -177,10 +183,19 @@ class FakeClient:
         *,
         fully_on_gpu: bool | None = True,
         interrupt_at: int | None = None,
+        cached_counts: tuple[int | None, ...] | None = None,
+        load_durations: tuple[int, ...] | None = None,
+        runtime_version: str = "0.99.0-test",
+        digest: str = DIGEST,
     ) -> None:
         self.fully_on_gpu = fully_on_gpu
         self.interrupt_at = interrupt_at
+        self.cached_counts = cached_counts
+        self.load_durations = load_durations
+        self.runtime_version = runtime_version
+        self.digest = digest
         self.requests: list[InferenceRequest] = []
+        self.preload_options: list[dict[str, Any] | None] = []
         self.closed = False
 
     def __enter__(self) -> FakeClient:
@@ -190,17 +205,16 @@ class FakeClient:
         self.closed = True
 
     def version(self) -> str:
-        return "0.99.0-test"
+        return self.runtime_version
 
-    def preload(self, model: str) -> RunningModel:
+    def preload(self, model: str, *, options: dict[str, Any] | None = None) -> RunningModel:
+        self.preload_options.append(options)
         size = 3_000_000_000
-        size_vram = (
-            None if self.fully_on_gpu is None else size if self.fully_on_gpu else size - 1
-        )
+        size_vram = None if self.fully_on_gpu is None else size if self.fully_on_gpu else size - 1
         return RunningModel(
             name=model,
             model=model,
-            digest=DIGEST,
+            digest=self.digest,
             size_bytes=size,
             size_vram_bytes=size_vram,
             quantization="Q4_K_M",
@@ -213,7 +227,18 @@ class FakeClient:
         self.requests.append(request)
         if self.interrupt_at == len(self.requests):
             raise KeyboardInterrupt
-        return result(request.request_id)
+        cached_tokens = 0
+        if self.cached_counts is not None:
+            cached_tokens = self.cached_counts[len(self.requests) - 1]
+        load_duration_ns = 10_000_000
+        if self.load_durations is not None:
+            load_duration_ns = self.load_durations[len(self.requests) - 1]
+        generated = result(
+            request.request_id,
+            cached_tokens=cached_tokens,
+            load_duration_ns=load_duration_ns,
+        )
+        return replace(generated, model_digest=self.digest)
 
 
 class FakeSampler:
@@ -263,7 +288,12 @@ def test_total_energy_counter_takes_precedence_over_power_integration() -> None:
     )
 
     metrics = derive_request_metrics(
-        result(), samples, capabilities(), prompt(), repetition=0
+        result(),
+        samples,
+        capabilities(),
+        prompt(),
+        repetition=0,
+        template_cache_baseline_tokens=0,
     )
 
     assert metrics.energy_source is EnergySource.TOTAL_ENERGY_COUNTER
@@ -279,7 +309,12 @@ def test_implausible_energy_counter_falls_back_to_power_integration() -> None:
     )
 
     metrics = derive_request_metrics(
-        result(), samples, capabilities(), prompt(), repetition=0
+        result(),
+        samples,
+        capabilities(),
+        prompt(),
+        repetition=0,
+        template_cache_baseline_tokens=0,
     )
 
     assert metrics.energy_source is EnergySource.POWER_INSTANT_INTEGRATION
@@ -301,11 +336,82 @@ def test_instantaneous_power_uses_trapezoidal_integration() -> None:
         capabilities(EnergySource.POWER_INSTANT_INTEGRATION),
         prompt(),
         repetition=0,
+        template_cache_baseline_tokens=0,
     )
 
     assert metrics.gpu_energy_joules == pytest.approx(44.0)
     assert metrics.average_gpu_power_watts == pytest.approx(44.0 / 3.0)
     assert metrics.observed_peak_gpu_power_watts == pytest.approx(18.0)
+
+
+def test_duplicate_timestamp_uses_the_latest_reading_without_losing_energy() -> None:
+    samples = (
+        sample("request-1", 0.0, energy_j=None, instant_w=10.0),
+        sample("request-1", 0.1, energy_j=None, instant_w=14.0),
+        sample("request-1", 0.1, energy_j=None, instant_w=16.0),
+    )
+
+    metrics = derive_request_metrics(
+        result(),
+        samples,
+        capabilities(EnergySource.POWER_INSTANT_INTEGRATION),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.energy_source is EnergySource.POWER_INSTANT_INTEGRATION
+    assert metrics.gpu_energy_joules == pytest.approx(1.3)
+    assert metrics.average_gpu_power_watts == pytest.approx(13.0)
+
+
+def test_power_integration_rejects_decreasing_timestamps() -> None:
+    assert _integrate_power([(0.1, 10.0), (0.0, 12.0)]) is None
+
+
+def test_implausible_instant_power_falls_back_to_legacy_power() -> None:
+    samples = (
+        sample("request-1", 0.0, energy_j=None, instant_w=9.0, legacy_w=8.0),
+        sample("request-1", 0.1, energy_j=None, instant_w=4_666.0, legacy_w=12.0),
+        sample("request-1", 0.2, energy_j=None, instant_w=10.0, legacy_w=16.0),
+    )
+
+    metrics = derive_request_metrics(
+        result(),
+        samples,
+        capabilities(EnergySource.POWER_INSTANT_INTEGRATION),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.energy_source is EnergySource.POWER_LEGACY_INTEGRATION
+    assert metrics.gpu_energy_joules == pytest.approx(2.4)
+    assert metrics.average_gpu_power_watts == pytest.approx(12.0)
+    assert metrics.observed_peak_gpu_power_watts == pytest.approx(16.0)
+    assert metrics.energy_fallback_reason is not None
+    assert "enforced power limit" in metrics.energy_fallback_reason
+
+
+def test_all_implausible_power_sources_make_energy_unavailable() -> None:
+    samples = (
+        sample("request-1", 0.0, energy_j=None, instant_w=9.0, legacy_w=8.0),
+        sample("request-1", 0.1, energy_j=None, instant_w=4_666.0, legacy_w=4_000.0),
+    )
+
+    metrics = derive_request_metrics(
+        result(),
+        samples,
+        capabilities(EnergySource.POWER_INSTANT_INTEGRATION),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.energy_source is EnergySource.UNAVAILABLE
+    assert metrics.gpu_energy_joules is None
+    assert metrics.average_gpu_power_watts is None
+    assert metrics.observed_peak_gpu_power_watts is None
+    assert "gpu_energy" in metrics.invalid_reasons
+    assert metrics.energy_fallback_reason is not None
+    assert "enforced power limit" in metrics.energy_fallback_reason
 
 
 def test_efficiency_throughput_and_optional_cost_formulas() -> None:
@@ -318,6 +424,7 @@ def test_efficiency_throughput_and_optional_cost_formulas() -> None:
         capabilities(),
         prompt(),
         repetition=3,
+        template_cache_baseline_tokens=0,
         tariff_per_kwh=0.2,
         currency="USD",
     )
@@ -343,15 +450,103 @@ def test_cost_is_null_without_an_explicit_tariff() -> None:
         capabilities(),
         prompt(),
         repetition=0,
+        template_cache_baseline_tokens=0,
     )
 
     assert metrics.gpu_cost_per_million_output_tokens is None
     assert metrics.cost_currency is None
 
 
-def test_a_positive_cached_prompt_count_invalidates_primary_metrics() -> None:
+def test_direct_metric_derivation_defaults_to_a_strict_zero_cache_baseline() -> None:
     metrics = derive_request_metrics(
-        result(cached_tokens=5),
+        result(cached_tokens=0),
+        (
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+            sample("request-1", 0.1, energy_j=101.2, instant_w=14.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.valid is True
+    assert metrics.template_cache_baseline_tokens == 0
+
+
+def test_cached_prompt_count_at_the_template_baseline_is_valid() -> None:
+    metrics = derive_request_metrics(
+        result(cached_tokens=20),
+        (
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+            sample("request-1", 0.1, energy_j=101.2, instant_w=14.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+        template_cache_baseline_tokens=20,
+    )
+
+    assert metrics.valid is True
+    assert metrics.template_cache_baseline_tokens == 20
+    assert metrics.excess_cached_prompt_tokens == 0
+    assert metrics.uncached_prompt_tokens == 6
+    assert metrics.prefill_tokens_per_second == pytest.approx(3.0)
+
+
+def test_one_cached_marker_token_above_the_template_floor_is_valid() -> None:
+    metrics = derive_request_metrics(
+        result(cached_tokens=21),
+        (
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+            sample("request-1", 0.1, energy_j=101.2, instant_w=14.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+        template_cache_baseline_tokens=20,
+    )
+
+    assert metrics.valid is True
+    assert metrics.excess_cached_prompt_tokens == 1
+
+
+def test_two_cached_tokens_above_the_template_floor_are_invalid() -> None:
+    metrics = derive_request_metrics(
+        result(cached_tokens=22),
+        (
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+            sample("request-1", 1.0, energy_j=112.0, instant_w=14.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+        template_cache_baseline_tokens=20,
+    )
+
+    assert metrics.valid is False
+    assert "cached_prompt_tokens_above_allowed_excess" in metrics.invalid_reasons
+    assert metrics.excess_cached_prompt_tokens == 2
+
+
+def test_decreasing_telemetry_timestamps_are_invalid() -> None:
+    metrics = derive_request_metrics(
+        result(),
+        (
+            sample("request-1", 1.0, energy_j=112.0, instant_w=14.0),
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.valid is False
+    assert "telemetry_timestamp_order" in metrics.invalid_reasons
+
+
+def test_a_model_reload_is_invalid() -> None:
+    metrics = derive_request_metrics(
+        result(load_duration_ns=3_000_000_000),
         (
             sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
             sample("request-1", 1.0, energy_j=112.0, instant_w=14.0),
@@ -362,8 +557,51 @@ def test_a_positive_cached_prompt_count_invalidates_primary_metrics() -> None:
     )
 
     assert metrics.valid is False
-    assert "cached_prompt_tokens" in metrics.invalid_reasons
-    assert metrics.cached_prompt_tokens == 5
+    assert "model_reloaded" in metrics.invalid_reasons
+
+
+def test_a_missing_load_duration_is_invalid() -> None:
+    metrics = derive_request_metrics(
+        result(load_duration_ns=None),
+        (
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+            sample("request-1", 0.1, energy_j=101.2, instant_w=14.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.valid is False
+    assert "load_duration_missing" in metrics.invalid_reasons
+
+
+@pytest.mark.parametrize(
+    ("field", "reason"),
+    [
+        ("prompt_eval_count", "prompt_tokens_missing"),
+        ("total_duration_ns", "total_duration_missing"),
+        ("prompt_eval_duration_ns", "prompt_eval_duration_missing"),
+        ("eval_duration_ns", "eval_duration_missing"),
+        ("ttft_s", "ttft_missing"),
+    ],
+)
+def test_missing_required_runtime_metrics_are_invalid(field: str, reason: str) -> None:
+    inference = replace(result(), **{field: None})
+
+    metrics = derive_request_metrics(
+        inference,
+        (
+            sample("request-1", 0.0, energy_j=100.0, instant_w=10.0),
+            sample("request-1", 0.1, energy_j=101.2, instant_w=14.0),
+        ),
+        capabilities(),
+        prompt(),
+        repetition=0,
+    )
+
+    assert metrics.valid is False
+    assert reason in metrics.invalid_reasons
 
 
 def test_run_order_is_deterministic_and_warmups_are_excluded(tmp_path: Path) -> None:
@@ -387,13 +625,12 @@ def test_run_order_is_deterministic_and_warmups_are_excluded(tmp_path: Path) -> 
     )
     second_requests = read_jsonl(second_dir / "requests.jsonl")
 
-    assert len(first_client.requests) == 6  # 2 warm-ups + 2 prompts x 2 repetitions
+    assert len(first_client.requests) == 8  # 4 warm-ups + 2 prompts x 2 repetitions
+    assert len(read_jsonl(first_dir / WARMUPS)) == 4
     assert len(first_requests) == 4
     assert len(read_jsonl(first_dir / "outputs.jsonl")) == 4
     assert len(read_gzip_jsonl(first_dir / "telemetry.jsonl.gz")) == 8
-    assert [
-        (record["prompt_id"], record["repetition"]) for record in first_requests
-    ] == [
+    assert [(record["prompt_id"], record["repetition"]) for record in first_requests] == [
         (record["prompt_id"], record["repetition"]) for record in second_requests
     ]
     assert first_sampler.started == [record["request_id"] for record in first_requests]
@@ -409,11 +646,114 @@ def test_every_generation_has_a_unique_leading_cache_buster(tmp_path: Path) -> N
         sampler_factory=lambda **_kwargs: FakeSampler(),
     )
 
-    prefixes = [request.prompt.splitlines()[0] for request in client.requests]
+    lines = [request.prompt.splitlines() for request in client.requests]
+    prefixes = [parts[0] for parts in lines]
+    assert all(UUID(prefix).version == 4 for prefix in prefixes)
+    assert all(
+        parts[1] == "[llm-energy-bench request marker; ignore this marker]" for parts in lines
+    )
     assert len(prefixes) == len(set(prefixes))
-    assert all(prefix.startswith("[llm-energy-bench:") for prefix in prefixes)
     assert all("kv_cache" not in request.options for request in client.requests)
     assert all(request.options["num_ctx"] == 4096 for request in client.requests)
+    assert all(request.options["num_gpu"] == 999 for request in client.requests)
+    assert client.preload_options == [
+        {"num_ctx": 4096, "num_gpu": 999},
+        {"num_ctx": 4096, "num_gpu": 999},
+    ]
+
+
+def test_measured_cache_marker_is_stable_across_model_configurations(tmp_path: Path) -> None:
+    second_model = "llama3.2:3b-instruct-q8_0"
+    config = replace(
+        make_config(tmp_path),
+        models=(MODEL, second_model),
+        expected_model_digests={MODEL: DIGEST, second_model: DIGEST},
+    )
+
+    run_dir = run_experiment(
+        config,
+        client_factory=lambda _url: FakeClient(),
+        sampler_factory=lambda **_kwargs: FakeSampler(),
+    )
+
+    records = read_jsonl(run_dir / "requests.jsonl")
+    markers: dict[tuple[str, int], set[str]] = {}
+    for record in records:
+        key = (record["prompt_id"], record["repetition"])
+        markers.setdefault(key, set()).add(record["prompt"].splitlines()[0])
+
+    assert all(len(values) == 1 for values in markers.values())
+    assert len({next(iter(values)) for values in markers.values()}) == len(markers)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["cache_buster_policy"] == "uuid_prefix_v1"
+
+
+def test_run_requires_four_warmups_to_establish_a_cache_floor(tmp_path: Path) -> None:
+    config = make_config(tmp_path, warmups=3)
+
+    with pytest.raises(RunnerPreflightError, match="four warm-up"):
+        run_experiment(
+            config,
+            client_factory=lambda _url: FakeClient(),
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+
+    assert not config.output_dir.exists()
+
+
+def test_minimum_post_cold_warmup_cache_count_is_the_floor(tmp_path: Path) -> None:
+    client = FakeClient(cached_counts=(40, 21, 20, 21, 21, 20, 21, 20))
+
+    run_dir = run_experiment(
+        make_config(tmp_path),
+        client_factory=lambda _url: client,
+        sampler_factory=lambda **_kwargs: FakeSampler(),
+    )
+
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    outputs = read_jsonl(run_dir / "outputs.jsonl")
+    warmups = read_jsonl(run_dir / WARMUPS)
+    assert manifest["models"][0]["template_cache_baseline_tokens"] == 20
+    assert [record["prompt_eval_cached_count"] for record in warmups] == [40, 21, 20, 21]
+    assert all(record["valid"] is True for record in outputs)
+    assert {record["metrics"]["template_cache_baseline_tokens"] for record in outputs} == {20}
+    assert {record["metrics"]["excess_cached_prompt_tokens"] for record in outputs} == {0, 1}
+
+
+def test_missing_baseline_warmup_cache_count_aborts_before_measurement(tmp_path: Path) -> None:
+    client = FakeClient(cached_counts=(0, 20, None, 20))
+    config = make_config(tmp_path)
+
+    with pytest.raises(RunnerError, match="prompt_eval_cached_count"):
+        run_experiment(
+            config,
+            client_factory=lambda _url: client,
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+
+    assert len(client.requests) == 4
+    run_dir = next(config.output_dir.iterdir())
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+    assert manifest["started_requests"] == 0
+
+
+def test_reloaded_baseline_warmup_aborts_before_measurement(tmp_path: Path) -> None:
+    client = FakeClient(load_durations=(10_000_000, 3_000_000_000, 10_000_000, 10_000_000))
+    config = make_config(tmp_path)
+
+    with pytest.raises(RunnerError, match="reloaded during cache-floor warm-up"):
+        run_experiment(
+            config,
+            client_factory=lambda _url: client,
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+
+    assert len(client.requests) == 2
+    run_dir = next(config.output_dir.iterdir())
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+    assert manifest["started_requests"] == 0
 
 
 @pytest.mark.parametrize("placement", [False, None])
@@ -436,8 +776,8 @@ def test_preflight_requires_confirmed_full_gpu_placement(
 
 
 def test_interrupt_stops_telemetry_and_preserves_partial_run(tmp_path: Path) -> None:
-    config = make_config(tmp_path, warmups=0, repetitions=1)
-    client = FakeClient(interrupt_at=1)
+    config = make_config(tmp_path, repetitions=1)
+    client = FakeClient(interrupt_at=5)
     sampler = FakeSampler()
 
     with pytest.raises(KeyboardInterrupt):
@@ -460,7 +800,7 @@ def test_interrupt_stops_telemetry_and_preserves_partial_run(tmp_path: Path) -> 
 
 
 def test_completed_run_writes_auditable_manifest_and_validation(tmp_path: Path) -> None:
-    config = make_config(tmp_path, warmups=0, repetitions=1, tariff=5.0)
+    config = make_config(tmp_path, repetitions=1, tariff=5.0)
 
     run_dir = run_experiment(
         config,
@@ -471,16 +811,18 @@ def test_completed_run_writes_auditable_manifest_and_validation(tmp_path: Path) 
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     validation = json.loads((run_dir / "validation.json").read_text(encoding="utf-8"))
     outputs = read_jsonl(run_dir / "outputs.jsonl")
-    assert manifest["schema_version"] == 1
+    assert manifest["schema_version"] == 2
     assert manifest["status"] == "completed"
     assert manifest["runtime"]["name"] == "ollama"
     assert manifest["runtime"]["version"] == "0.99.0-test"
     assert manifest["models"][0]["digest"] == DIGEST
     assert manifest["models"][0]["fully_on_gpu"] is True
+    assert manifest["models"][0]["template_cache_baseline_tokens"] == 0
     assert manifest["config_sha256"]
     assert manifest["prompt_set_sha256"]
     assert set(manifest["artifact_sha256"]) == {
         "config.resolved.toml",
+        "warmups.jsonl",
         "requests.jsonl",
         "outputs.jsonl",
         "telemetry.jsonl.gz",
@@ -488,3 +830,47 @@ def test_completed_run_writes_auditable_manifest_and_validation(tmp_path: Path) 
     assert validation["ok"] is True
     assert all(record["valid"] is True for record in outputs)
     assert all(record["metrics"]["gpu_energy_joules"] == 1.2 for record in outputs)
+
+
+def test_runtime_version_and_digest_pins_are_enforced_before_artifacts(tmp_path: Path) -> None:
+    config = replace(
+        make_config(tmp_path),
+        expected_runtime_version="0.34.2",
+        expected_model_digests={MODEL: DIGEST},
+    )
+
+    with pytest.raises(RunnerPreflightError, match="runtime version"):
+        run_experiment(
+            config,
+            client_factory=lambda _url: FakeClient(runtime_version="0.34.1"),
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+    assert not config.output_dir.exists()
+
+    with pytest.raises(RunnerPreflightError, match="digest"):
+        run_experiment(
+            config,
+            client_factory=lambda _url: FakeClient(runtime_version="0.34.2", digest="f" * 64),
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+    assert not config.output_dir.exists()
+
+
+def test_measured_model_reload_is_written_then_aborts_the_run(tmp_path: Path) -> None:
+    config = make_config(tmp_path, repetitions=1)
+    client = FakeClient(load_durations=(10_000_000,) * 4 + (3_000_000_000,))
+
+    with pytest.raises(RunnerError, match="reloaded"):
+        run_experiment(
+            config,
+            client_factory=lambda _url: client,
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+
+    run_dir = next(config.output_dir.iterdir())
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    outputs = read_jsonl(run_dir / "outputs.jsonl")
+    assert manifest["status"] == "failed"
+    assert len(outputs) == 1
+    assert outputs[0]["valid"] is False
+    assert "model_reloaded" in outputs[0]["invalid_reasons"]

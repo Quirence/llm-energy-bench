@@ -12,19 +12,29 @@ frozen research protocol.
 - `docs/experiment-log.md` is the append-only index of environment probes and
   validated hardware runs.
 - `docs/research-plan.md` and the approved design define the methodology.
+- `docs/pilot-baseline.md` pins the commit, runtime, digest, host configs and
+  commands used for comparable GPU acceptance runs.
 - Pull requests and Git history record reviewed implementation decisions.
 
 Do not report an environment probe as a validated experimental run. Do not
 change the model matrix, prompt set, metric definitions, or validity gates only
 to improve a result.
 
+## Current Freeze Gate
+
+PR #17 is the only open stabilization PR. Until it is approved, merged, and
+tagged `pilot-v1-code`, contributors should review that PR and prepare hardware
+only; they must not start result branches or publish local runs. PRs #18, #19,
+and #22 were reviewed and closed without merge, and their head branches were
+deleted after the useful requirements and observations were preserved.
+
 ## Current Owners
 
 | Contributor | Primary responsibility | Active work |
 | --- | --- | --- |
-| `@Quirence` | runner, validation, reporting, methodology, RTX 3050 pilot and RTX 5060 baseline | [Issues #3, #4, and #6](https://github.com/Quirence/llm-energy-bench/issues?q=is%3Aissue+is%3Aopen+assignee%3AQuirence) |
-| `@Qcsteeven` | NVML capability probing, telemetry lifecycle, energy-source fallback, RTX 4060 desktop study | [Issue #5](https://github.com/Quirence/llm-energy-bench/issues/5) and [Issue #6](https://github.com/Quirence/llm-energy-bench/issues/6) |
-| `@Skipl1` (Dimas) | Ollama preload/inventory, streaming generation, TTFT, model digest and GPU-placement checks | [Issue #7](https://github.com/Quirence/llm-energy-bench/issues/7) |
+| `@Quirence` | runner, validation, reporting, methodology and RTX 5060 baseline | [Issues #4 and #6](https://github.com/Quirence/llm-energy-bench/issues?q=is%3Aissue+is%3Aopen+assignee%3AQuirence) |
+| `@Qcsteeven` | NVML capability probing, telemetry lifecycle, energy-source fallback, RTX 4060 Ti desktop study | [Issue #5](https://github.com/Quirence/llm-energy-bench/issues/5) and [Issue #6](https://github.com/Quirence/llm-energy-bench/issues/6) |
+| `@Skipl1` (Dimas) | Ollama preload/inventory, streaming generation, TTFT, model digest and GPU-placement review | Runtime boundary review and GTX 1080 observation |
 
 CODEOWNERS reflects the module ownership. Shared schemas and methodology still
 require cross-review; ownership does not permit unilateral protocol changes.
@@ -58,7 +68,7 @@ git pull --ff-only
 git switch -c feat/<issue-number>-<short-name>
 ```
 
-Examples are `feat/5-rtx4060-study` and
+Examples are `feat/5-rtx4060ti-study` and
 `feat/7-ollama-runtime-validation`. Never develop directly on `main`.
 
 ## Pull Request Contract
@@ -79,9 +89,10 @@ merge.
 
 ## Dimas: Ollama Workstream
 
-Dimas starts from [Issue #7](https://github.com/Quirence/llm-energy-bench/issues/7)
-and treats `src/llm_energy_bench/ollama.py` plus `tests/test_ollama.py` as his
-primary boundary. The workstream covers:
+Dimas's [Issue #7](https://github.com/Quirence/llm-energy-bench/issues/7) work
+is integrated and the Issue is closed. His current action is to review the
+latest commit of PR #17; a prior comment on an older commit is not the required
+approval. The completed workstream covers:
 
 - model inventory, preload, resolved digest, and complete GPU placement;
 - streaming response parsing, TTFT, token counts, and runtime durations;
@@ -90,13 +101,20 @@ primary boundary. The workstream covers:
 - read-only `doctor` support and evidence needed by the measured pilot.
 
 The CLI must never pull a model automatically. A missing model is a preflight
-error. Dimas should coordinate before changing shared request/result schemas,
-the frozen model tags, prompt files, or benchmark configuration.
+error. Any later Ollama change starts with a new Issue from tagged `main`.
+Dimas should coordinate before changing shared request/result schemas, the
+frozen model tags, prompt files, or benchmark configuration.
 
 ## Hardware Coordination
 
-The final RTX 4060 run must use the same committed config, prompt hash, Ollama
-version, and model digests as the RTX 5060 run. Contributors may prepare a host
-and run `doctor` earlier, but a result is comparable only after these inputs are
-frozen and recorded. Invalid requests remain in raw artifacts with explicit
-reasons and are excluded from primary aggregates.
+The RTX 5060 and RTX 4060 Ti acceptance runs use the committed host configs and
+the `pilot-v1-code` tag described in `docs/pilot-baseline.md`. Contributors may
+prepare a host and run `doctor` earlier, but a result is comparable only after
+the commit, prompt hash, Ollama version and model digest are frozen and
+recorded. Invalid requests remain in raw artifacts with explicit reasons and
+are excluded from primary aggregates.
+
+Contributor observations made before the tag belong in
+`docs/diagnostic-observations.md`; they are not dataset rows. The GTX 1080 must
+use its committed `gtx1080-observation` identity and stays outside the primary
+matrix even when its run validates.

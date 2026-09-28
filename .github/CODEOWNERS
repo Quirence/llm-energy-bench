@@ -1,5 +1,5 @@
 # Default ownership for repository maintenance.
-* @Quirence
+* @Quirence @Qcsteeven @Skipl1
 
 # Measurement contracts and methodology require review by the other author.
 /src/llm_energy_bench/config.py @Quirence @Qcsteeven

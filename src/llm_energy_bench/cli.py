@@ -79,10 +79,21 @@ def doctor_environment(
             if runtime["available"]:
                 for model_name in config.models:
                     try:
-                        running = client.preload(model_name)
+                        running = client.preload(
+                            model_name,
+                            options={
+                                "num_ctx": config.options.num_ctx,
+                                "num_gpu": config.options.num_gpu,
+                            },
+                        )
                         record = running.to_dict()
                         record["requested"] = model_name
                         record["installed"] = True
+                        expected_digest = config.expected_model_digests.get(model_name)
+                        record["expected_digest"] = expected_digest
+                        record["digest_matches_expected"] = (
+                            expected_digest is not None and running.digest == expected_digest
+                        )
                         record["error"] = None
                     except ModelNotFound as error:
                         record = {
@@ -116,12 +127,19 @@ def doctor_environment(
         model.get("installed") is True
         and model.get("fully_on_gpu") is True
         and bool(model.get("digest"))
+        and model.get("digest_matches_expected") is True
         for model in models
+    )
+    runtime["expected_version"] = config.expected_runtime_version
+    runtime["version_matches_expected"] = (
+        config.expected_runtime_version is not None
+        and runtime["version"] == config.expected_runtime_version
     )
     report = {
         "schema_version": 1,
         "ok": (
             runtime["available"] is True
+            and runtime["version_matches_expected"] is True
             and gpu.get("available") is True
             and gpu.get("energy_source") != EnergySource.UNAVAILABLE.value
             and models_ok
@@ -131,6 +149,7 @@ def doctor_environment(
         "models": models,
         "controls": {
             "num_ctx": config.options.num_ctx,
+            "num_gpu": config.options.num_gpu,
             "kv_cache": config.options.kv_cache,
             "kv_cache_verification": "not_exposed_by_ollama_api",
             "concurrency": config.concurrency,
@@ -142,12 +161,15 @@ def doctor_environment(
 
 
 def _default_config_path() -> Path:
+    checkout_config = Path.cwd() / "configs" / "pilot.toml"
+    if checkout_config.is_file():
+        return checkout_config.resolve()
     return Path(__file__).resolve().parents[2] / "configs" / "pilot.toml"
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     try:
-        config = load_config(_default_config_path())
+        config = load_config(args.config or _default_config_path())
     except ConfigError as error:
         raise UsageError(str(error)) from error
 
@@ -261,6 +283,12 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = subparsers.add_parser(
         "doctor",
         help="Check Ollama, GPU, NVML capabilities, and model placement.",
+    )
+    doctor.add_argument(
+        "--config",
+        type=Path,
+        metavar="<experiment.toml>",
+        help="Experiment configuration file; defaults to configs/pilot.toml.",
     )
     doctor.add_argument(
         "--json",

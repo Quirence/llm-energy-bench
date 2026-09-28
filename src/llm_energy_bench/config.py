@@ -18,16 +18,18 @@ import hashlib
 import json
 import re
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
-DEFAULT_WARMUP_REQUESTS = 2
+DEFAULT_WARMUP_REQUESTS = 4
 DEFAULT_REPETITIONS = 3
 DEFAULT_ORDER_SEED = 42
 DEFAULT_TELEMETRY_INTERVAL_MS = 100
 DEFAULT_NUM_CTX = 4096
+DEFAULT_NUM_GPU = 999
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_INFERENCE_SEED = 42
 DEFAULT_KV_CACHE = "f16"
@@ -38,6 +40,7 @@ SUPPORTED_KV_CACHE = ("f16", "q8_0", "q4_0")
 # Identifiers reach file names, manifests, and published reports, so they are
 # restricted to characters that are safe everywhere and reveal nothing.
 IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+SHA256_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 class ConfigError(Exception):
@@ -88,6 +91,7 @@ class InferenceOptions:
     """Runtime controls passed to Ollama and recorded in the manifest."""
 
     num_ctx: int = DEFAULT_NUM_CTX
+    num_gpu: int = DEFAULT_NUM_GPU
     temperature: float = DEFAULT_TEMPERATURE
     seed: int = DEFAULT_INFERENCE_SEED
     num_predict: int | None = None
@@ -96,6 +100,7 @@ class InferenceOptions:
     def to_dict(self) -> dict[str, Any]:
         return {
             "num_ctx": self.num_ctx,
+            "num_gpu": self.num_gpu,
             "temperature": self.temperature,
             "seed": self.seed,
             "num_predict": self.num_predict,
@@ -123,6 +128,8 @@ class ExperimentConfig:
     tariff_per_kwh: float | None
     currency: str | None
     source_path: Path
+    expected_runtime_version: str | None = None
+    expected_model_digests: dict[str, str] = field(default_factory=dict)
 
     @property
     def cost_reporting_enabled(self) -> bool:
@@ -140,6 +147,8 @@ class ExperimentConfig:
             "host_id": self.host_id,
             "ollama_url": self.ollama_url,
             "models": list(self.models),
+            "expected_runtime_version": self.expected_runtime_version,
+            "expected_model_digests": dict(self.expected_model_digests),
             "gpu_index": self.gpu_index,
             "telemetry_interval_ms": self.telemetry_interval_ms,
             "warmup_requests": self.warmup_requests,
@@ -169,10 +178,18 @@ _SECTIONS: dict[str, set[str]] = {
         "warmup_requests",
         "order_seed",
     },
-    "runtime": {"ollama_url", "models"},
+    "runtime": {"ollama_url", "models", "expected_version", "expected_digests"},
     "gpu": {"index", "telemetry_interval_ms"},
     "prompts": {"path"},
-    "options": {"num_ctx", "temperature", "seed", "num_predict", "kv_cache", "concurrency"},
+    "options": {
+        "num_ctx",
+        "num_gpu",
+        "temperature",
+        "seed",
+        "num_predict",
+        "kv_cache",
+        "concurrency",
+    },
     "cost": {"tariff_per_kwh", "currency"},
 }
 _REQUIRED_SECTIONS = ("experiment", "runtime", "prompts")
@@ -211,6 +228,8 @@ def load_config(path: Path | str) -> ExperimentConfig:
     duplicates = sorted({m for m in models if models.count(m) > 1})
     if duplicates:
         raise ConfigError(f"[runtime] models contains duplicate entries: {', '.join(duplicates)}")
+    expected_runtime_version = _optional_nonempty_str(runtime, "expected_version", "runtime")
+    expected_model_digests = _expected_digests(runtime, models)
 
     concurrency = _as_int(options_table, "concurrency", "options", DEFAULT_CONCURRENCY)
     if concurrency != 1:
@@ -225,6 +244,8 @@ def load_config(path: Path | str) -> ExperimentConfig:
         output_dir=_as_path(experiment, "output_dir", "experiment", base),
         ollama_url=_as_url(runtime, "ollama_url", "runtime"),
         models=tuple(models),
+        expected_runtime_version=expected_runtime_version,
+        expected_model_digests=expected_model_digests,
         prompt_path=_as_path(raw["prompts"], "path", "prompts", base),
         gpu_index=_as_int(gpu, "index", "gpu", 0, minimum=0),
         telemetry_interval_ms=_as_int(
@@ -257,6 +278,7 @@ def _load_options(table: dict[str, Any]) -> InferenceOptions:
 
     return InferenceOptions(
         num_ctx=_as_int(table, "num_ctx", "options", DEFAULT_NUM_CTX, minimum=1),
+        num_gpu=_as_int(table, "num_gpu", "options", DEFAULT_NUM_GPU, minimum=1),
         temperature=_as_float(table, "temperature", "options", DEFAULT_TEMPERATURE, minimum=0.0),
         seed=_as_int(table, "seed", "options", DEFAULT_INFERENCE_SEED),
         num_predict=num_predict,
@@ -470,7 +492,42 @@ def _as_url(table: dict[str, Any], key: str, section: str) -> str:
     value = _as_str(table, key, section)
     if not value.startswith(("http://", "https://")):
         raise ConfigError(f"[{section}]: {key} must start with http:// or https://, got {value!r}")
+    parsed = urlsplit(value)
+    if parsed.username is not None or parsed.password is not None:
+        raise ConfigError(f"[{section}]: {key} must not contain credentials")
+    if not parsed.hostname:
+        raise ConfigError(f"[{section}]: {key} must contain a host, got {value!r}")
     return value.rstrip("/")
+
+
+def _optional_nonempty_str(table: dict[str, Any], key: str, section: str) -> str | None:
+    value = table.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise _wrong_type(key, section, "a non-empty string", value)
+    return value.strip()
+
+
+def _expected_digests(table: dict[str, Any], models: list[str]) -> dict[str, str]:
+    value = table.get("expected_digests")
+    if value is None:
+        return {}
+    if not isinstance(value, dict) or not all(
+        isinstance(name, str) and isinstance(digest, str) for name, digest in value.items()
+    ):
+        raise _wrong_type(
+            "expected_digests", "runtime", "a table mapping model names to SHA-256 strings", value
+        )
+    if set(value) != set(models):
+        raise ConfigError("[runtime]: expected_digests must cover exactly the configured models")
+    invalid = sorted(name for name, digest in value.items() if not SHA256_PATTERN.fullmatch(digest))
+    if invalid:
+        raise ConfigError(
+            "[runtime]: expected_digests values must be full 64-character SHA-256 hex strings; "
+            f"invalid models: {', '.join(invalid)}"
+        )
+    return {name: digest.lower() for name, digest in value.items()}
 
 
 def _as_path(table: dict[str, Any], key: str, section: str, base: Path) -> Path:

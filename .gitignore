@@ -23,6 +23,7 @@ env/
 *.log
 experiments/.staging/
 experiments/tmp/
+configs/*.local.toml
 
 # Jupyter
 .ipynb_checkpoints/

@@ -1,95 +1,75 @@
 # Project Status
 
-Last updated: 2026-09-20
+Last updated: 2026-09-28
 
 ## Current Milestone
 
-M1 — Measured Pilot. Tasks 1–7 and Task 9 are implemented; Task 8 remains.
+M1 — Measured Pilot. The implementation is in final stabilization on PR #17;
+no publishable dataset exists yet.
 
 ## Done
 
-- Research question and failure condition documented.
-- MVP architecture and data flow approved.
-- Initial model and quantization matrix fixed.
-- Parallel implementation from Qcsteeven and Dimas reviewed and integrated
-  into `main` while preserving both contributors' commits.
-- CODEOWNERS plus reproducible bug, experiment, and pull-request templates
-  enforce the two-author review workflow in the repository.
-- The versioned collaboration guide maps `@Qcsteeven` to NVML/RTX 4060 work
-  and `@Skipl1` (Dimas) to the Ollama runtime boundary and Issue #7.
-- Public GitHub milestones `M0 Bootstrap`, `M1 Measured Pilot`, `M2 Two-GPU
-  Study`, and `M3 Paper Dataset` track the delivery stages.
-- `main` requires a pull request, one approval, CODEOWNERS review, successful
-  Windows and Linux CI, resolved conversations, and linear history. Force
-  pushes and branch deletion are disabled, including for administrators.
-- Detailed implementation plan prepared.
-- Task 1 (Qcsteeven): package shell, `doctor`/`run`/`report` parsing, fixed
-  exit codes, packaging, and Windows/Linux CI.
-- Task 2 (Qcsteeven): strict experiment config and prompt-set contracts plus
-  the six-prompt RTX 3050 pilot inputs.
-- Task 3 (Qcsteeven): atomic raw-result writers, gzip telemetry, checksums,
-  privacy guards, run directories, and basic validation.
-- Task 4 (Dimas): read-only Ollama inventory/preload and streaming inference
-  measurements, including TTFT, placement, digests, and partial failures.
-- Task 5 (Qcsteeven): NVML capability probe and request-scoped telemetry
-  sampler with total-energy/instant-power/legacy-power fallback.
-- Task 6: deterministic warm experiment runner, cache contamination handling,
-  request metrics, partial-run preservation, and semantic validation.
-- Task 7: read-only environment diagnosis, CLI execution path, validation
-  summaries, aggregate CSV/Markdown reports, quality floor, and speed/energy
-  ranking comparison.
-- Task 9: frozen four-configuration `benchmark-v1` matrix, 24-prompt workload,
-  repeatability CV, bootstrap materiality rule, and explicit negative-result
-  decision criterion.
-- Issue #7 (Dimas): the Ollama runtime path is validated against a live
-  Ollama 0.34.2 server. `doctor` reports the real version, digest and
-  full-VRAM placement, and a streaming request completes end to end. The
-  observation is recorded in `docs/ollama-runtime-observations.md`.
-- Integrated test baseline: 239 tests pass on Python 3.12 without Ollama or
-  NVIDIA hardware.
+- The Python 3.12 CLI implements `doctor`, `run`, and `report` with stable exit
+  codes and 299 Windows/Linux hardware-independent tests.
+- Strict TOML and prompt contracts, Ollama streaming/TTFT, full-GPU placement,
+  request-scoped NVML telemetry, power-source fallbacks, atomic artifacts,
+  privacy guards, and aggregate reports are implemented.
+- The pilot model is pinned to Ollama 0.34.2 and digest
+  `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72`.
+- Before any publishable data was collected, the two-host protocol was amended
+  to the hardware actually available: RTX 5060 Laptop and RTX 4060 Ti desktop.
+  GTX 1080 has a committed observation-only pilot config.
+- Schema v2 records four excluded warm-ups. The first is a cold-start
+  exclusion; the minimum cached count from the next three is the auditable
+  template floor.
+- At most one cache token above that floor is accepted for the unique marker
+  boundary. Raw, cached, and uncached prompt-token counts remain distinct.
+- A model load longer than 100 ms in a cache-floor warm-up or measured request
+  is invalid and aborts the launch; runtime failures also abort instead of
+  contaminating later requests.
+- Validation fails closed on unknown schemas and independently checks frozen
+  runtime/digests, placement, warm-up floor, request counts, manifest counters,
+  hashes, telemetry order/coverage, cache excess, load duration, and energy.
+- Reports exclude entire invalid runs and rank configurations only within one
+  `host_id × prompt category` block.
+- Contributions from Qcsteeven and Dimas are integrated and attributed in
+  `docs/project-state-for-owner.md`. Their later hardware observations are
+  preserved separately as diagnostic evidence.
 
 ## In Progress
 
-- Task 8: validate the complete path with a real NVIDIA GPU and Ollama model.
-- Agreeing the prompt-cache validity rule the Issue #7 observation makes
-  necessary.
+- PR #17 must receive collaborator approval and green Windows/Linux CI after
+  the final stabilization commits are pushed.
+- The 2026-09-28 RTX 5060 preflight passed NVML, digest and full-placement
+  checks but found Ollama 0.34.4 instead of the frozen 0.34.2. The host must use
+  the frozen runtime, or the protocol version must be amended for every host
+  before any publishable pilot is launched.
+- PRs #18, #19, and #22 were reviewed and closed without merge. Their useful
+  requirements and diagnostic evidence are preserved, but their local runs
+  predate schema v2 and remain excluded from the research dataset.
 
-## Next
+## Next Acceptance Gate
 
-- Decide the cached-token rule and the cache-buster shape, then Task 8:
-  RTX 3050 hardware pilot.
+1. Merge PR #17 by squash after one collaborator approval and both CI jobs.
+2. Tag the exact merge commit `pilot-v1-code`.
+3. Have all three contributors pull that tag and execute their committed
+   primary or observation config without code or protocol changes.
+4. Accept only runs with `validation.json: ok=true` and all 18 measured
+   requests valid.
+5. Freeze all four benchmark model digests before enabling `benchmark-v1`.
 
-## Blockers
+## Open Research Work
 
-- **Every measured request is currently invalid.** Ollama reuses the chat
-  template preamble, so `prompt_eval_cached_count` never drops below about 20
-  tokens after the first request, while `runner.py` and `results.py` invalidate
-  any request with a non-zero cached count. Measured on a live 0.34.2 server;
-  the floor is constant across prompt bodies and lengths. A pilot cannot
-  produce valid data until the rule distinguishes the template floor from real
-  contamination.
-- **The cache buster leaks a shared prefix.** Request IDs share a long
-  run-specific head that Ollama caches: 46 of 69 prompt tokens came from cache
-  on a short prompt, so prefill was measured on a fraction of the prompt. The
-  per-request entropy has to come first.
-- Both are documented with evidence and a proposed fix in
-  `docs/ollama-runtime-observations.md` and await review by the owners of
-  `runner.py` and `results.py`.
-- End-to-end hardware validation on a matrix GPU is still pending. The Ollama
-  runtime path itself is now validated on real hardware, but only on a GTX
-  1080 observation host that is outside the research matrix.
-- The official Ollama 0.34.2 installer download timed out repeatedly from
-  GitHub on the RTX 3050 host. It installed without trouble on the GTX 1080
-  observation host, so the download, not the package, is the obstacle there.
-- Real NVML probing succeeds on the RTX 3050 and exposes all requested fields.
-  Driver 572.83 reports an inconsistent total-energy counter, so the new
-  per-request sanity check correctly falls back to instantaneous power
-  integration; this still needs validation under model load.
+- RTX 5060 and RTX 4060 Ti publishable pilots plus three independent
+  calibration launches on each primary host.
+- A schema-v2 GTX 1080 observation run, kept outside the primary comparison.
+- A corrected implementation of the rank-inversion analysis after clean,
+  compatible campaign data exists. PR #18 is not the frozen implementation.
+- External wattmeter validation remains outside MVP; all reported energy and
+  cost values are GPU-only estimates.
 
 ## Latest Validated Run
 
-No experimental runs yet. Task 8 is the first measured run. The GTX 1080
-observation of 2026-09-20 exercised the runtime path end to end, but it used a
-non-matrix GPU and three prompts instead of the frozen protocol, and all three
-of its requests were rejected by the cached-token rule. It is an observation,
-not a run.
+No publishable run yet. RTX 5060 Laptop, RTX 4060 Ti, and GTX 1080 local runs
+were useful diagnostics, but they predate the final schema-v2 tag or contain
+known validity failures and therefore are excluded from the research dataset.

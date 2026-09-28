@@ -35,11 +35,33 @@ def test_doctor_parses_without_arguments() -> None:
     args = cli.build_parser().parse_args(["doctor"])
     assert args.command == "doctor"
     assert args.json is False
+    assert args.config is None
 
 
 def test_doctor_parses_json_flag() -> None:
     args = cli.build_parser().parse_args(["doctor", "--json"])
     assert args.json is True
+
+
+def test_doctor_accepts_an_explicit_host_config(tmp_path: Path) -> None:
+    config = tmp_path / "pilot-host.toml"
+    args = cli.build_parser().parse_args(["doctor", "--config", str(config)])
+
+    assert args.config == config
+
+
+def test_default_doctor_config_prefers_repository_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = tmp_path / "configs" / "pilot.toml"
+    expected.parent.mkdir()
+    expected.write_text("[experiment]\n", encoding="utf-8")
+    installed_module = tmp_path / ".venv" / "Lib" / "site-packages" / "llm_energy_bench" / "cli.py"
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "__file__", str(installed_module))
+
+    assert cli._default_config_path() == expected.resolve()
 
 
 def test_run_requires_a_config(capsys: pytest.CaptureFixture[str]) -> None:
@@ -79,6 +101,18 @@ def test_doctor_command_emits_json_and_returns_report_status(
 
     assert cli.main(["doctor", "--json"]) == cli.EXIT_OK
     assert json.loads(capsys.readouterr().out)["ok"] is True
+
+
+def test_doctor_command_loads_the_explicit_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    selected = tmp_path / "pilot-host.toml"
+    loaded: list[Path] = []
+    monkeypatch.setattr(cli, "load_config", lambda path: loaded.append(path) or object())
+    monkeypatch.setattr(cli, "doctor_environment", lambda _config: {"ok": True, "gpu": {}})
+
+    assert cli.main(["doctor", "--config", str(selected), "--json"]) == cli.EXIT_OK
+    assert loaded == [selected]
 
 
 def test_run_command_returns_validation_failure_without_hiding_artifacts(

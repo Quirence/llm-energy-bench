@@ -1,5 +1,5 @@
 # Frozen two-host study protocol. Change host_id only when copying this file
-# for the RTX 4060 host; all measurement controls must remain identical.
+# for the RTX 4060 Ti host; all measurement controls must remain identical.
 #
 # 24 prompts x 5 repetitions x 4 configurations = 480 measured requests.
 
@@ -8,7 +8,7 @@ id = "benchmark-v1"
 host_id = "maibenben-x16c"
 output_dir = "../experiments/runs"
 repetitions = 5
-warmup_requests = 2
+warmup_requests = 4
 order_seed = 42
 
 [runtime]
@@ -19,6 +19,9 @@ models = [
     "llama3.2:3b-instruct-q4_K_M",
     "llama3.2:3b-instruct-q8_0",
 ]
+expected_version = "0.34.2"
+# Before benchmark-v1 becomes executable, add expected_digests for all four
+# installed tags. The runner intentionally rejects an unpinned model set.
 
 [gpu]
 index = 0
@@ -29,6 +32,8 @@ path = "../prompts/benchmark-v1.jsonl"
 
 [options]
 num_ctx = 4096
+# Force all layers onto the selected GPU; placement is verified through /api/ps.
+num_gpu = 999
 temperature = 0.0
 seed = 42
 num_predict = 256

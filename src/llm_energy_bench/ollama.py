@@ -337,11 +337,17 @@ class OllamaClient:
         self._remember_digests(models)
         return models
 
-    def preload(self, model: str) -> RunningModel:
+    def preload(
+        self,
+        model: str,
+        *,
+        options: Mapping[str, Any] | None = None,
+    ) -> RunningModel:
         """Load an installed model into memory and report where it landed.
 
         Raises ``ModelNotFound`` when the model is not installed; it is never
-        downloaded.
+        downloaded. Load-affecting options must match measured generation so
+        placement is checked for the runner configuration that will be used.
         """
         available = _find(self.list_models(), model)
         if available is None:
@@ -350,9 +356,10 @@ class OllamaClient:
                 f"pull it manually (ollama pull {model}) and record why"
             )
 
-        response = self._send(
-            "POST", "/api/generate", json={"model": available.name, "stream": False}
-        )
+        payload: dict[str, Any] = {"model": available.name, "stream": False}
+        if options:
+            payload["options"] = dict(options)
+        response = self._send("POST", "/api/generate", json=payload)
         if response.status_code == httpx.codes.NOT_FOUND:
             raise ModelNotFound(f"Ollama could not load {model!r}: {_error_message(response)}")
         if response.status_code != httpx.codes.OK:
