@@ -20,6 +20,14 @@ Do not report an environment probe as a validated experimental run. Do not
 change the model matrix, prompt set, metric definitions, or validity gates only
 to improve a result.
 
+## Current Freeze Gate
+
+PR #17 is the only open stabilization PR. Until it is approved, merged, and
+tagged `pilot-v1-code`, contributors should review that PR and prepare hardware
+only; they must not start result branches or publish local runs. PRs #18, #19,
+and #22 were reviewed and closed without merge, and their head branches were
+deleted after the useful requirements and observations were preserved.
+
 ## Current Owners
 
 | Contributor | Primary responsibility | Active work |
@@ -81,9 +89,10 @@ merge.
 
 ## Dimas: Ollama Workstream
 
-Dimas starts from [Issue #7](https://github.com/Quirence/llm-energy-bench/issues/7)
-and treats `src/llm_energy_bench/ollama.py` plus `tests/test_ollama.py` as his
-primary boundary. The workstream covers:
+Dimas's [Issue #7](https://github.com/Quirence/llm-energy-bench/issues/7) work
+is integrated and the Issue is closed. His current action is to review the
+latest commit of PR #17; a prior comment on an older commit is not the required
+approval. The completed workstream covers:
 
 - model inventory, preload, resolved digest, and complete GPU placement;
 - streaming response parsing, TTFT, token counts, and runtime durations;
@@ -92,8 +101,9 @@ primary boundary. The workstream covers:
 - read-only `doctor` support and evidence needed by the measured pilot.
 
 The CLI must never pull a model automatically. A missing model is a preflight
-error. Dimas should coordinate before changing shared request/result schemas,
-the frozen model tags, prompt files, or benchmark configuration.
+error. Any later Ollama change starts with a new Issue from tagged `main`.
+Dimas should coordinate before changing shared request/result schemas, the
+frozen model tags, prompt files, or benchmark configuration.
 
 ## Hardware Coordination
 
