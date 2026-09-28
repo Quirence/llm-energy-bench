@@ -47,6 +47,18 @@ def test_issue_and_pull_request_templates_cover_reproducible_work() -> None:
     assert "private" in pull_request.lower()
 
 
+def test_experiment_artifacts_are_checked_out_byte_exact() -> None:
+    attributes_path = REPO_ROOT / ".gitattributes"
+
+    assert attributes_path.is_file()
+    rules = {
+        line.strip()
+        for line in attributes_path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    assert "experiments/runs/** -text" in rules
+
+
 def test_contributor_workstreams_are_versioned() -> None:
     collaboration_path = REPO_ROOT / "docs" / "collaboration.md"
     assert collaboration_path.is_file()

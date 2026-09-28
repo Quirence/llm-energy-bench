@@ -17,8 +17,10 @@ section below and are never counted as experimental runs.
 
 ## Validated Experimental Runs
 
-None yet. The first publishable entry will be the RTX 5060 Laptop `pilot-v1`
-run repeated from the reviewed, merged implementation.
+No primary-matrix run has been published yet. The first such entry will be the
+RTX 5060 Laptop `pilot-v1` run repeated from the reviewed, merged implementation.
+Observation-only launches are recorded below but cannot enter the primary
+decision blocks.
 
 ### 2026-09-28 — GTX 1080 pilot-v1 observation launch (before the tag)
 
