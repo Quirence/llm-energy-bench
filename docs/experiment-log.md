@@ -216,3 +216,18 @@ run repeated from the reviewed, merged implementation.
 - Decision: do not launch or publish the pilot under mixed runtime versions.
   Use the frozen 0.34.2 runtime on every host, or approve one protocol-wide
   amendment and repeat preflight everywhere.
+
+### 2026-09-28 — Prospective host-matrix amendment
+
+- Timing: the amendment was made before `pilot-v1-code` was tagged and before
+  any publishable run existed.
+- Evidence: the contributor machine available for the second primary campaign
+  is an RTX 4060 Ti desktop, not the originally anticipated RTX 4060 desktop.
+- Decision: name RTX 5060 Laptop and RTX 4060 Ti desktop as the two primary
+  hosts. Do not alias one GPU model as the other.
+- Additional host: GTX 1080 receives a committed observation-only pilot config
+  with the same runtime, model, prompt, and inference controls. It remains
+  outside the primary two-host decision blocks.
+- Historical data: all earlier RTX 4060 Ti and GTX 1080 local launches remain
+  diagnostics. The amendment does not retroactively validate them; every
+  accepted run must be repeated from the tagged schema-v2 baseline.

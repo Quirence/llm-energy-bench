@@ -21,7 +21,7 @@ research comparison begins.
 
 ### Main Matrix
 
-- GPUs: MAIBENBEN X16C RTX 5060 Laptop and RTX 4060 desktop;
+- GPUs: MAIBENBEN X16C RTX 5060 Laptop and RTX 4060 Ti desktop;
 - runtime: Ollama, with one pinned version for the campaign;
 - models/quantizations:
   - `qwen3:4b-instruct-2507-q4_K_M`;
@@ -44,9 +44,14 @@ The four tags were rechecked against the official
 [Llama 3.2](https://ollama.com/library/llama3.2/tags) registries on
 2026-09-19. Tags are configuration names, not immutable identities, so this
 check does not replace the digest captured by each run. The checked-in
-`benchmark-v1.toml` is the MAIBENBEN copy; the RTX 4060 copy changes only
+`benchmark-v1.toml` is the MAIBENBEN copy; the RTX 4060 Ti copy changes only
 `host_id`, while prompt, runtime, model, GPU-sampling, and inference controls
 remain byte-for-byte equivalent.
+
+The originally planned RTX 4060 desktop was replaced prospectively by the
+actually available RTX 4060 Ti desktop on 2026-09-28, before any publishable
+run existed. GTX 1080 uses the same pilot workload only as an observation host;
+it is not included in the primary two-host decision blocks.
 
 ## Core Metrics
 

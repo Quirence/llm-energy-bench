@@ -506,6 +506,33 @@ def test_the_pilot_produces_the_eighteen_records_task_8_expects() -> None:
     assert len(prompts) * config.repetitions * len(config.models) == 18
 
 
+@pytest.mark.parametrize(
+    ("filename", "experiment_id", "host_id"),
+    [
+        ("pilot-rtx5060.toml", "pilot-v1", "maibenben-x16c-rtx5060"),
+        ("pilot-rtx4060ti.toml", "pilot-v1", "rtx4060ti-desktop"),
+        ("pilot-gtx1080-observation.toml", "pilot-v1-observation", "gtx1080-observation"),
+    ],
+)
+def test_each_confirmed_gpu_has_a_frozen_pilot_config(
+    filename: str, experiment_id: str, host_id: str
+) -> None:
+    config = load_config(REPO_ROOT / "configs" / filename)
+    prompts = load_prompts(config.prompt_path)
+
+    assert config.experiment_id == experiment_id
+    assert config.host_id == host_id
+    assert config.expected_runtime_version == "0.34.2"
+    assert config.expected_model_digests == {
+        "llama3.2:3b-instruct-q4_K_M": DIGEST,
+    }
+    assert len(prompts) * config.repetitions * len(config.models) == 18
+
+
+def test_the_unconfirmed_rtx4060_host_config_is_not_shipped() -> None:
+    assert not (REPO_ROOT / "configs" / "pilot-rtx4060.toml").exists()
+
+
 # --------------------------------------------------------------------------
 # Frozen benchmark-v1 artifacts
 # --------------------------------------------------------------------------

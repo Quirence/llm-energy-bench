@@ -216,25 +216,26 @@ request metrics for latency, throughput, power, energy, efficiency, and cost.
 - [x] Run focused tests and verify success.
 - [x] Commit as `feat: add environment doctor and reports`.
 
-### Task 8: RTX 3050 hardware pilot
+### Task 8: tagged three-host pilot acceptance
 
 **Files:**
 
-- Add one run under `experiments/runs/`
+- Add reviewed runs under `experiments/runs/`
 - Create or append `docs/experiment-log.md`
 - Update `STATUS.md`
 
-- [ ] Install and record one Ollama version without enabling mid-campaign
-  updates.
-- [ ] Pull `llama3.2:3b-instruct-q4_K_M` manually.
-- [ ] Run `python -m llm_energy_bench doctor --config configs/pilot.toml --json`
-  and confirm 100% GPU.
-- [ ] Run `python -m llm_energy_bench run --config configs/pilot.toml`.
-- [ ] Verify 18 measured request records, positive energy for valid requests,
-  telemetry coverage, hashes, and validation status.
+- [ ] Tag the reviewed PR #17 merge commit as `pilot-v1-code`.
+- [ ] Install and record Ollama 0.34.2 on every host without mid-campaign
+  updates; pull the pinned Q4 model manually.
+- [ ] Run `doctor` with each committed host config and confirm version, digest,
+  energy source, and 100% GPU placement.
+- [ ] Run and validate three independent launches on RTX 5060 and RTX 4060 Ti;
+  run one explicitly observation-only launch on GTX 1080.
+- [ ] Verify 18 measured request records per launch, positive energy for valid
+  requests, telemetry coverage, hashes, and validation status.
 - [ ] Regenerate the report and confirm deterministic output.
 - [ ] Run the complete `ruff check .` and `pytest` suite.
-- [ ] Commit as `data: add RTX 3050 pilot run`.
+- [ ] Commit each host's artifacts on its result branch and obtain cross-review.
 
 ### Task 9: Two-host benchmark preparation
 
@@ -253,5 +254,6 @@ request metrics for latency, throughput, power, energy, efficiency, and cost.
 ## Completion Criteria
 
 The MVP is complete only when CI passes, the public repository workflow is in
-place, the RTX 3050 pilot validates, all raw artifacts are auditable, and the
-same frozen benchmark config is ready for RTX 5060 Laptop and RTX 4060 desktop.
+place, the RTX 5060 and RTX 4060 Ti pilots validate, all raw artifacts are
+auditable, and the same frozen benchmark controls are ready for both primary
+hosts. GTX 1080 remains an observation-only acceptance host.

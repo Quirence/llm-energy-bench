@@ -8,8 +8,9 @@ verdict.
 
 ## RTX 4060 Ti desktop — Qcsteeven (Lev)
 
-- Distinct observation host: `rtx4060ti-desktop-observation`. It must not reuse
-  the frozen `rtx4060-desktop` identity.
+- Historical pre-freeze identity: `rtx4060ti-desktop-observation`. The reviewed
+  protocol now names the actual RTX 4060 Ti as the second primary host, but
+  this does not retroactively validate the old local artifacts.
 - Ollama 0.34.2 and the pilot Q4 model were observed fully placed on the GPU.
 - Three local pilot launches produced 54/54 requests accepted by the then
   current validator.
@@ -20,8 +21,8 @@ verdict.
   earlier attempt. That attempt is contamination evidence, not repeatability
   evidence.
 - No speed/energy ranking or hypothesis conclusion from these local artifacts
-  is retained. The hardware differs from the RTX 4060 named by the frozen
-  protocol, and the artifacts are not reviewable in the repository.
+  is retained. They predate the final schema and are not reviewable in the
+  repository; the primary run must be repeated from the tagged baseline.
 
 ## GTX 1080 — Skipl1 (Dimas)
 

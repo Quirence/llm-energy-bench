@@ -1,8 +1,8 @@
-# Pilot experiment: RTX 3050 Laptop smoke run.
+# Generic one-model technical smoke config used by default `doctor`.
 #
-# This configuration validates the measurement pipeline end to end. It is not
-# part of the research conclusions: the RTX 3050 is a technical smoke test, and
-# the two-host comparison uses configs/benchmark-v1.toml.
+# This is not a host-specific publication config. Primary and observation data
+# must use the committed GPU-specific configs; the two-host comparison uses
+# configs/benchmark-v1.toml.
 #
 # 6 prompts x 3 repetitions x 1 model = 18 measured requests.
 

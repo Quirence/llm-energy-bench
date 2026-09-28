@@ -46,13 +46,23 @@ Pull the model manually if necessary. The benchmark never downloads weights:
 ollama pull llama3.2:3b-instruct-q4_K_M
 ```
 
+Before every independent launch, keep the machine on AC power, use the same
+documented OS/performance and cooling profile, close avoidable GPU workloads,
+and let the GPU return to a stable idle state. Record any unavoidable change
+in `docs/experiment-log.md`; never hide it by editing raw artifacts. A safe
+hardware identity check that does not expose GPU UUIDs is:
+
+```text
+nvidia-smi --query-gpu=name,driver_version,memory.total,power.limit --format=csv,noheader
+```
+
 ## Host assignments
 
 | Contributor | Host | Config | Result branch |
 | --- | --- | --- | --- |
 | Quirence | RTX 5060 Laptop | `configs/pilot-rtx5060.toml` | `experiment/rtx5060-pilot-v1` |
-| Qcsteeven | RTX 4060 desktop | `configs/pilot-rtx4060.toml` | `experiment/rtx4060-pilot-v1` |
-| Skipl1 | other GPU | copy of the closest pilot config, clearly labelled observation-only | `experiment/<gpu>-observation` |
+| Qcsteeven | RTX 4060 Ti desktop | `configs/pilot-rtx4060ti.toml` | `experiment/rtx4060ti-pilot-v1` |
+| Skipl1 | GTX 1080 | `configs/pilot-gtx1080-observation.toml` | `experiment/gtx1080-observation` |
 
 ## Preflight and run
 
@@ -63,7 +73,8 @@ Use the host's committed config in both commands:
 .venv\Scripts\python -m llm_energy_bench run --config configs/pilot-rtx5060.toml
 ```
 
-Qcsteeven substitutes `configs/pilot-rtx4060.toml`. A run is publishable only
+Qcsteeven substitutes `configs/pilot-rtx4060ti.toml`; Skipl1 uses
+`configs/pilot-gtx1080-observation.toml`. A run is acceptable only
 when `doctor` confirms the frozen runtime, digest and full placement, the CLI
 returns success, `validation.json` reports `ok: true`, and all 18 measured
 requests are valid. Raw output must retain the energy source and any fallback
@@ -72,16 +83,36 @@ manifest floor, cached-token excess must be at most one, and no measured
 `load_duration` may exceed 100 ms. Warm-ups two through four must also stay at
 or below 100 ms so the cache floor cannot be established across a model reload.
 
-Create the result branch from the tag before adding artifacts:
+The RTX 5060 and RTX 4060 Ti runs are primary pilot data. The GTX 1080 run is
+observation-only even when it passes the same technical validation; it cannot
+be silently added to the primary decision blocks.
+
+After the first valid run, each primary host repeats the exact command twice
+more as independent launches. These three run directories provide the
+pre-registered repeatability CV. Do not change the environment between them.
+Run and validate one launch at a time; do not use a loop that continues after
+a failure. GTX 1080 produces one required observation launch and may repeat it
+only when explicitly labelled as observation repeatability.
+
+Create the assigned result branch from the tag before adding artifacts. Run
+exactly one of these commands:
 
 ```text
-git switch -c experiment/<host>-pilot-v1 pilot-v1-code
+git switch -c experiment/rtx5060-pilot-v1 pilot-v1-code
+git switch -c experiment/rtx4060ti-pilot-v1 pilot-v1-code
+git switch -c experiment/gtx1080-observation pilot-v1-code
+```
+
+Then add only the run artifacts and append-only log entry:
+
+```text
 git add experiments/runs/<run-id> docs/experiment-log.md
 git commit -m "data: add <host> pilot-v1 run"
 git push -u origin experiment/<host>-pilot-v1
 ```
 
 Open a pull request and request review from another contributor. Do not change
-code, prompts, configs or validity rules in a result PR. If any frozen input
-differs, preserve the local output for diagnosis but do not publish it as a
-comparable run.
+code, prompts, configs or validity rules in a result PR. In the final push
+command, use the exact branch created above (including the GTX 1080 observation
+name). If any frozen input differs, preserve the local output for diagnosis
+but do not publish it as a comparable run.

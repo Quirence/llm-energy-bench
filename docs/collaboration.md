@@ -33,8 +33,8 @@ deleted after the useful requirements and observations were preserved.
 | Contributor | Primary responsibility | Active work |
 | --- | --- | --- |
 | `@Quirence` | runner, validation, reporting, methodology and RTX 5060 baseline | [Issues #4 and #6](https://github.com/Quirence/llm-energy-bench/issues?q=is%3Aissue+is%3Aopen+assignee%3AQuirence) |
-| `@Qcsteeven` | NVML capability probing, telemetry lifecycle, energy-source fallback, RTX 4060 desktop study | [Issue #5](https://github.com/Quirence/llm-energy-bench/issues/5) and [Issue #6](https://github.com/Quirence/llm-energy-bench/issues/6) |
-| `@Skipl1` (Dimas) | Ollama preload/inventory, streaming generation, TTFT, model digest and GPU-placement review | Runtime boundary review and optional observation hosts |
+| `@Qcsteeven` | NVML capability probing, telemetry lifecycle, energy-source fallback, RTX 4060 Ti desktop study | [Issue #5](https://github.com/Quirence/llm-energy-bench/issues/5) and [Issue #6](https://github.com/Quirence/llm-energy-bench/issues/6) |
+| `@Skipl1` (Dimas) | Ollama preload/inventory, streaming generation, TTFT, model digest and GPU-placement review | Runtime boundary review and GTX 1080 observation |
 
 CODEOWNERS reflects the module ownership. Shared schemas and methodology still
 require cross-review; ownership does not permit unilateral protocol changes.
@@ -68,7 +68,7 @@ git pull --ff-only
 git switch -c feat/<issue-number>-<short-name>
 ```
 
-Examples are `feat/5-rtx4060-study` and
+Examples are `feat/5-rtx4060ti-study` and
 `feat/7-ollama-runtime-validation`. Never develop directly on `main`.
 
 ## Pull Request Contract
@@ -107,7 +107,7 @@ frozen model tags, prompt files, or benchmark configuration.
 
 ## Hardware Coordination
 
-The RTX 5060 and RTX 4060 acceptance runs use the committed host configs and
+The RTX 5060 and RTX 4060 Ti acceptance runs use the committed host configs and
 the `pilot-v1-code` tag described in `docs/pilot-baseline.md`. Contributors may
 prepare a host and run `doctor` earlier, but a result is comparable only after
 the commit, prompt hash, Ollama version and model digest are frozen and
@@ -115,7 +115,6 @@ recorded. Invalid requests remain in raw artifacts with explicit reasons and
 are excluded from primary aggregates.
 
 Contributor observations made before the tag belong in
-`docs/diagnostic-observations.md`; they are not dataset rows. Do not reuse the
-frozen `rtx4060-desktop` host ID for an RTX 4060 Ti or another GPU. Create an
-explicit observation-only host ID unless a reviewed protocol amendment changes
-the primary matrix.
+`docs/diagnostic-observations.md`; they are not dataset rows. The GTX 1080 must
+use its committed `gtx1080-observation` identity and stays outside the primary
+matrix even when its run validates.

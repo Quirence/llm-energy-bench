@@ -1,6 +1,7 @@
 # llm-energy-bench MVP Design
 
-Status: approved for implementation planning on 2026-09-19.
+Status: approved for implementation planning on 2026-09-19; host matrix
+amended prospectively on 2026-09-28 before publishable data collection.
 
 ## Purpose
 
@@ -19,10 +20,10 @@ The primary comparison covers two Windows hosts:
 
 - MAIBENBEN X16C with RTX 5060 Laptop GPU as the main development and
   experiment host;
-- RTX 4060 desktop as the second host.
+- RTX 4060 Ti desktop as the second host.
 
-The currently available RTX 3050 Laptop GPU is used only for a technical
-smoke run. It is not part of the main research conclusions.
+RTX 3050 Laptop and GTX 1080 may be used only for technical smoke or
+observation runs. They are not part of the main research conclusions.
 
 The initial runtime is Ollama. llama.cpp may be added only after a validated
 Ollama pilot. vLLM, web dashboards, databases, FastAPI, Django, and external
@@ -37,7 +38,7 @@ The main two-host experiment uses exactly these Ollama tags:
 - `llama3.2:3b-instruct-q4_K_M`;
 - `llama3.2:3b-instruct-q8_0`.
 
-The RTX 3050 smoke run uses only
+The RTX 3050 smoke and GTX 1080 observation runs use only
 `llama3.2:3b-instruct-q4_K_M`. Every run records the resolved model digest;
 model tags alone are not considered sufficient identifiers.
 
