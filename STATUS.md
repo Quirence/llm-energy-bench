@@ -10,7 +10,7 @@ no publishable dataset exists yet.
 ## Done
 
 - The Python 3.12 CLI implements `doctor`, `run`, and `report` with stable exit
-  codes and Windows/Linux hardware-independent tests.
+  codes and 295 Windows/Linux hardware-independent tests.
 - Strict TOML and prompt contracts, Ollama streaming/TTFT, full-GPU placement,
   request-scoped NVML telemetry, power-source fallbacks, atomic artifacts,
   privacy guards, and aggregate reports are implemented.
@@ -41,7 +41,7 @@ no publishable dataset exists yet.
   checks but found Ollama 0.34.4 instead of the frozen 0.34.2. The host must use
   the frozen runtime, or the protocol version must be amended for every host
   before any publishable pilot is launched.
-- PRs #18, #19, and #22 were reviewed as non-mergeable in their current form:
+- PRs #18, #19, and #22 were reviewed and closed without merge:
   #18 can draw a formal conclusion from invalid/incomparable campaigns; #19
   silently substitutes an RTX 4060 Ti for the frozen RTX 4060 host; #22 is
   stacked on #19 and includes a calibration launch contaminated by a model

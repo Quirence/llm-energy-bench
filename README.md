@@ -39,8 +39,9 @@ Earlier local checks on the RTX 5060 Laptop and contributor GPUs remain
 diagnostic only. They exposed cache-floor variability and an accepted cold
 model reload, so the stabilized policy now records four warm-ups, tolerates at
 most one marker-boundary cache token, and aborts a run after a runtime failure
-or measured model reload. The first publishable pilot must be repeated from
-the reviewed `pilot-v1-code` tag on both primary hosts.
+or model reload during a cache-floor warm-up or measured request. The first
+publishable pilot must be repeated from the reviewed `pilot-v1-code` tag on
+both primary hosts.
 
 ## Minimal Scope
 
