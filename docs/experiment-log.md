@@ -420,3 +420,43 @@ decision blocks.
   are not the final two-host primary dataset. The superseding marker key must
   exclude run and host identity so actual request text is byte-identical for
   the same experiment/prompt/repetition everywhere.
+
+### 2026-09-29 — Stable-marker acceptance and final RTX 5060 campaign
+
+- Frozen code: `d587a5d6fbeae039009a4e722f2af1249ebcbbf4`, tag
+  `benchmark-v1-code-v5`, policy `uuid_stable_slot_prefix_v4`.
+- Measured UUIDs now depend only on experiment ID, prompt ID, repetition, and
+  canonical slot. Tests require byte-identical marker text across models,
+  hosts, and independent run directories.
+- Qwen acceptance:
+  `cache-marker-acceptance-v3-maibenben-x16c-rtx5060-20260929T020837Z-4c48dd`
+  (the diagnostic experiment ID retains its historical v3 name). Result:
+  18/18 valid, warm-up cache `0, 3, 3, 3`, floor 3, measured cache 3, zero
+  excess, scored quality 1.0.
+- Final primary-A run:
+  `benchmark-v1-maibenben-x16c-20260929T021056Z-ad31b3`. Ollama 0.34.2,
+  RTX 5060 Laptop, driver 591.66, reported 80 W power limit, all four frozen
+  digests matched, full-GPU placement confirmed.
+- Validity: 16/16 warm-ups and 480/480 measured requests persisted;
+  `validation.ok=true`, zero errors/warnings, floors `3, 3, 20, 20`, maximum
+  cache excess 1, maximum telemetry gap 141 ms, temperature peak 71 °C, and
+  maximum observed power sample 95.018 W. Repeated steady-state reports are
+  byte-idempotent.
+- Quality: Qwen3 Q4/Q8 = 1.0, Llama 3.2 Q4 = 0.85, Llama 3.2 Q8 = 0.75. All
+  meet the frozen quality threshold.
+- Aggregate result: speed and energy ranks agree in 3/3 workload blocks.
+  Long/short order: Llama Q4, Qwen Q4, Llama Q8, Qwen Q8. Scored order: Llama
+  Q4, Llama Q8, Qwen Q4, Qwen Q8.
+- Energy-source sensitivity: 474 requests used instantaneous-power integration
+  and 6 used the total-energy counter. Recomputing every request from
+  instantaneous power preserves all three energy rankings; counter/instant
+  ratios for the six selected counter requests span 0.563–1.222 (median
+  0.907).
+- Actual prompt-map check: the 120 unique `(prompt_id, repetition, prompt)`
+  records hash to SHA-256
+  `6715d4c2c6fe9846a20356fe221c723aaf185278239c68f48b8d3503ede104a0`
+  under canonical compact JSON. The RTX 4060 Ti campaign must reproduce this
+  logical prompt map.
+- Interpretation: no aggregate rank inversion is observed on primary host A.
+  The hypothesis remains undecided until primary host B runs the same v5 tag
+  and the preregistered material-effect/bootstrap analysis is implemented.

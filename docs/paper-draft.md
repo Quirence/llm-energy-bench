@@ -1,9 +1,9 @@
 # Черновик статьи: структура и распределение работы
 
-Статус: каркас с полными RTX 5060 calibration runs. Они подтвердили pipeline и
-стабильность aggregate ranks, но финальный primary-host run повторяется после
-фикса byte-identical marker text. Итоговый вывод откладывается до совместимого
-RTX 4060 Ti run и предзарегистрированного bootstrap/material-effect анализа.
+Статус: каркас с финальным RTX 5060 primary-host run от frozen protocol v5.
+Прогон подтвердил pipeline и стабильность aggregate ranks; итоговый
+двухстендовый вывод откладывается до совместимого RTX 4060 Ti run и
+предзарегистрированного bootstrap/material-effect анализа.
 
 ## Рабочее название
 
@@ -113,10 +113,10 @@ TODO: median/IQR и CV по host × workload category.
 
 ### 5.2. Основная матрица
 
-Калибровочный RTX 5060 run:
-`benchmark-v1-maibenben-x16c-20260929T013445Z-dd13a1`, 480/480 valid,
-Ollama 0.34.2, tag `benchmark-v1-code-v3`. Все четыре конфигурации прошли
-quality floor: Qwen3 Q4/Q8 — 1.0, Llama 3.2 Q4 — 0.825, Llama 3.2 Q8 — 0.75.
+Финальный RTX 5060 primary-host run:
+`benchmark-v1-maibenben-x16c-20260929T021056Z-ad31b3`, 480/480 valid,
+Ollama 0.34.2, tag `benchmark-v1-code-v5`. Все четыре конфигурации прошли
+quality floor: Qwen3 Q4/Q8 — 1.0, Llama 3.2 Q4 — 0.85, Llama 3.2 Q8 — 0.75.
 
 Наблюдаемые aggregate speed/energy ranks совпали во всех трёх workload blocks:
 
@@ -126,21 +126,20 @@ quality floor: Qwen3 Q4/Q8 — 1.0, Llama 3.2 Q4 — 0.825, Llama 3.2 Q8 — 0.7
 | scored | Llama Q4 → Llama Q8 → Qwen Q4 → Qwen Q8 |
 | short | Llama Q4 → Qwen Q4 → Llama Q8 → Qwen Q8 |
 
-Диапазон Llama Q4: 83.402–122.719 output tok/s и 1.041–1.553 output tok/J.
-Диапазон Qwen Q8: 32.967–67.148 output tok/s и 0.412–0.858 output tok/J.
+Диапазон Llama Q4: 82.463–122.583 output tok/s и 1.118–1.549 output tok/J.
+Диапазон Qwen Q8: 32.322–66.888 output tok/s и 0.434–0.851 output tok/J.
 Полные latency, TTFT, prefill/decode, power, energy и temperature values берутся
 из committed `summary.csv`, а не округлённого текста этого раздела.
 
-Из 480 запросов 468 использовали instantaneous-power integration, 12 —
+Из 480 запросов 474 использовали instantaneous-power integration, 6 —
 total-energy counter после sanity check. Sensitivity-пересчёт всех запросов
 только по instantaneous power сохранил каждый energy rank. Внешней wall-energy
 валидации это не заменяет.
 
 ### 5.3. Rank inversion
 
-На двух полных RTX 5060 calibration runs aggregate speed- и energy-top совпали
-в 3/3 блоках. Это ещё не
-проверка material inversion: TODO остаются effect threshold
+На финальном RTX 5060 primary-host run aggregate speed- и energy-top совпали
+в 3/3 блоках. Это ещё не проверка material inversion: TODO остаются effect threshold
 `max(5%, 3 × repeatability CV)`, bootstrap 95% CI и совместимый второй primary
 host. Поэтому текущая формулировка — «инверсия не наблюдалась на одном стенде»,
 а не «гипотеза опровергнута».
@@ -174,7 +173,7 @@ GTX 1080 показывается отдельно как observation и не у
 - [x] Один validated GTX 1080 observation launch.
 - [x] Benchmark digests предзарегистрированы до основной кампании.
 - [x] Два RTX 5060 calibration benchmark: по 480/480 valid.
-- [ ] Финальный RTX 5060 benchmark с byte-identical cross-host markers.
+- [x] Финальный RTX 5060 benchmark с byte-identical cross-host markers.
 - [ ] Result PRs содержат raw artifacts, hashes и experiment-log entries.
 - [ ] Числа в тексте воспроизводятся из committed `summary.csv`/report command.
 - [ ] Вывод не сильнее собранных данных.

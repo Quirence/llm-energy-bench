@@ -201,3 +201,8 @@ experiment ID, prompt ID, repetition, and the canonical slot. Unit tests now
 require byte-identical markers across model configurations and independent
 run directories. Four warm-ups overwrite the prior sequential context before
 measurement, while the cache validator still rejects any unexpected reuse.
+
+The v5 hardware acceptance retained Qwen's `0, 3, 3, 3` warm-up sequence and
+zero measured excess across 18 requests. The following full campaign completed
+480/480 valid requests with floors `3, 3, 20, 20`. This stable-key policy is
+the frozen cross-host protocol; earlier policies remain diagnostic history.

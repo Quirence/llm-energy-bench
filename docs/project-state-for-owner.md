@@ -32,7 +32,7 @@ VRAM-контекст. Это измерительный инструмент, �
 - CSV/Markdown report с ratios of sums, median/IQR, quality floor и ranking
   только внутри одного GPU/host workload block.
 - CI для Windows/Linux и hardware-independent fake implementations.
-- Зафиксированный срез проходит 306 автоматических тестов.
+- Зафиксированный срез проходит 308 автоматических тестов.
 - Тег `pilot-v1-code` указывает на merge commit `0ffc091`; это единственная
   кодовая база для сравнимых pilot-запусков.
 - Schema-v2 наблюдение Dimas на GTX 1080 принято через PR #23: 18/18 запросов
@@ -41,6 +41,9 @@ VRAM-контекст. Это измерительный инструмент, �
   benchmark по 480/480 valid. Сравнение этих runs обнаружило, что random run ID
   менял UUID-текст и Llama quality. Новая policy требует byte-identical markers
   между независимыми runs до финальной двухстендовой серии.
+- Stable-marker policy v4 исключила run/host identity из measured prompt text.
+  Финальный tagged run `benchmark-v1-code-v5` завершён с 480/480 valid; его
+  logical prompt-map SHA-256 зафиксирован для сверки со вторым стендом.
 
 ## Кто что сделал
 
@@ -82,14 +85,13 @@ VRAM-контекст. Это измерительный инструмент, �
 
 ## Первый результат основной матрицы
 
-На двух RTX 5060 calibration runs aggregate speed- и energy-ranking совпали во
-всех трёх workload blocks. Llama 3.2 Q4 заняла первое место в каждом блоке; все
-четыре конфигурации прошли quality floor. Это устойчивое предварительное
-наблюдение, но не итог статьи: финальная primary series использует стабильный
-marker text, затем нужны совместимый RTX 4060 Ti benchmark и
+На финальном RTX 5060 primary-host run aggregate speed- и energy-ranking
+совпали во всех трёх workload blocks. Llama 3.2 Q4 заняла первое место в каждом
+блоке; все четыре конфигурации прошли quality floor. Это результат первого
+стенда, но не итог статьи: нужны совместимый RTX 4060 Ti benchmark и
 предзарегистрированный bootstrap/material-effect анализ.
 
-Из 480 запросов 468 использовали instantaneous-power integration и 12 —
+Из 480 запросов 474 использовали instantaneous-power integration и 6 —
 total-energy counter. Instantaneous-only sensitivity analysis сохранил все
 energy ranks. Энергия остаётся GPU-only оценкой.
 
@@ -110,16 +112,17 @@ energy ranks. Энергия остаётся GPU-only оценкой.
 4. Dimas опубликовал observation-only run с 18/18 valid measured requests и
    `validation.json: ok=true`.
 
-RTX 5060 уже работает на согласованном Ollama 0.34.2 и имеет принятый полный
-benchmark run. Ветка Qcsteeven содержит три RTX 4060 Ti pilot launch и должна
-быть отдельно проверена. Следующий gate — его полный benchmark строго от
-`benchmark-v1-code-v3` с `configs/benchmark-v1-rtx4060ti.toml`.
+RTX 5060 уже работает на согласованном Ollama 0.34.2 и имеет финальный полный
+benchmark run от `benchmark-v1-code-v5`. Ветка Qcsteeven содержит три RTX 4060
+Ti pilot launch и должна быть отдельно проверена. Следующий gate — его полный
+benchmark строго от `benchmark-v1-code-v5` с
+`configs/benchmark-v1-rtx4060ti.toml`.
 
 ## Команды для запуска от зафиксированного тега
 
 ```text
 git fetch origin --prune --tags
-git switch --detach benchmark-v1-code-v3
+git switch --detach benchmark-v1-code-v5
 git rev-parse HEAD
 git tag --points-at HEAD
 py -3.12 -m venv .venv

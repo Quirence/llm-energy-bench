@@ -1,0 +1,33 @@
+{
+  "checksums": {
+    "config.resolved.toml": "090130a28f29f725b071baf81298ca299e9efea5cd2b559b3fbce1db9bb1db1c",
+    "manifest.json": "721a866812619e155f26969c7b16f1c2424af39d6ef38dab32234bf9f9d56b47",
+    "outputs.jsonl": "e33fa8023e77e45c3985d1591da287caf2739d049088afb8b81cf2d2bf77bd23",
+    "report.md": "75fc6f2955d1a1ea433e1d56a7f28eccf6535be08e99c4f928c3b821ed8316ca",
+    "requests.jsonl": "6096548d326622dcabd0a7e2fe45e85f1f71d424a7c9abd9de3c4e6ea5906cbc",
+    "summary.csv": "8702fb166bde6ac79f6f08855c5976353f820439f19f943595305f6af721cc26",
+    "telemetry.jsonl.gz": "01aff8d9ef90ac9d49032c45ce75ddbcc5690953abe690bec59840a13d67893a",
+    "warmups.jsonl": "58bb4f66e4c4cc9a16df8311bff80e6f10d34a67945d06c2ace3ef24da68be18"
+  },
+  "errors": [],
+  "ok": true,
+  "record_counts": {
+    "outputs.jsonl": 18,
+    "requests.jsonl": 18,
+    "telemetry.jsonl.gz": 199,
+    "warmups.jsonl": 4
+  },
+  "run_id": "cache-marker-acceptance-v3-maibenben-x16c-rtx5060-20260929T020837Z-4c48dd",
+  "sizes": {
+    "config.resolved.toml": 728,
+    "manifest.json": 3411,
+    "outputs.jsonl": 49554,
+    "report.md": 977,
+    "requests.jsonl": 24186,
+    "summary.csv": 1975,
+    "telemetry.jsonl.gz": 7368,
+    "warmups.jsonl": 1500
+  },
+  "status": "completed",
+  "warnings": []
+}

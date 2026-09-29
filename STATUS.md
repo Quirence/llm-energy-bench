@@ -4,9 +4,8 @@ Last updated: 2026-09-29
 
 ## Current Milestone
 
-M2 — Two-GPU Study. The reviewed pilot baseline is tagged `pilot-v1-code`;
-the four-configuration benchmark is in hardware acceptance and no publishable
-two-host dataset exists yet.
+M2 — Two-GPU Study. Primary host A (RTX 5060 Laptop) has a complete validated
+campaign from `benchmark-v1-code-v5`; primary host B (RTX 4060 Ti) is pending.
 
 ## Done
 
@@ -54,6 +53,10 @@ two-host dataset exists yet.
   measured requests and identical aggregate ranks.
 - Derived validation is idempotent: `validation.json` does not recursively hash
   itself, and repeated report generation leaves its bytes unchanged.
+- `uuid_stable_slot_prefix_v4` makes measured prompt text byte-identical across
+  hosts and independent launches; its Qwen hardware acceptance passed 18/18.
+- The final RTX 5060 campaign from `benchmark-v1-code-v5` passed 480/480 with
+  zero validation errors or warnings.
 
 ## In Progress
 
@@ -63,22 +66,21 @@ two-host dataset exists yet.
 - `uuid_slot_prefix_v2` passed a Llama acceptance but inflated Qwen's warm-up
   floor because sequential slots `00` through `03` share one leading
   character. The partial follow-up run is excluded.
-- The accepted RTX 5060 aggregate speed and energy rankings agree in all three
-  workload categories. The two runs are calibration evidence, not the final
-  primary dataset, because their random run IDs changed the UUID marker text.
-- `uuid_stable_slot_prefix_v4` makes actual measured request prompts identical
-  across independent launches and hosts. It needs hardware acceptance and a
-  new frozen tag before the final RTX 5060 campaign.
+- Earlier v3/v4 full runs are retained as calibration evidence; their aggregate
+  rankings agree with v5 but their random marker text excludes them from the
+  final cross-host dataset.
+- Final RTX 5060 speed and energy rankings agree in all three workload
+  categories. This is one primary host, not the final hypothesis decision.
 - The RTX 4060 Ti pilot result branch exists and requires review; its complete
-  benchmark must use the same v3 tag before a two-host comparison is valid.
+  benchmark must use the same v5 tag before a two-host comparison is valid.
 
 ## Next Acceptance Gate
 
-1. Accept the stable-marker policy on Qwen and freeze the final shared tag.
-2. Repeat the RTX 5060 campaign from that tag and require 480/480 valid.
-3. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
+1. Review and publish the v5 protocol plus the final RTX 5060 artifacts.
+2. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
    digests, and execute the committed companion config without code changes.
-4. Accept only `validation.json: ok=true` with all 480 requests valid.
+3. Accept only `validation.json: ok=true` with all 480 requests valid.
+4. Verify the RTX 4060 Ti logical prompt-map SHA-256 matches primary A.
 5. Implement the preregistered bootstrap/material-effect analysis against the
    two compatible primary runs.
 6. Compare only those complete compatible runs in the paper tables.
@@ -94,8 +96,8 @@ two-host dataset exists yet.
 
 ## Latest Validated Run
 
-The latest validated artifact is the v4 calibration run
-`benchmark-v1-maibenben-x16c-20260929T015412Z-1099aa`: 480/480 valid measured
-requests on RTX 5060. Its aggregate speed and energy rankings agree in 3/3
-workload blocks, but its random UUID text is not cross-host identical. There
-is still no compatible two-host research dataset.
+The latest validated artifact is the final primary-A run
+`benchmark-v1-maibenben-x16c-20260929T021056Z-ad31b3`: 480/480 valid measured
+requests on RTX 5060 from `benchmark-v1-code-v5`. Aggregate speed and energy
+rankings agree in 3/3 workload blocks. There is still no compatible two-host
+research dataset until RTX 4060 Ti completes the same protocol.
