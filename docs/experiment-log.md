@@ -403,3 +403,20 @@ decision blocks.
   and repeated validation now produces byte-identical JSON.
 - Scope: post-processing integrity only. The accepted inference records,
   telemetry, manifest, metrics, ranks, tag and validity verdict are unchanged.
+
+### 2026-09-29 — RTX 5060 v4 confirmation and marker-stability finding
+
+- Run: `benchmark-v1-maibenben-x16c-20260929T015412Z-1099aa`; commit/tag
+  `382443895afaaa5bf7d01ad18078130b864f3cb4` / `benchmark-v1-code-v4`.
+- Result: 480/480 measured requests valid, zero validation errors/warnings,
+  floors `3, 3, 20, 20`, and the same speed/energy order as v3 in all three
+  workload categories. Steady-state `report` regeneration was byte-idempotent.
+- New cross-run evidence: despite fixed temperature and seed, Llama quality
+  changed from 0.825/0.75 in v3 to 0.875/0.8 in v4. Inspection showed that the
+  UUID digest included the random run-directory ID. Thus logical
+  prompt/repetition pairs were identical only inside one run, not across hosts
+  or independent launches.
+- Decision: v3 and v4 remain valid single-host calibration measurements but
+  are not the final two-host primary dataset. The superseding marker key must
+  exclude run and host identity so actual request text is byte-identical for
+  the same experiment/prompt/repetition everywhere.
