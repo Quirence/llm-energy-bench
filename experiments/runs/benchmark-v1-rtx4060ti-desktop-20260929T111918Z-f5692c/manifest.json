@@ -1,0 +1,150 @@
+{
+  "artifact_sha256": {
+    "config.resolved.toml": "58e9697ba7b6179139aab70631f024f38763028d8a0f20b6bf4e909ed56ba1ae",
+    "outputs.jsonl": "69480f79b689e2ad95566b5d66102bd1a621a7986c2e8f52592917099cc0e3bb",
+    "requests.jsonl": "963edff3a3635454f85e07cdefc1a9619ebd3bc1919122a7ccc703ddacadfabf",
+    "telemetry.jsonl.gz": "a97d1e7bb31281940aac93e52d88cf35a66469e87feb543cd5bd403e80e92c19",
+    "warmups.jsonl": "bced9b939537e1fb31eb578e430c263088fd6cad66718a20961fda1e561434a5"
+  },
+  "cache_buster_policy": "uuid_stable_slot_prefix_v4",
+  "completed_requests": 480,
+  "completed_warmups": 16,
+  "config_sha256": "58e9697ba7b6179139aab70631f024f38763028d8a0f20b6bf4e909ed56ba1ae",
+  "controls": {
+    "concurrency": 1,
+    "currency": null,
+    "expected_model_digests": {
+      "llama3.2:3b-instruct-q4_K_M": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "llama3.2:3b-instruct-q8_0": "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a",
+      "qwen3:4b-instruct-2507-q4_K_M": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "qwen3:4b-instruct-2507-q8_0": "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374"
+    },
+    "expected_runtime_version": "0.34.2",
+    "experiment_id": "benchmark-v1",
+    "gpu_index": 0,
+    "host_id": "rtx4060ti-desktop",
+    "models": [
+      "qwen3:4b-instruct-2507-q4_K_M",
+      "qwen3:4b-instruct-2507-q8_0",
+      "llama3.2:3b-instruct-q4_K_M",
+      "llama3.2:3b-instruct-q8_0"
+    ],
+    "ollama_url": "http://127.0.0.1:11434",
+    "options": {
+      "kv_cache": "f16",
+      "num_ctx": 4096,
+      "num_gpu": 999,
+      "num_predict": 256,
+      "seed": 42,
+      "temperature": 0.0
+    },
+    "order_seed": 42,
+    "repetitions": 5,
+    "tariff_per_kwh": null,
+    "telemetry_interval_ms": 100,
+    "warmup_requests": 4
+  },
+  "ended_utc": "2026-09-29T11:31:30.289594+00:00",
+  "experiment_id": "benchmark-v1",
+  "failure": null,
+  "git_commit": "d587a5d6fbeae039009a4e722f2af1249ebcbbf4",
+  "gpu": {
+    "driver_version": "560.94",
+    "energy_fallback_reason": null,
+    "energy_source": "total_energy_counter",
+    "field_errors": {},
+    "gpu_fingerprint": "8a7c37ae035a1091",
+    "gpu_index": 0,
+    "name": "NVIDIA GeForce RTX 4060 Ti",
+    "power_limit_watts": 160.0,
+    "supports_clocks": true,
+    "supports_power_instant": true,
+    "supports_power_legacy": true,
+    "supports_power_limit": true,
+    "supports_temperature": true,
+    "supports_total_energy": true,
+    "supports_utilization": true,
+    "unsupported_fields": [],
+    "vram_total_bytes": 8585740288
+  },
+  "host": {
+    "architecture": "AMD64",
+    "os": "Windows",
+    "os_release": "11"
+  },
+  "host_id": "rtx4060ti-desktop",
+  "max_cache_excess_tokens": 1,
+  "max_measured_load_duration_ns": 100000000,
+  "models": [
+    {
+      "context_length": 4096,
+      "digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "family": "qwen3",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "name": "qwen3:4b-instruct-2507-q4_K_M",
+      "parameter_size": "4.0B",
+      "quantization": "Q4_K_M",
+      "size_bytes": 3178149969,
+      "size_vram_bytes": 3178149969,
+      "template_cache_baseline_tokens": 3
+    },
+    {
+      "context_length": 4096,
+      "digest": "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374",
+      "family": "qwen3",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "qwen3:4b-instruct-2507-q8_0",
+      "name": "qwen3:4b-instruct-2507-q8_0",
+      "parameter_size": "4.0B",
+      "quantization": "Q8_0",
+      "size_bytes": 4961274428,
+      "size_vram_bytes": 4961274428,
+      "template_cache_baseline_tokens": 3
+    },
+    {
+      "context_length": 4096,
+      "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "family": "llama",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "llama3.2:3b-instruct-q4_K_M",
+      "name": "llama3.2:3b-instruct-q4_K_M",
+      "parameter_size": "3.2B",
+      "quantization": "Q4_K_M",
+      "size_bytes": 2554708622,
+      "size_vram_bytes": 2554708622,
+      "template_cache_baseline_tokens": 20
+    },
+    {
+      "context_length": 4096,
+      "digest": "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a",
+      "family": "llama",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "llama3.2:3b-instruct-q8_0",
+      "name": "llama3.2:3b-instruct-q8_0",
+      "parameter_size": "3.2B",
+      "quantization": "Q8_0",
+      "size_bytes": 3957231451,
+      "size_vram_bytes": 3957231451,
+      "template_cache_baseline_tokens": 20
+    }
+  ],
+  "prompt_cache_policy": "template_floor_v2",
+  "prompt_count": 24,
+  "prompt_set_sha256": "41331de1182406a61f3d4ea06c033b4e212ba128d3a5441607325e3d7015007f",
+  "repetitions": 5,
+  "run_id": "benchmark-v1-rtx4060ti-desktop-20260929T111918Z-f5692c",
+  "runtime": {
+    "name": "ollama",
+    "version": "0.34.2"
+  },
+  "schema_version": 2,
+  "started_requests": 480,
+  "started_utc": "2026-09-29T11:19:18.365258+00:00",
+  "status": "completed",
+  "valid_requests": 480
+}

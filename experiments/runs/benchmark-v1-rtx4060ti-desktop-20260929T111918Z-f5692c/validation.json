@@ -1,0 +1,33 @@
+{
+  "checksums": {
+    "config.resolved.toml": "58e9697ba7b6179139aab70631f024f38763028d8a0f20b6bf4e909ed56ba1ae",
+    "manifest.json": "5b2e8f895e9743537f2af826a15e6c9bf6f18163932c18044373589b4d3403aa",
+    "outputs.jsonl": "69480f79b689e2ad95566b5d66102bd1a621a7986c2e8f52592917099cc0e3bb",
+    "report.md": "19dc8cb4a92de8b262e68e98268c695bba561acff056403437b6c26a7c068ea9",
+    "requests.jsonl": "963edff3a3635454f85e07cdefc1a9619ebd3bc1919122a7ccc703ddacadfabf",
+    "summary.csv": "8aa4b457f4f7070370c1461d8014333af16849bb6f9f2721011f43174320b547",
+    "telemetry.jsonl.gz": "a97d1e7bb31281940aac93e52d88cf35a66469e87feb543cd5bd403e80e92c19",
+    "warmups.jsonl": "bced9b939537e1fb31eb578e430c263088fd6cad66718a20961fda1e561434a5"
+  },
+  "errors": [],
+  "ok": true,
+  "record_counts": {
+    "outputs.jsonl": 480,
+    "requests.jsonl": 480,
+    "telemetry.jsonl.gz": 7348,
+    "warmups.jsonl": 16
+  },
+  "run_id": "benchmark-v1-rtx4060ti-desktop-20260929T111918Z-f5692c",
+  "sizes": {
+    "config.resolved.toml": 1102,
+    "manifest.json": 5187,
+    "outputs.jsonl": 1293185,
+    "report.md": 2420,
+    "requests.jsonl": 484980,
+    "summary.csv": 5729,
+    "telemetry.jsonl.gz": 289466,
+    "warmups.jsonl": 5684
+  },
+  "status": "completed",
+  "warnings": []
+}

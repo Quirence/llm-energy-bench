@@ -1,0 +1,38 @@
+{
+  "checksums": {
+    "config.resolved.toml": "58e9697ba7b6179139aab70631f024f38763028d8a0f20b6bf4e909ed56ba1ae",
+    "manifest.json": "0674d957e32155dd4dcc3ac726ade1bd83ff0bdbfcdfad14cec67212922b92bb",
+    "outputs.jsonl": "4598cfc4b37a6994015fb81183ba417f8513f568b16cf6a36d6f40a5ee0c3b9c",
+    "requests.jsonl": "302d7ceee39d5bf09f64c6852402aae43dc51dd7eaa01964260bc1b429feeaf2",
+    "telemetry.jsonl.gz": "e10ba02e7d2316e1c18f51dd795330bebcb419050ec429e55e7f40cd06433c2a",
+    "warmups.jsonl": "3daf54458e25e5c6025441014f232a150ba8c19df4158be68948d8f451238a19"
+  },
+  "errors": [
+    "manifest.json valid_requests does not match expected request count",
+    "request 'benchmark-v1-rtx4060ti-desktop-20260929T110448Z-98f860-request-00189' is invalid for primary analysis",
+    "request 'benchmark-v1-rtx4060ti-desktop-20260929T110448Z-98f860-request-00189' reloaded the model or has no valid load duration",
+    "request 'benchmark-v1-rtx4060ti-desktop-20260929T110448Z-98f860-request-00292' is invalid for primary analysis",
+    "request 'benchmark-v1-rtx4060ti-desktop-20260929T110448Z-98f860-request-00292' reloaded the model or has no valid load duration"
+  ],
+  "ok": false,
+  "record_counts": {
+    "outputs.jsonl": 480,
+    "requests.jsonl": 480,
+    "telemetry.jsonl.gz": 7387,
+    "warmups.jsonl": 16
+  },
+  "run_id": "benchmark-v1-rtx4060ti-desktop-20260929T110448Z-98f860",
+  "sizes": {
+    "config.resolved.toml": 1102,
+    "manifest.json": 5187,
+    "outputs.jsonl": 1292688,
+    "requests.jsonl": 484980,
+    "telemetry.jsonl.gz": 291513,
+    "warmups.jsonl": 5685
+  },
+  "status": "completed",
+  "warnings": [
+    "summary.csv has not been generated yet",
+    "report.md has not been generated yet"
+  ]
+}
