@@ -1,6 +1,6 @@
 # Состояние проекта для владельца
 
-Дата среза: 2026-09-28.
+Дата среза: 2026-09-29.
 
 ## Что представляет собой проект
 
@@ -32,7 +32,11 @@ VRAM-контекст. Это измерительный инструмент, �
 - CSV/Markdown report с ratios of sums, median/IQR, quality floor и ranking
   только внутри одного GPU/host workload block.
 - CI для Windows/Linux и hardware-independent fake implementations.
-- Текущий стабилизационный срез проходит 299 автоматических тестов.
+- Зафиксированный срез проходит 300 автоматических тестов.
+- Тег `pilot-v1-code` указывает на merge commit `0ffc091`; это единственная
+  кодовая база для сравнимых pilot-запусков.
+- Schema-v2 наблюдение Dimas на GTX 1080 принято через PR #23: 18/18 запросов
+  валидны, raw hashes воспроизводятся, но данные не входят в primary matrix.
 
 ## Кто что сделал
 
@@ -45,8 +49,8 @@ VRAM-контекст. Это измерительный инструмент, �
   основная NVML telemetry-реализация, fallback sources, RTX 4060 Ti
   диагностические прогоны и первая реализация rank-inversion анализа.
 - **Skipl1 (Димас)**: Ollama inventory/preload/streaming/TTFT boundary, live
-  runtime-проверка, GTX 1080 диагностика и обнаружение cold reload после падения
-  runtime.
+  runtime-проверка, обнаружение cold reload после падения runtime, независимый
+  approval финальной стабилизации и validated GTX 1080 observation.
 
 Для ориентировочного технического среза на интеграционном коммите `a683a57`
 доля добавленных строк была около 49% Quirence, 33% Qcsteeven и 18% Dimas
@@ -56,9 +60,9 @@ VRAM-контекст. Это измерительный инструмент, �
 
 ## Что показало ревью веток
 
-- **PR #17** — правильная точка консолидации, но исходная версия имела ошибки
+- **PR #17** — утверждённая точка консолидации. Во время ревью исправлены
   aggregate prefill, fail-open schema validation, неаудируемый cache floor и
-  не отбрасывала cold reload. Исправления включены в текущую стабилизацию.
+  пропуск cold reload; PR одобрен Dimas, прошёл CI и влит в `main`.
 - **PR #18** — закрыт без merge: мог использовать невалидные run directories,
   смешивать разные model digests, сравнивать неполные prompt sets и выдавать
   ложный вывод «гипотеза не поддержана». Требования сохраняются в Issue #6.
@@ -68,6 +72,9 @@ VRAM-контекст. Это измерительный инструмент, �
 - **PR #22** — закрыт без merge; полезная GTX 1080 диагностика, но ветка
   наследовала #19, а один calibration run содержал cold reload.
   Исследовательские выводы отброшены.
+- **PR #23** — влит после независимой перепроверки. Он содержит один валидный
+  schema-v2 GTX 1080 observation-run и защиту byte-exact артефактов от Windows
+  EOL-конверсии.
 
 ## Что сейчас нельзя утверждать
 
@@ -76,13 +83,18 @@ VRAM-контекст. Это измерительный инструмент, �
 - Что NVML energy равна wall-system energy.
 - Что локальные незакоммиченные прогоны образуют публикационный датасет.
 
-## Когда база считается закреплённой
+## Состояние закрепления базы
 
-1. PR #17 получает approval и зелёный CI на Windows/Linux.
-2. PR #17 squash-merge в `main`.
-3. Merge commit получает тег `pilot-v1-code`.
-4. Оба основных участника создают result branches именно от этого тега.
-5. Pilot run имеет 18/18 valid measured requests и `validation.json: ok=true`.
+Выполнено:
+
+1. PR #17 получил approval и зелёный CI на Windows/Linux.
+2. PR #17 squash-merged в `main` как `0ffc091`.
+3. Merge commit получил тег `pilot-v1-code`.
+4. Dimas опубликовал observation-only run с 18/18 valid measured requests и
+   `validation.json: ok=true`.
+
+Следующий gate: Quirence и Qcsteeven создают result branches именно от тега и
+получают по три независимых validated launch на основных стендах.
 
 На текущем MAIBENBEN preflight уже подтверждает RTX 5060, NVML, полный GPU
 placement и правильный model digest, но установлен Ollama 0.34.4 вместо
@@ -90,12 +102,12 @@ placement и правильный model digest, но установлен Ollama
 публикационным pilot нужно либо вернуть 0.34.2, либо отдельным решением изменить
 версию протокола сразу для всех стендов и повторить preflight.
 
-## Команды после появления тега
+## Команды для запуска от зафиксированного тега
 
 ```text
 git fetch origin --prune --tags
-git switch main
-git pull --ff-only origin main
+git switch --detach pilot-v1-code
+git rev-parse HEAD
 git tag --points-at HEAD
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install ".[dev]"

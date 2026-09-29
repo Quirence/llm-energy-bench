@@ -36,6 +36,13 @@ two-host dataset exists yet.
 - Contributions from Qcsteeven and Dimas are integrated and attributed in
   `docs/project-state-for-owner.md`. Their later hardware observations are
   preserved separately as diagnostic evidence.
+- PR #17 was independently approved, passed Windows/Linux CI, and was
+  squash-merged as `0ffc091`. The immutable `pilot-v1-code` tag points exactly
+  to that commit.
+- PR #23 preserves Dimas's schema-v2 GTX 1080 observation: 18/18 measured
+  requests valid, full GPU placement, frozen Ollama/model identity, and
+  byte-exact raw artifacts. It remains outside the primary comparison.
+- Completed milestones M0 Bootstrap and M1 Measured Pilot are closed.
 - Three complete RTX 5060 pilot repeatability launches passed validation with
   54/54 measured requests. They support instrument repeatability only and are
   not a two-host research result.
@@ -68,7 +75,6 @@ two-host dataset exists yet.
 
 - RTX 5060 and RTX 4060 Ti publishable pilots plus three independent
   calibration launches on each primary host.
-- A schema-v2 GTX 1080 observation run, kept outside the primary comparison.
 - A corrected implementation of the rank-inversion analysis after clean,
   compatible campaign data exists. PR #18 is not the frozen implementation.
 - External wattmeter validation remains outside MVP; all reported energy and
@@ -76,7 +82,10 @@ two-host dataset exists yet.
 
 ## Latest Validated Run
 
-The latest accepted local evidence is the three-launch RTX 5060 `pilot-v1`
-repeatability set (54/54 valid measured requests). The later 480-request
-benchmark attempt is deliberately invalid and contributes no aggregates or
-rankings. There is still no compatible two-host research dataset.
+The latest validated artifact is
+`pilot-v1-observation-gtx1080-observation-20260928T155322Z-989238`: 18/18 valid
+requests on GTX 1080 and is observation-only. Three local RTX 5060
+repeatability launches also passed with 54/54 measured requests. The later
+480-request benchmark attempt is deliberately invalid and contributes no
+aggregates or rankings; there is still no compatible two-host research
+dataset.

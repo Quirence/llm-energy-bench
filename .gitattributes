@@ -1,0 +1,2 @@
+# Preserve committed experiment artifacts byte-for-byte on every platform.
+experiments/runs/** -text
