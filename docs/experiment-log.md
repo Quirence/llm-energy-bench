@@ -300,3 +300,26 @@ decision blocks.
   preventing any pair from sharing two leading hex characters. The correction
   must pass synthetic tests and a fresh hardware acceptance run before the
   complete campaign is repeated under a new frozen commit.
+
+### 2026-09-29 — RTX 5060 `uuid_slot_prefix_v2` hardware acceptance
+
+- Contributor: Quirence/Codex; code commit
+  `d8ef5dad69c811b92363b106143befe52998c1e8` after merging the current
+  `origin/main` baseline.
+- Run: `pilot-v1-maibenben-x16c-rtx5060-20260929T012225Z-8f048a`; Ollama
+  0.34.2; RTX 5060 Laptop, driver 591.66, reported 80 W power limit; frozen
+  Llama 3.2 Q4 digest and full-GPU placement confirmed by `doctor`.
+- Synthetic gate: `ruff check`, `ruff format --check`, and the complete test
+  suite passed before the launch.
+- Result: all four warm-ups and all 18 measured requests were persisted;
+  `validation.json` reports `ok: true` with 18/18 valid requests and no errors.
+- Cache result: the template floor was 20 tokens; measured counts were only 20
+  or 21, maximum excess was one, and all 18 measured first-byte slots were
+  unique. Scored-prompt quality was 1.0.
+- Energy note: all accepted requests selected instantaneous-power integration
+  after the per-request total-counter sanity check. This remains a GPU-only
+  estimate and does not establish wall-energy accuracy.
+- Decision: the prospective correction passes short hardware acceptance. This
+  is instrumentation evidence, not the four-configuration research campaign;
+  the complete 480-request RTX 5060 run must be repeated from the frozen
+  corrected commit.

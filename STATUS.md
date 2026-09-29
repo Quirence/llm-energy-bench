@@ -57,19 +57,18 @@ two-host dataset exists yet.
 - `uuid_slot_prefix_v2` is under acceptance. It assigns every warm-up and
   measured logical request a unique first UUID byte, eliminating the observed
   two-character marker-prefix collision without weakening the cache rule.
-- The correction still needs the full synthetic suite, one short RTX 5060
-  hardware acceptance, a new frozen commit/tag, and a clean 480-request rerun.
+- The correction passed the full synthetic suite and an 18/18 RTX 5060
+  hardware acceptance. It still needs a frozen tag after review and a clean
+  480-request rerun.
 
 ## Next Acceptance Gate
 
-1. Complete synthetic and short hardware acceptance for
-   `uuid_slot_prefix_v2` while retaining the failed campaign unchanged.
-2. Freeze and tag the corrected benchmark commit after collaborator review.
-3. Repeat the full 480-request RTX 5060 campaign; accept only
+1. Freeze and tag the corrected benchmark commit after collaborator review.
+2. Repeat the full 480-request RTX 5060 campaign; accept only
    `validation.json: ok=true` with all 480 requests valid.
-4. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
+3. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
    digests, and execute the committed companion config without code changes.
-5. Compare only the two complete compatible runs in the primary report.
+4. Compare only the two complete compatible runs in the primary report.
 
 ## Open Research Work
 
@@ -82,10 +81,9 @@ two-host dataset exists yet.
 
 ## Latest Validated Run
 
-The latest validated artifact is
-`pilot-v1-observation-gtx1080-observation-20260928T155322Z-989238`: 18/18 valid
-requests on GTX 1080 and is observation-only. Three local RTX 5060
-repeatability launches also passed with 54/54 measured requests. The later
-480-request benchmark attempt is deliberately invalid and contributes no
-aggregates or rankings; there is still no compatible two-host research
-dataset.
+The latest local validated artifact is
+`pilot-v1-maibenben-x16c-rtx5060-20260929T012225Z-8f048a`: 18/18 valid requests
+under `uuid_slot_prefix_v2`. It is a marker-policy acceptance run, not the
+research campaign. The earlier 480-request benchmark attempt is deliberately
+invalid and contributes no aggregates or rankings; there is still no
+compatible two-host research dataset.
