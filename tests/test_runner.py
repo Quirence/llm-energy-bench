@@ -698,7 +698,29 @@ def test_measured_cache_marker_is_stable_across_model_configurations(tmp_path: P
     assert all(len(values) == 1 for values in markers.values())
     assert len({next(iter(values)) for values in markers.values()}) == len(markers)
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["cache_buster_policy"] == "uuid_slot_prefix_v3"
+    assert manifest["cache_buster_policy"] == "uuid_stable_slot_prefix_v4"
+
+
+def test_measured_cache_marker_is_stable_across_independent_runs(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    first_dir = run_experiment(
+        config,
+        client_factory=lambda _url: FakeClient(),
+        sampler_factory=lambda **_kwargs: FakeSampler(),
+    )
+    second_dir = run_experiment(
+        config,
+        client_factory=lambda _url: FakeClient(),
+        sampler_factory=lambda **_kwargs: FakeSampler(),
+    )
+
+    def markers(run_dir: Path) -> dict[tuple[str, int], str]:
+        return {
+            (record["prompt_id"], record["repetition"]): record["prompt"].splitlines()[0]
+            for record in read_jsonl(run_dir / "requests.jsonl")
+        }
+
+    assert markers(first_dir) == markers(second_dir)
 
 
 def test_run_rejects_more_than_256_unique_cache_marker_slots(tmp_path: Path) -> None:

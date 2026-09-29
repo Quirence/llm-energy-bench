@@ -296,7 +296,7 @@ def run_experiment(
     if marker_slot_count > MAX_CACHE_MARKER_SLOTS:
         raise RunnerPreflightError(
             f"experiment needs {marker_slot_count} cache marker slots; "
-            f"uuid_slot_prefix_v3 supports at most {MAX_CACHE_MARKER_SLOTS} per model"
+            f"uuid_stable_slot_prefix_v4 supports at most {MAX_CACHE_MARKER_SLOTS} per model"
         )
     client_builder = client_factory or OllamaClient
     sampler_builder = sampler_factory or NvmlSampler
@@ -437,7 +437,7 @@ def _execute_requests(
                     request_id=request_id,
                     model=model_name,
                     prompt=_cache_busted_prompt(
-                        request_id,
+                        f"{config.experiment_id}:warmup:{warmup_index}",
                         prompt.prompt,
                         marker_slot=warmup_index,
                     ),
@@ -518,7 +518,7 @@ def _execute_requests(
                     request_id=request_id,
                     model=model_name,
                     prompt=_cache_busted_prompt(
-                        f"{run_dir.name}:{item.prompt.prompt_id}:{item.repetition}",
+                        f"{config.experiment_id}:{item.prompt.prompt_id}:{item.repetition}",
                         item.prompt.prompt,
                         marker_slot=item.marker_slot,
                     ),
@@ -843,7 +843,7 @@ def _initial_manifest(
         "gpu": capabilities.to_dict(),
         "models": [{**model.to_dict(), "template_cache_baseline_tokens": None} for model in models],
         "prompt_cache_policy": "template_floor_v2",
-        "cache_buster_policy": "uuid_slot_prefix_v3",
+        "cache_buster_policy": "uuid_stable_slot_prefix_v4",
         "max_cache_excess_tokens": MAX_CACHE_EXCESS_TOKENS,
         "max_measured_load_duration_ns": MAX_MEASURED_LOAD_DURATION_NS,
         "controls": config.to_dict(),

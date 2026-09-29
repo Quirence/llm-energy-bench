@@ -37,9 +37,10 @@ VRAM-контекст. Это измерительный инструмент, �
   кодовая база для сравнимых pilot-запусков.
 - Schema-v2 наблюдение Dimas на GTX 1080 принято через PR #23: 18/18 запросов
   валидны, raw hashes воспроизводятся, но данные не входят в primary matrix.
-- После двух исключённых диагностических попыток cache-marker policy v3 прошла
-  отдельную Qwen-приёмку и полный RTX 5060 benchmark: 480/480 valid,
-  `validation.ok=true`, exact commit `9ea98b2` (`benchmark-v1-code-v3`).
+- Cache-marker policy v3 прошла отдельную Qwen-приёмку и два полных RTX 5060
+  benchmark по 480/480 valid. Сравнение этих runs обнаружило, что random run ID
+  менял UUID-текст и Llama quality. Новая policy требует byte-identical markers
+  между независимыми runs до финальной двухстендовой серии.
 
 ## Кто что сделал
 
@@ -81,10 +82,11 @@ VRAM-контекст. Это измерительный инструмент, �
 
 ## Первый результат основной матрицы
 
-На RTX 5060 aggregate speed- и energy-ranking совпали во всех трёх workload
-blocks. Llama 3.2 Q4 заняла первое место в каждом блоке; все четыре
-конфигурации прошли quality floor. Это корректный отрицательный результат для
-одного стенда, но не итог статьи: нужны совместимый RTX 4060 Ti benchmark и
+На двух RTX 5060 calibration runs aggregate speed- и energy-ranking совпали во
+всех трёх workload blocks. Llama 3.2 Q4 заняла первое место в каждом блоке; все
+четыре конфигурации прошли quality floor. Это устойчивое предварительное
+наблюдение, но не итог статьи: финальная primary series использует стабильный
+marker text, затем нужны совместимый RTX 4060 Ti benchmark и
 предзарегистрированный bootstrap/material-effect анализ.
 
 Из 480 запросов 468 использовали instantaneous-power integration и 12 —

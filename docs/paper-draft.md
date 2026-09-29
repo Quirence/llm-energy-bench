@@ -1,8 +1,9 @@
 # Черновик статьи: структура и распределение работы
 
-Статус: каркас с первым принятым primary-host run. Итоговый вывод о гипотезе
-откладывается до совместимого RTX 4060 Ti run и предзарегистрированного
-bootstrap/material-effect анализа.
+Статус: каркас с полными RTX 5060 calibration runs. Они подтвердили pipeline и
+стабильность aggregate ranks, но финальный primary-host run повторяется после
+фикса byte-identical marker text. Итоговый вывод откладывается до совместимого
+RTX 4060 Ti run и предзарегистрированного bootstrap/material-effect анализа.
 
 ## Рабочее название
 
@@ -112,7 +113,7 @@ TODO: median/IQR и CV по host × workload category.
 
 ### 5.2. Основная матрица
 
-Принятый RTX 5060 run:
+Калибровочный RTX 5060 run:
 `benchmark-v1-maibenben-x16c-20260929T013445Z-dd13a1`, 480/480 valid,
 Ollama 0.34.2, tag `benchmark-v1-code-v3`. Все четыре конфигурации прошли
 quality floor: Qwen3 Q4/Q8 — 1.0, Llama 3.2 Q4 — 0.825, Llama 3.2 Q8 — 0.75.
@@ -137,7 +138,8 @@ total-energy counter после sanity check. Sensitivity-пересчёт вс�
 
 ### 5.3. Rank inversion
 
-На RTX 5060 aggregate speed- и energy-top совпали в 3/3 блоках. Это ещё не
+На двух полных RTX 5060 calibration runs aggregate speed- и energy-top совпали
+в 3/3 блоках. Это ещё не
 проверка material inversion: TODO остаются effect threshold
 `max(5%, 3 × repeatability CV)`, bootstrap 95% CI и совместимый второй primary
 host. Поэтому текущая формулировка — «инверсия не наблюдалась на одном стенде»,
@@ -171,7 +173,8 @@ GTX 1080 показывается отдельно как observation и не у
 - [ ] Три validated launch на каждом primary host.
 - [x] Один validated GTX 1080 observation launch.
 - [x] Benchmark digests предзарегистрированы до основной кампании.
-- [x] RTX 5060 benchmark: 480/480 valid из frozen v3 tag.
+- [x] Два RTX 5060 calibration benchmark: по 480/480 valid.
+- [ ] Финальный RTX 5060 benchmark с byte-identical cross-host markers.
 - [ ] Result PRs содержат raw artifacts, hashes и experiment-log entries.
 - [ ] Числа в тексте воспроизводятся из committed `summary.csv`/report command.
 - [ ] Вывод не сильнее собранных данных.

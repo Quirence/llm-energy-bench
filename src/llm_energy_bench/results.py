@@ -960,6 +960,7 @@ def _validate_schema_v2(
         "uuid_prefix_v1",
         "uuid_slot_prefix_v2",
         "uuid_slot_prefix_v3",
+        "uuid_stable_slot_prefix_v4",
     }:
         errors.append(f"{MANIFEST} schema v2 has no recognized cache buster policy")
     if manifest.get("max_cache_excess_tokens") != 1:

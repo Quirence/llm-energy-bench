@@ -191,3 +191,13 @@ campaign then retained the expected model floors `3, 3, 20, 20`, with no
 request above one excess token and `validation.ok=true`. This is the accepted
 cache-marker policy for the two-host benchmark; v1 and v2 remain recognized
 only so their diagnostic artifacts can be audited.
+
+Two independent full runs then exposed a cross-run issue outside the cache
+counts: the UUID digest still included the random run-directory name. The
+actual marker text therefore differed between hosts and Llama scored quality
+changed despite fixed sampling controls. `uuid_stable_slot_prefix_v4` removes
+run and host identity from the digest key; measured markers depend only on
+experiment ID, prompt ID, repetition, and the canonical slot. Unit tests now
+require byte-identical markers across model configurations and independent
+run directories. Four warm-ups overwrite the prior sequential context before
+measurement, while the cache validator still rejects any unexpected reuse.

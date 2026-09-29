@@ -549,7 +549,10 @@ def test_schema_v2_run_passes_semantic_validation(tmp_path: Path) -> None:
     assert report.errors == ()
 
 
-@pytest.mark.parametrize("policy", ["uuid_slot_prefix_v2", "uuid_slot_prefix_v3"])
+@pytest.mark.parametrize(
+    "policy",
+    ["uuid_slot_prefix_v2", "uuid_slot_prefix_v3", "uuid_stable_slot_prefix_v4"],
+)
 def test_schema_v2_accepts_the_slot_prefixed_cache_buster_policy(
     tmp_path: Path, policy: str
 ) -> None:

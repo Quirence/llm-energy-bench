@@ -50,8 +50,8 @@ two-host dataset exists yet.
   0.34.2 in the two primary-host configs.
 - `uuid_slot_prefix_v3` passed a Qwen-specific 18/18 hardware acceptance with
   the expected three-token floor and zero excess cached tokens.
-- The RTX 5060 `benchmark-v1` campaign completed with 480/480 valid measured
-  requests and `validation.ok=true` from tag `benchmark-v1-code-v3`.
+- Two RTX 5060 full calibration campaigns completed with 480/480 valid
+  measured requests and identical aggregate ranks.
 - Derived validation is idempotent: `validation.json` does not recursively hash
   itself, and repeated report generation leaves its bytes unchanged.
 
@@ -64,21 +64,24 @@ two-host dataset exists yet.
   floor because sequential slots `00` through `03` share one leading
   character. The partial follow-up run is excluded.
 - The accepted RTX 5060 aggregate speed and energy rankings agree in all three
-  workload categories. This is a single-host observation, not the final
-  hypothesis decision.
+  workload categories. The two runs are calibration evidence, not the final
+  primary dataset, because their random run IDs changed the UUID marker text.
+- `uuid_stable_slot_prefix_v4` makes actual measured request prompts identical
+  across independent launches and hosts. It needs hardware acceptance and a
+  new frozen tag before the final RTX 5060 campaign.
 - The RTX 4060 Ti pilot result branch exists and requires review; its complete
   benchmark must use the same v3 tag before a two-host comparison is valid.
 
 ## Next Acceptance Gate
 
-1. Review and publish the v3 fix, acceptance artifacts, and accepted RTX 5060
-   campaign without changing the frozen commit.
-2. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
+1. Accept the stable-marker policy on Qwen and freeze the final shared tag.
+2. Repeat the RTX 5060 campaign from that tag and require 480/480 valid.
+3. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
    digests, and execute the committed companion config without code changes.
-3. Accept only `validation.json: ok=true` with all 480 requests valid.
-4. Implement the preregistered bootstrap/material-effect analysis against the
+4. Accept only `validation.json: ok=true` with all 480 requests valid.
+5. Implement the preregistered bootstrap/material-effect analysis against the
    two compatible primary runs.
-5. Compare only those complete compatible runs in the paper tables.
+6. Compare only those complete compatible runs in the paper tables.
 
 ## Open Research Work
 
@@ -91,8 +94,8 @@ two-host dataset exists yet.
 
 ## Latest Validated Run
 
-The latest validated artifact is
-`benchmark-v1-maibenben-x16c-20260929T013445Z-dd13a1`: 480/480 valid measured
-requests on RTX 5060 from `benchmark-v1-code-v3`. Its observed aggregate speed
-and energy rankings agree in 3/3 workload blocks. The result remains
-single-host; there is still no compatible two-host research dataset.
+The latest validated artifact is the v4 calibration run
+`benchmark-v1-maibenben-x16c-20260929T015412Z-1099aa`: 480/480 valid measured
+requests on RTX 5060. Its aggregate speed and energy rankings agree in 3/3
+workload blocks, but its random UUID text is not cross-host identical. There
+is still no compatible two-host research dataset.
