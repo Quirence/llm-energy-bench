@@ -231,3 +231,33 @@ run repeated from the reviewed, merged implementation.
 - Historical data: all earlier RTX 4060 Ti and GTX 1080 local launches remain
   diagnostics. The amendment does not retroactively validate them; every
   accepted run must be repeated from the tagged schema-v2 baseline.
+
+### 2026-09-29 — RTX 5060 `benchmark-v1` first campaign attempt (invalid)
+
+- Contributor: Quirence/Codex; frozen code commit `f40fedefc625e9df3c8a2ae30c611637e2078cda`
+  (`benchmark-v1-code`).
+- Run: `benchmark-v1-maibenben-x16c-20260928T175309Z-cd0a58`; Ollama
+  0.34.2; RTX 5060 Laptop, driver 591.66, reported 80 W power limit; all four
+  pinned model digests matched and every model was fully resident on the GPU.
+- Completion: all 16 warm-ups and all 480 measured requests were persisted.
+  Validation rejected the campaign: 478 requests passed and two Qwen requests
+  exceeded the registered one-token cache-boundary allowance.
+- Exact failures: Qwen3 Q4 request 104 and Qwen3 Q8 request 145 each reported
+  five cached prompt tokens against a three-token floor (`excess = 2`). The
+  requests were warm (`load_duration` 3.211 ms and 2.6811 ms), so neither was
+  a model reload.
+- Root cause: in both failures the preceding UUID marker shared exactly its
+  first two hexadecimal characters (`32...` then `32...`; `55...` then
+  `55...`). Across all 240 Qwen observations, a one-character prefix match
+  accounted for the accepted `+1` cases and the only two-character matches
+  accounted for the two rejected `+2` cases. Prompt bodies differed, so this
+  is marker-token boundary reuse rather than semantic prompt reuse.
+- Decision: retain the complete run as diagnostic evidence and exclude it
+  from every aggregate, rank, and research claim. Do not relax the registered
+  cache-excess threshold after observing the data.
+- Prospective correction: `uuid_slot_prefix_v2` assigns a unique first UUID
+  byte to every warm-up and measured logical request within a model. This
+  preserves valid UUID v4 markers and cross-model prompt identity while
+  preventing any pair from sharing two leading hex characters. The correction
+  must pass synthetic tests and a fresh hardware acceptance run before the
+  complete campaign is repeated under a new frozen commit.
