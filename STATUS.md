@@ -52,6 +52,8 @@ two-host dataset exists yet.
   the expected three-token floor and zero excess cached tokens.
 - The RTX 5060 `benchmark-v1` campaign completed with 480/480 valid measured
   requests and `validation.ok=true` from tag `benchmark-v1-code-v3`.
+- Derived validation is idempotent: `validation.json` does not recursively hash
+  itself, and repeated report generation leaves its bytes unchanged.
 
 ## In Progress
 

@@ -391,3 +391,15 @@ decision blocks.
   inversion. It does not establish equivalence, satisfy the predeclared
   bootstrap/material-effect criterion, or answer the two-host hypothesis.
   The compatible RTX 4060 Ti campaign remains required.
+
+### 2026-09-29 — Derived-validation idempotence correction
+
+- A post-campaign verification reran `report` without changing any raw
+  artifact. It exposed that `validation.json` included the checksum and size
+  of its own previous bytes, so every regeneration changed only those two
+  self-referential fields.
+- Correction: validation no longer hashes or sizes its own output. Raw and
+  derived peer artifacts remain covered, semantic validation is unchanged,
+  and repeated validation now produces byte-identical JSON.
+- Scope: post-processing integrity only. The accepted inference records,
+  telemetry, manifest, metrics, ranks, tag and validity verdict are unchanged.

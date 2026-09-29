@@ -11,6 +11,7 @@ import pytest
 from llm_energy_bench.results import (
     MAX_ARTIFACT_BYTES,
     REQUIRED_RAW_ARTIFACTS,
+    VALIDATION,
     WARMUPS,
     GzipJsonlWriter,
     JsonlWriter,
@@ -513,6 +514,18 @@ def test_the_validation_report_serializes(tmp_path: Path) -> None:
     assert payload["ok"] is True
     assert payload["status"] == "completed"
     assert "requests.jsonl" in payload["checksums"]
+
+
+def test_validation_is_idempotent_and_does_not_hash_itself(tmp_path: Path) -> None:
+    run_dir = complete_run(tmp_path)
+    write_json(run_dir / VALIDATION, validate_run(run_dir).to_dict())
+    first = validate_run(run_dir)
+    write_json(run_dir / VALIDATION, first.to_dict())
+    second = validate_run(run_dir)
+
+    assert first.to_dict() == second.to_dict()
+    assert VALIDATION not in second.checksums
+    assert VALIDATION not in second.sizes
 
 
 def test_every_required_raw_artifact_is_checked(tmp_path: Path) -> None:

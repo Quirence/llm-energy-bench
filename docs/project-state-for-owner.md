@@ -32,7 +32,7 @@ VRAM-контекст. Это измерительный инструмент, �
 - CSV/Markdown report с ratios of sums, median/IQR, quality floor и ranking
   только внутри одного GPU/host workload block.
 - CI для Windows/Linux и hardware-independent fake implementations.
-- Зафиксированный срез проходит 305 автоматических тестов.
+- Зафиксированный срез проходит 306 автоматических тестов.
 - Тег `pilot-v1-code` указывает на merge commit `0ffc091`; это единственная
   кодовая база для сравнимых pilot-запусков.
 - Schema-v2 наблюдение Dimas на GTX 1080 принято через PR #23: 18/18 запросов

@@ -762,6 +762,11 @@ def validate_run(run_dir: Path) -> ValidationReport:
     counts: dict[str, int] = {}
 
     for name in RUN_ARTIFACTS:
+        # validation.json is this function's own derived output. Hashing or
+        # sizing it inside itself makes every otherwise identical validation
+        # rewrite produce a different payload.
+        if name == VALIDATION:
+            continue
         path = run_dir / name
         if not path.is_file():
             if name in REQUIRED_RAW_ARTIFACTS:
