@@ -323,3 +323,23 @@ decision blocks.
   is instrumentation evidence, not the four-configuration research campaign;
   the complete 480-request RTX 5060 run must be repeated from the frozen
   corrected commit.
+
+### 2026-09-29 — Qwen warm-up floor check (partial, excluded)
+
+- Run: `benchmark-v1-maibenben-x16c-20260929T012531Z-474a9e`, launched from
+  local tag `benchmark-v1-code-v2` after the Llama acceptance above.
+- Observation: Qwen3 Q4 completed 120 measured requests without an invalid
+  request. During the next Qwen3 Q8 block, inspection showed a four-token
+  warm-up baseline instead of the known three-token template floor.
+- Root cause: slot-prefix v2 used sequential marker bytes for warm-ups, so the
+  first lines began `00...`, `01...`, `02...`, and `03...`. All post-cold
+  warm-ups shared the first character with their predecessor, adding one
+  tokenizer-boundary cache token to every floor candidate.
+- Action: the operator stopped the launch after 152 measured outputs. The
+  Windows PTY termination did not reach Python's exception handler, so the
+  raw manifest still says `running`; validation explicitly classifies the
+  directory as partial. It is diagnostic only and contributes no aggregates.
+- Prospective correction: `uuid_slot_prefix_v3` nibble-swaps the logical slot,
+  yielding warm-up prefixes `00...`, `10...`, `20...`, `30...` while still
+  assigning all 256 possible first bytes exactly once. A Qwen-specific short
+  acceptance is required before another complete campaign.

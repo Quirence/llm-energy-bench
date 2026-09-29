@@ -175,3 +175,12 @@ MVP permits at most 256 such slots per model and refuses a larger experiment
 before creating a run directory. Schema-v2 validation continues to recognize
 the historical `uuid_prefix_v1` policy so diagnostic artifacts remain
 auditable.
+
+A short Llama acceptance could not reveal that sequential v2 warm-up slots
+`00` through `03` share their first character. In the next Qwen launch this
+made all post-cold warm-ups report four cached tokens instead of the known
+three-token template floor. The launch was stopped and excluded. The
+superseding `uuid_slot_prefix_v3` policy nibble-swaps the logical slot number:
+the first four prefixes are `00`, `10`, `20`, and `30`, while the mapping
+remains a permutation of all 256 byte values. This separates consecutive
+warm-up boundaries without weakening the one-token excess rule.

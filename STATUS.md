@@ -54,21 +54,23 @@ two-host dataset exists yet.
 - The first RTX 5060 `benchmark-v1` attempt completed 480/480 requests but is
   excluded because two Qwen requests exceeded the registered cache-boundary
   allowance. The complete diagnostic run is preserved in `experiments/runs/`.
-- `uuid_slot_prefix_v2` is under acceptance. It assigns every warm-up and
-  measured logical request a unique first UUID byte, eliminating the observed
-  two-character marker-prefix collision without weakening the cache rule.
-- The correction passed the full synthetic suite and an 18/18 RTX 5060
-  hardware acceptance. It still needs a frozen tag after review and a clean
-  480-request rerun.
+- `uuid_slot_prefix_v2` passed a Llama acceptance but inflated Qwen's warm-up
+  floor because sequential slots `00` through `03` share one leading
+  character. The partial follow-up run is excluded.
+- `uuid_slot_prefix_v3` keeps unique first bytes and permutes sequential slots
+  to begin `00`, `10`, `20`, `30`. It needs a Qwen-specific short acceptance
+  before another 480-request run.
 
 ## Next Acceptance Gate
 
-1. Freeze and tag the corrected benchmark commit after collaborator review.
-2. Repeat the full 480-request RTX 5060 campaign; accept only
+1. Run the committed Qwen-specific marker acceptance and require its warm-up
+   floor to remain three tokens with 18/18 requests valid.
+2. Freeze and tag the corrected benchmark commit after collaborator review.
+3. Repeat the full 480-request RTX 5060 campaign; accept only
    `validation.json: ok=true` with all 480 requests valid.
-3. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
+4. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
    digests, and execute the committed companion config without code changes.
-4. Compare only the two complete compatible runs in the primary report.
+5. Compare only the two complete compatible runs in the primary report.
 
 ## Open Research Work
 
@@ -81,9 +83,9 @@ two-host dataset exists yet.
 
 ## Latest Validated Run
 
-The latest local validated artifact is
+The latest local validated artifact remains
 `pilot-v1-maibenben-x16c-rtx5060-20260929T012225Z-8f048a`: 18/18 valid requests
-under `uuid_slot_prefix_v2`. It is a marker-policy acceptance run, not the
-research campaign. The earlier 480-request benchmark attempt is deliberately
-invalid and contributes no aggregates or rankings; there is still no
-compatible two-host research dataset.
+under `uuid_slot_prefix_v2`. It is a Llama-only marker-policy acceptance, not
+the research campaign. Both later benchmark attempts are excluded (one
+invalid, one partial) and contribute no aggregates or rankings; there is still
+no compatible two-host research dataset.

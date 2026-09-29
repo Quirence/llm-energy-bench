@@ -655,6 +655,7 @@ def test_every_generation_has_a_unique_leading_cache_buster(tmp_path: Path) -> N
     )
     assert len(prefixes) == len(set(prefixes))
     assert len({prefix[:2] for prefix in prefixes}) == len(prefixes)
+    assert [prefix[:2] for prefix in prefixes[:4]] == ["00", "10", "20", "30"]
     assert all("kv_cache" not in request.options for request in client.requests)
     assert all(request.options["num_ctx"] == 4096 for request in client.requests)
     assert all(request.options["num_gpu"] == 999 for request in client.requests)
@@ -670,7 +671,7 @@ def test_cache_buster_slot_owns_the_first_uuid_byte() -> None:
         for slot in (0, 1, 15, 16, 255)
     ]
 
-    assert [marker[:2] for marker in markers] == ["00", "01", "0f", "10", "ff"]
+    assert [marker[:2] for marker in markers] == ["00", "10", "f0", "01", "ff"]
     assert all(UUID(marker).version == 4 for marker in markers)
 
 
@@ -697,7 +698,7 @@ def test_measured_cache_marker_is_stable_across_model_configurations(tmp_path: P
     assert all(len(values) == 1 for values in markers.values())
     assert len({next(iter(values)) for values in markers.values()}) == len(markers)
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["cache_buster_policy"] == "uuid_slot_prefix_v2"
+    assert manifest["cache_buster_policy"] == "uuid_slot_prefix_v3"
 
 
 def test_run_rejects_more_than_256_unique_cache_marker_slots(tmp_path: Path) -> None:

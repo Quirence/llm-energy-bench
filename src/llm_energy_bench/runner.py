@@ -296,7 +296,7 @@ def run_experiment(
     if marker_slot_count > MAX_CACHE_MARKER_SLOTS:
         raise RunnerPreflightError(
             f"experiment needs {marker_slot_count} cache marker slots; "
-            f"uuid_slot_prefix_v2 supports at most {MAX_CACHE_MARKER_SLOTS} per model"
+            f"uuid_slot_prefix_v3 supports at most {MAX_CACHE_MARKER_SLOTS} per model"
         )
     client_builder = client_factory or OllamaClient
     sampler_builder = sampler_factory or NvmlSampler
@@ -809,7 +809,10 @@ def _cache_busted_prompt(marker_key: str, prompt: str, *, marker_slot: int) -> s
     if not 0 <= marker_slot < MAX_CACHE_MARKER_SLOTS:
         raise ValueError(f"cache marker slot must be in [0, {MAX_CACHE_MARKER_SLOTS})")
     digest = bytearray(hashlib.sha256(marker_key.encode("utf-8")).digest()[:16])
-    digest[0] = marker_slot
+    # Swap the byte's nibbles so sequential warm-ups start 00, 10, 20, 30
+    # instead of sharing the leading character in 00, 01, 02, 03. All 256
+    # byte values remain available exactly once to measured requests.
+    digest[0] = ((marker_slot & 0x0F) << 4) | (marker_slot >> 4)
     marker = UUID(bytes=bytes(digest), version=4)
     return f"{marker}\n[llm-energy-bench request marker; ignore this marker]\n{prompt}"
 
@@ -840,7 +843,7 @@ def _initial_manifest(
         "gpu": capabilities.to_dict(),
         "models": [{**model.to_dict(), "template_cache_baseline_tokens": None} for model in models],
         "prompt_cache_policy": "template_floor_v2",
-        "cache_buster_policy": "uuid_slot_prefix_v2",
+        "cache_buster_policy": "uuid_slot_prefix_v3",
         "max_cache_excess_tokens": MAX_CACHE_EXCESS_TOKENS,
         "max_measured_load_duration_ns": MAX_MEASURED_LOAD_DURATION_NS,
         "controls": config.to_dict(),

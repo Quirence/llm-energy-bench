@@ -536,10 +536,13 @@ def test_schema_v2_run_passes_semantic_validation(tmp_path: Path) -> None:
     assert report.errors == ()
 
 
-def test_schema_v2_accepts_the_slot_prefixed_cache_buster_policy(tmp_path: Path) -> None:
+@pytest.mark.parametrize("policy", ["uuid_slot_prefix_v2", "uuid_slot_prefix_v3"])
+def test_schema_v2_accepts_the_slot_prefixed_cache_buster_policy(
+    tmp_path: Path, policy: str
+) -> None:
     run_dir = schema_v2_run(tmp_path)
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
-    manifest["cache_buster_policy"] = "uuid_slot_prefix_v2"
+    manifest["cache_buster_policy"] = policy
     write_json(run_dir / "manifest.json", manifest)
 
     report = validate_run(run_dir)
