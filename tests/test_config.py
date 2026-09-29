@@ -545,6 +545,50 @@ BENCHMARK_MODELS = (
 )
 
 
+BENCHMARK_DIGESTS = {
+    "qwen3:4b-instruct-2507-q4_K_M": (
+        "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0"
+    ),
+    "qwen3:4b-instruct-2507-q8_0": (
+        "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374"
+    ),
+    "llama3.2:3b-instruct-q4_K_M": DIGEST,
+    "llama3.2:3b-instruct-q8_0": (
+        "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a"
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("filename", "host_id"),
+    [
+        ("benchmark-v1.toml", "maibenben-x16c"),
+        ("benchmark-v1-rtx4060ti.toml", "rtx4060ti-desktop"),
+    ],
+)
+def test_benchmark_v1_host_configs_pin_the_runtime_and_all_four_digests(
+    filename: str, host_id: str
+) -> None:
+    config = load_config(REPO_ROOT / "configs" / filename)
+
+    assert config.host_id == host_id
+    assert config.expected_runtime_version == "0.34.2"
+    assert config.expected_model_digests == BENCHMARK_DIGESTS
+
+
+def test_benchmark_v1_host_copies_differ_only_by_host_id() -> None:
+    primary = load_config(REPO_ROOT / "configs" / "benchmark-v1.toml")
+    desktop = load_config(REPO_ROOT / "configs" / "benchmark-v1-rtx4060ti.toml")
+
+    primary_controls = primary.to_dict()
+    desktop_controls = desktop.to_dict()
+    primary_controls.pop("host_id")
+    desktop_controls.pop("host_id")
+    assert primary_controls == desktop_controls
+    assert primary.expected_model_digests == desktop.expected_model_digests
+    assert primary.prompt_path == desktop.prompt_path
+
+
 def test_benchmark_v1_config_freezes_the_approved_matrix() -> None:
     config = load_config(REPO_ROOT / "configs" / "benchmark-v1.toml")
 

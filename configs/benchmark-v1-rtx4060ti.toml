@@ -1,11 +1,11 @@
-# Frozen two-host study protocol. Change host_id only when copying this file
-# for the RTX 4060 Ti host; all measurement controls must remain identical.
+# Frozen two-host study protocol, RTX 4060 Ti desktop copy of benchmark-v1.toml.
+# It differs from benchmark-v1.toml only by host_id and these comments.
 #
 # 24 prompts x 5 repetitions x 4 configurations = 480 measured requests.
 
 [experiment]
 id = "benchmark-v1"
-host_id = "maibenben-x16c"
+host_id = "rtx4060ti-desktop"
 output_dir = "../experiments/runs"
 repetitions = 5
 warmup_requests = 4
