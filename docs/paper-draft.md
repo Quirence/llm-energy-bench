@@ -142,10 +142,10 @@ GTX 1080 показывается отдельно как observation и не у
 
 ## Контроль заполнения
 
-- [ ] PR #17 merged и merge commit tagged `pilot-v1-code`.
+- [x] PR #17 merged и merge commit tagged `pilot-v1-code`.
 - [ ] Все три участника подтвердили commit, Python, Ollama и model digest.
 - [ ] Три validated launch на каждом primary host.
-- [ ] Один validated GTX 1080 observation launch.
+- [x] Один validated GTX 1080 observation launch.
 - [ ] Benchmark digests предзарегистрированы до основной кампании.
 - [ ] Result PRs содержат raw artifacts, hashes и experiment-log entries.
 - [ ] Числа в тексте воспроизводятся из committed `summary.csv`/report command.

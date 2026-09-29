@@ -22,11 +22,11 @@ to improve a result.
 
 ## Current Freeze Gate
 
-PR #17 is the only open stabilization PR. Until it is approved, merged, and
-tagged `pilot-v1-code`, contributors should review that PR and prepare hardware
-only; they must not start result branches or publish local runs. PRs #18, #19,
-and #22 were reviewed and closed without merge, and their head branches were
-deleted after the useful requirements and observations were preserved.
+The stabilization gate is closed. PR #17 was approved and merged, and
+`pilot-v1-code` points to its exact merge commit `0ffc091`. PR #23 added the
+validated GTX 1080 observation without changing the frozen runtime protocol.
+There are no open PRs. Contributors may now execute their assigned configs from
+the tag; later commits on `main` do not change the code used for a pilot run.
 
 ## Current Owners
 
@@ -90,9 +90,9 @@ merge.
 ## Dimas: Ollama Workstream
 
 Dimas's [Issue #7](https://github.com/Quirence/llm-energy-bench/issues/7) work
-is integrated and the Issue is closed. His current action is to review the
-latest commit of PR #17; a prior comment on an older commit is not the required
-approval. The completed workstream covers:
+is integrated and the Issue is closed. He supplied the independent approval
+that released PR #17 and published the validated GTX 1080 observation in PR
+#23. The completed workstream covers:
 
 - model inventory, preload, resolved digest, and complete GPU placement;
 - streaming response parsing, TTFT, token counts, and runtime durations;
@@ -102,19 +102,22 @@ approval. The completed workstream covers:
 
 The CLI must never pull a model automatically. A missing model is a preflight
 error. Any later Ollama change starts with a new Issue from tagged `main`.
-Dimas should coordinate before changing shared request/result schemas, the
-frozen model tags, prompt files, or benchmark configuration.
+Dimas has no required follow-up for the pilot gate. He may review result PRs or
+help diagnose Ollama-specific failures, but any later runtime change starts
+with a new Issue from tagged `main`. He should coordinate before changing
+shared request/result schemas, frozen model tags, prompt files, or benchmark
+configuration.
 
 ## Hardware Coordination
 
 The RTX 5060 and RTX 4060 Ti acceptance runs use the committed host configs and
-the `pilot-v1-code` tag described in `docs/pilot-baseline.md`. Contributors may
-prepare a host and run `doctor` earlier, but a result is comparable only after
-the commit, prompt hash, Ollama version and model digest are frozen and
-recorded. Invalid requests remain in raw artifacts with explicit reasons and
-are excluded from primary aggregates.
+the `pilot-v1-code` tag described in `docs/pilot-baseline.md`. A result is
+comparable only when the checked-out commit, prompt hash, Ollama version and
+model digest match that frozen protocol. Invalid requests remain in raw
+artifacts with explicit reasons and are excluded from primary aggregates.
 
-Contributor observations made before the tag belong in
-`docs/diagnostic-observations.md`; they are not dataset rows. The GTX 1080 must
-use its committed `gtx1080-observation` identity and stays outside the primary
-matrix even when its run validates.
+The accepted GTX 1080 observation records that its launch preceded creation of
+the tag but used the exact commit later tagged. It retains the committed
+`gtx1080-observation` identity and stays outside the primary matrix. Other
+pre-tag observations belong in `docs/diagnostic-observations.md` and are not
+dataset rows.

@@ -1,8 +1,9 @@
 # Pilot Baseline and GPU Handoff
 
-This document becomes operational only after the stabilization pull request is
-merged and its merge commit is tagged `pilot-v1-code`. Until then contributors
-may run `doctor`, but must not publish experimental artifacts.
+This protocol is operational. The immutable `pilot-v1-code` tag points to
+commit `0ffc091`, the reviewed and merged pilot implementation. Every primary
+launch must run from that tag even though `main` now contains later result
+artifacts and documentation.
 
 ## Frozen inputs
 
@@ -22,8 +23,8 @@ Do not discard local changes. Commit or stash them first, then run:
 
 ```text
 git fetch origin --prune --tags
-git switch main
-git pull --ff-only origin main
+git switch --detach pilot-v1-code
+git rev-parse HEAD
 git tag --points-at HEAD
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install ".[dev]"
@@ -37,8 +38,10 @@ On Windows, use a short ASCII checkout path such as `C:\src\llm-energy-bench`.
 Deep worktree paths can exceed the legacy path limit while an atomic temporary
 artifact is being written even when the final run-directory name itself fits.
 
-`git tag --points-at HEAD` must include `pilot-v1-code`, and Ollama must report
-0.34.2. Do not continue with a different commit or runtime version.
+`git rev-parse HEAD` must print
+`0ffc091b4747533e6a2b9015a1c0a49ada88c1c1`, `git tag --points-at HEAD` must
+include `pilot-v1-code`, and Ollama must report 0.34.2. Do not continue with a
+different commit or runtime version.
 
 Pull the model manually if necessary. The benchmark never downloads weights:
 
@@ -62,7 +65,7 @@ nvidia-smi --query-gpu=name,driver_version,memory.total,power.limit --format=csv
 | --- | --- | --- | --- |
 | Quirence | RTX 5060 Laptop | `configs/pilot-rtx5060.toml` | `experiment/rtx5060-pilot-v1` |
 | Qcsteeven | RTX 4060 Ti desktop | `configs/pilot-rtx4060ti.toml` | `experiment/rtx4060ti-pilot-v1` |
-| Skipl1 | GTX 1080 | `configs/pilot-gtx1080-observation.toml` | `experiment/gtx1080-observation` |
+| Skipl1 | GTX 1080 | `configs/pilot-gtx1080-observation.toml` | completed in PR #23 |
 
 ## Preflight and run
 
@@ -73,8 +76,9 @@ Use the host's committed config in both commands:
 .venv\Scripts\python -m llm_energy_bench run --config configs/pilot-rtx5060.toml
 ```
 
-Qcsteeven substitutes `configs/pilot-rtx4060ti.toml`; Skipl1 uses
-`configs/pilot-gtx1080-observation.toml`. A run is acceptable only
+Qcsteeven substitutes `configs/pilot-rtx4060ti.toml`. The required GTX 1080
+observation is already committed; Dimas reruns it only when explicitly
+requested and labels it as an observation repeat. A run is acceptable only
 when `doctor` confirms the frozen runtime, digest and full placement, the CLI
 returns success, `validation.json` reports `ok: true`, and all 18 measured
 requests are valid. Raw output must retain the energy source and any fallback
@@ -100,7 +104,6 @@ exactly one of these commands:
 ```text
 git switch -c experiment/rtx5060-pilot-v1 pilot-v1-code
 git switch -c experiment/rtx4060ti-pilot-v1 pilot-v1-code
-git switch -c experiment/gtx1080-observation pilot-v1-code
 ```
 
 Then add only the run artifacts and append-only log entry:
@@ -113,6 +116,6 @@ git push -u origin experiment/<host>-pilot-v1
 
 Open a pull request and request review from another contributor. Do not change
 code, prompts, configs or validity rules in a result PR. In the final push
-command, use the exact branch created above (including the GTX 1080 observation
-name). If any frozen input differs, preserve the local output for diagnosis
-but do not publish it as a comparable run.
+command, use the exact primary-host branch created above. If any frozen input
+differs, preserve the local output for diagnosis but do not publish it as a
+comparable run.
