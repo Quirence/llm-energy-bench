@@ -17,10 +17,8 @@ section below and are never counted as experimental runs.
 
 ## Validated Experimental Runs
 
-No primary-matrix run has been published yet. The first such entry will be the
-RTX 5060 Laptop `pilot-v1` run repeated from the reviewed, merged implementation.
-Observation-only launches are recorded below but cannot enter the primary
-decision blocks.
+Primary-matrix launches and observation-only launches are recorded below.
+Observation-only launches cannot enter the primary decision blocks.
 
 ### 2026-09-28 — GTX 1080 pilot-v1 observation launch (before the tag)
 
@@ -58,6 +56,65 @@ decision blocks.
   power of 176–186 W.
 - Anomalies: none. The pre-launch idle reading was about 2 W above the
   session idle because `doctor` had just preloaded the model.
+
+### 2026-09-29 — RTX 4060 Ti desktop pilot-v1 primary launches
+
+- Contributor: Qcsteeven
+- Host role: **primary**, the desktop host of the two-host matrix (Issue #5).
+  Three independent launches provide the pre-registered repeatability CV.
+- Code: `pilot-v1-code` = `0ffc091b4747533e6a2b9015a1c0a49ada88c1c1`.
+  `git rev-parse HEAD` printed that SHA and `git tag --points-at HEAD` printed
+  `pilot-v1-code` before the launches, and every manifest records `git_commit`
+  `0ffc091…`. At the tag, Python 3.12.14 passed `ruff check`,
+  `ruff format --check` and 299 tests.
+- GPU: NVIDIA GeForce RTX 4060 Ti, 8 GiB; driver 560.94; power limit 160 W.
+- Runtime and model: Ollama 0.34.2 (official Windows build);
+  `llama3.2:3b-instruct-q4_K_M`, digest
+  `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72`.
+- Config and prompts: committed `configs/pilot-rtx4060ti.toml`, config hash
+  `c72031bb75c1…`, prompt-set hash `c7c4ae95e164…`.
+- Preflight: `doctor --config configs/pilot-rtx4060ti.toml --json` returned
+  `ok: true`. The runtime version and model digest matched the frozen values,
+  with `fully_on_gpu: true`, `gpu_fraction: 1.0`, and
+  `energy_source: total_energy_counter`.
+- Conditions: desktop on mains power, Windows Balanced power plan, unchanged
+  cooling. The desktop wallpaper renderer, which had used about 12% of the GPU,
+  was closed before `doctor`. The only other GPU users in that sample were the
+  desktop compositor (about 2%) and the Claude app (about 1%). Before each
+  launch the GPU was in P8 at a median 12.5, 12.4 and 12.6 W and 38–39 °C. The
+  launches ran one at a time between 00:29 and 00:31 UTC, and each was
+  validated before the next started. Peak GPU temperature was 59 °C in every
+  launch.
+- Run IDs, committed under `experiments/runs/`:
+
+  | Launch | Run ID | Valid | Warm-up cached | Excess | Max load | Counter fallbacks |
+  | --- | --- | ---: | --- | --- | ---: | ---: |
+  | 1 | `pilot-v1-rtx4060ti-desktop-20260929T002903Z-552fa9` | 18/18 | 0, 20, 20, 20 | 0 × 18 | 2.5 ms | 5 |
+  | 2 | `pilot-v1-rtx4060ti-desktop-20260929T003009Z-f4bcf0` | 18/18 | 20, 20, 20, 20 | 0 × 16, +1 × 2 | 16.3 ms | 3 |
+  | 3 | `pilot-v1-rtx4060ti-desktop-20260929T003046Z-9daa3d` | 18/18 | 20, 20, 20, 20 | 0 × 16, +1 × 2 | 1.8 ms | 2 |
+
+- Result: the CLI returned success for every launch, and every
+  `validation.json` reports `ok: true`. Each floor is 20 cached tokens. Warm-up
+  loads stayed at 1.0–2.4 ms, and quality was 1.0 in every launch.
+- Energy source: 44 of 54 requests used the total-energy counter. Ten fell back
+  to instantaneous-power integration, each with its recorded reason: nine
+  because the counter produced no positive delta, and one because the counter
+  implied power above the enforced limit.
+- Ratio-of-sums metrics per launch:
+
+  | Category | tok/s (1, 2, 3) | tok/J (1, 2, 3) | Repeatability CV | Threshold |
+  | --- | --- | --- | ---: | ---: |
+  | short | 105.8, 105.2, 105.0 | 0.939, 0.953, 0.952 | 0.9% | 5.0% |
+  | long | 92.7, 92.1, 92.3 | 0.891, 0.821, 0.870 | 4.2% | 12.5% |
+  | scored | 39.9, 35.6, 36.8 | 0.378, 0.248, 0.353 | 21.0% | 63.1% |
+
+  The CV is `max(CV_speed, CV_energy)` across the three launches; the threshold
+  is `max(5%, 3 × CV)`. Mean GPU power was 104–113 W for `short` and `long`.
+- Anomalies: none that affect validity. Launch 1 began with the model unloaded,
+  so its first warm-up reported 0 cached tokens, as the cold-exclusion warm-up
+  is designed to. Launches 2 and 3 began with the model still loaded. The
+  two-token `scored` answers take about 40–50 ms, only two 100 ms telemetry
+  samples, which explains that block's high energy CV.
 
 ## Environment Probes
 

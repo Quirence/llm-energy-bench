@@ -1,0 +1,33 @@
+{
+  "checksums": {
+    "config.resolved.toml": "c72031bb75c13d4b62f4a7b2bc92cd1e0ceafb80576fbffbef4d8e3d041ec6fa",
+    "manifest.json": "e535d3766e3290ca8eb861915753bb93ac4b883649c7f8c0f4f211f87445c2e4",
+    "outputs.jsonl": "b8b3618b58d2ad5074c2e49e236c224dd5c545fc1e5c93021df54dad1bb2642d",
+    "requests.jsonl": "9c8e75bd2c50e7cfe7d9c81d556cd245b9bb3cad3d6cdc2b4b4f2714c5fa5e85",
+    "telemetry.jsonl.gz": "8f4bf38259da13ebfe286fd350b72b28af5679db16c0360e3445960d64ac9101",
+    "warmups.jsonl": "ff418c4744d46b17e3075e4305563b1a87a3d1233ed5cc21192af1b4b875fa02"
+  },
+  "errors": [],
+  "ok": true,
+  "record_counts": {
+    "outputs.jsonl": 18,
+    "requests.jsonl": 18,
+    "telemetry.jsonl.gz": 150,
+    "warmups.jsonl": 4
+  },
+  "run_id": "pilot-v1-rtx4060ti-desktop-20260929T003009Z-f4bcf0",
+  "sizes": {
+    "config.resolved.toml": 701,
+    "manifest.json": 3316,
+    "outputs.jsonl": 45988,
+    "requests.jsonl": 23736,
+    "telemetry.jsonl.gz": 6161,
+    "warmups.jsonl": 1404
+  },
+  "status": "completed",
+  "warnings": [
+    "validation.json has not been generated yet",
+    "summary.csv has not been generated yet",
+    "report.md has not been generated yet"
+  ]
+}
