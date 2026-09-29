@@ -536,6 +536,18 @@ def test_schema_v2_run_passes_semantic_validation(tmp_path: Path) -> None:
     assert report.errors == ()
 
 
+def test_schema_v2_accepts_the_slot_prefixed_cache_buster_policy(tmp_path: Path) -> None:
+    run_dir = schema_v2_run(tmp_path)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["cache_buster_policy"] = "uuid_slot_prefix_v2"
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is True
+    assert report.errors == ()
+
+
 @pytest.mark.parametrize("schema", [None, 999])
 def test_missing_or_unknown_schema_version_fails_closed(tmp_path: Path, schema: int | None) -> None:
     run_dir = complete_run(tmp_path)

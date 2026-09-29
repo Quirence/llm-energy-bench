@@ -157,3 +157,21 @@ above, record every warm-up plus the floor/excess/uncached counts, and abort
 before measured requests when the floor cannot be established. The prompt
 nonce also moved ahead of every static character. These methodology fixes do
 not turn the GTX 1080 observation into an experimental run.
+
+## RTX 5060 full-campaign marker-boundary observation
+
+The first 480-request `benchmark-v1` attempt exposed a case too rare for the
+18-request acceptance workload. Qwen3 reused one cache token for one matching
+leading UUID character and two cache tokens for two matching characters. The
+only two adjacent two-character matches in 240 Qwen requests were also the
+only requests above the registered one-token excess limit. Llama 3.2 remained
+within its one-token allowance.
+
+The failed campaign is retained unchanged and excluded from analysis. The
+prospective `uuid_slot_prefix_v2` policy keeps the UUID v4 representation but
+sets its first byte from a unique logical request slot. Thus no two warm-up or
+measured markers for one model can share the first two hex characters. The
+MVP permits at most 256 such slots per model and refuses a larger experiment
+before creating a run directory. Schema-v2 validation continues to recognize
+the historical `uuid_prefix_v1` policy so diagnostic artifacts remain
+auditable.

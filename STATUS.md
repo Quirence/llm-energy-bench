@@ -1,16 +1,17 @@
 # Project Status
 
-Last updated: 2026-09-28
+Last updated: 2026-09-29
 
 ## Current Milestone
 
-M1 — Measured Pilot. The implementation is in final stabilization on PR #17;
-no publishable dataset exists yet.
+M2 — Two-GPU Study. The reviewed pilot baseline is tagged `pilot-v1-code`;
+the four-configuration benchmark is in hardware acceptance and no publishable
+two-host dataset exists yet.
 
 ## Done
 
 - The Python 3.12 CLI implements `doctor`, `run`, and `report` with stable exit
-  codes and 299 Windows/Linux hardware-independent tests.
+  codes and more than 300 Windows/Linux hardware-independent tests.
 - Strict TOML and prompt contracts, Ollama streaming/TTFT, full-GPU placement,
   request-scoped NVML telemetry, power-source fallbacks, atomic artifacts,
   privacy guards, and aggregate reports are implemented.
@@ -35,28 +36,33 @@ no publishable dataset exists yet.
 - Contributions from Qcsteeven and Dimas are integrated and attributed in
   `docs/project-state-for-owner.md`. Their later hardware observations are
   preserved separately as diagnostic evidence.
+- Three complete RTX 5060 pilot repeatability launches passed validation with
+  54/54 measured requests. They support instrument repeatability only and are
+  not a two-host research result.
+- All four `benchmark-v1` model tags and exact digests are frozen for Ollama
+  0.34.2 in the two primary-host configs.
 
 ## In Progress
 
-- PR #17 must receive collaborator approval and green Windows/Linux CI after
-  the final stabilization commits are pushed.
-- The 2026-09-28 RTX 5060 preflight passed NVML, digest and full-placement
-  checks but found Ollama 0.34.4 instead of the frozen 0.34.2. The host must use
-  the frozen runtime, or the protocol version must be amended for every host
-  before any publishable pilot is launched.
-- PRs #18, #19, and #22 were reviewed and closed without merge. Their useful
-  requirements and diagnostic evidence are preserved, but their local runs
-  predate schema v2 and remain excluded from the research dataset.
+- The first RTX 5060 `benchmark-v1` attempt completed 480/480 requests but is
+  excluded because two Qwen requests exceeded the registered cache-boundary
+  allowance. The complete diagnostic run is preserved in `experiments/runs/`.
+- `uuid_slot_prefix_v2` is under acceptance. It assigns every warm-up and
+  measured logical request a unique first UUID byte, eliminating the observed
+  two-character marker-prefix collision without weakening the cache rule.
+- The correction still needs the full synthetic suite, one short RTX 5060
+  hardware acceptance, a new frozen commit/tag, and a clean 480-request rerun.
 
 ## Next Acceptance Gate
 
-1. Merge PR #17 by squash after one collaborator approval and both CI jobs.
-2. Tag the exact merge commit `pilot-v1-code`.
-3. Have all three contributors pull that tag and execute their committed
-   primary or observation config without code or protocol changes.
-4. Accept only runs with `validation.json: ok=true` and all 18 measured
-   requests valid.
-5. Freeze all four benchmark model digests before enabling `benchmark-v1`.
+1. Complete synthetic and short hardware acceptance for
+   `uuid_slot_prefix_v2` while retaining the failed campaign unchanged.
+2. Freeze and tag the corrected benchmark commit after collaborator review.
+3. Repeat the full 480-request RTX 5060 campaign; accept only
+   `validation.json: ok=true` with all 480 requests valid.
+4. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
+   digests, and execute the committed companion config without code changes.
+5. Compare only the two complete compatible runs in the primary report.
 
 ## Open Research Work
 
@@ -70,6 +76,7 @@ no publishable dataset exists yet.
 
 ## Latest Validated Run
 
-No publishable run yet. RTX 5060 Laptop, RTX 4060 Ti, and GTX 1080 local runs
-were useful diagnostics, but they predate the final schema-v2 tag or contain
-known validity failures and therefore are excluded from the research dataset.
+The latest accepted local evidence is the three-launch RTX 5060 `pilot-v1`
+repeatability set (54/54 valid measured requests). The later 480-request
+benchmark attempt is deliberately invalid and contributes no aggregates or
+rankings. There is still no compatible two-host research dataset.

@@ -951,7 +951,10 @@ def _validate_schema_v2(
     """Validate the auditable warm-cache schema-v2 contract independently."""
     if manifest.get("prompt_cache_policy") != "template_floor_v2":
         errors.append(f"{MANIFEST} schema v2 has no recognized prompt cache policy")
-    if manifest.get("cache_buster_policy") != "uuid_prefix_v1":
+    if manifest.get("cache_buster_policy") not in {
+        "uuid_prefix_v1",
+        "uuid_slot_prefix_v2",
+    }:
         errors.append(f"{MANIFEST} schema v2 has no recognized cache buster policy")
     if manifest.get("max_cache_excess_tokens") != 1:
         errors.append(f"{MANIFEST} schema v2 has an unexpected cache excess limit")

@@ -57,6 +57,7 @@ from llm_energy_bench.results import (
 
 MAX_TELEMETRY_GAP_S = 0.5
 MAX_CACHE_EXCESS_TOKENS = 1
+MAX_CACHE_MARKER_SLOTS = 256
 MAX_MEASURED_LOAD_DURATION_NS = 100_000_000
 # Consumer drivers can expose a callable total-energy field whose values are
 # nevertheless physically implausible. Keep this deliberately permissive: the
@@ -135,6 +136,7 @@ class RequestMetrics:
 class _PlannedRequest:
     prompt: PromptCase
     repetition: int
+    marker_slot: int
 
 
 def derive_request_metrics(
@@ -290,6 +292,12 @@ def run_experiment(
         )
 
     prompts = load_prompts(config.prompt_path)
+    marker_slot_count = config.warmup_requests + len(prompts) * config.repetitions
+    if marker_slot_count > MAX_CACHE_MARKER_SLOTS:
+        raise RunnerPreflightError(
+            f"experiment needs {marker_slot_count} cache marker slots; "
+            f"uuid_slot_prefix_v2 supports at most {MAX_CACHE_MARKER_SLOTS} per model"
+        )
     client_builder = client_factory or OllamaClient
     sampler_builder = sampler_factory or NvmlSampler
 
@@ -428,7 +436,11 @@ def _execute_requests(
                 warmup = InferenceRequest(
                     request_id=request_id,
                     model=model_name,
-                    prompt=_cache_busted_prompt(request_id, prompt.prompt),
+                    prompt=_cache_busted_prompt(
+                        request_id,
+                        prompt.prompt,
+                        marker_slot=warmup_index,
+                    ),
                     options=options,
                 )
                 warmup_result = client.generate_stream(warmup)
@@ -487,11 +499,16 @@ def _execute_requests(
             )
             _write_manifest(run_dir, manifest)
 
-            planned = [
-                _PlannedRequest(prompt=prompt, repetition=repetition)
-                for repetition in range(config.repetitions)
-                for prompt in prompts
-            ]
+            planned = []
+            for repetition in range(config.repetitions):
+                for prompt in prompts:
+                    planned.append(
+                        _PlannedRequest(
+                            prompt=prompt,
+                            repetition=repetition,
+                            marker_slot=config.warmup_requests + len(planned),
+                        )
+                    )
             random.Random(f"{config.order_seed}:{model_name}").shuffle(planned)
 
             for item in planned:
@@ -503,6 +520,7 @@ def _execute_requests(
                     prompt=_cache_busted_prompt(
                         f"{run_dir.name}:{item.prompt.prompt_id}:{item.repetition}",
                         item.prompt.prompt,
+                        marker_slot=item.marker_slot,
                     ),
                     options=options,
                 )
@@ -787,9 +805,12 @@ def _model_load_options(config: ExperimentConfig) -> dict[str, int]:
     }
 
 
-def _cache_busted_prompt(marker_key: str, prompt: str) -> str:
-    digest = hashlib.sha256(marker_key.encode("utf-8")).digest()
-    marker = UUID(bytes=digest[:16], version=4)
+def _cache_busted_prompt(marker_key: str, prompt: str, *, marker_slot: int) -> str:
+    if not 0 <= marker_slot < MAX_CACHE_MARKER_SLOTS:
+        raise ValueError(f"cache marker slot must be in [0, {MAX_CACHE_MARKER_SLOTS})")
+    digest = bytearray(hashlib.sha256(marker_key.encode("utf-8")).digest()[:16])
+    digest[0] = marker_slot
+    marker = UUID(bytes=bytes(digest), version=4)
     return f"{marker}\n[llm-energy-bench request marker; ignore this marker]\n{prompt}"
 
 
@@ -819,7 +840,7 @@ def _initial_manifest(
         "gpu": capabilities.to_dict(),
         "models": [{**model.to_dict(), "template_cache_baseline_tokens": None} for model in models],
         "prompt_cache_policy": "template_floor_v2",
-        "cache_buster_policy": "uuid_prefix_v1",
+        "cache_buster_policy": "uuid_slot_prefix_v2",
         "max_cache_excess_tokens": MAX_CACHE_EXCESS_TOKENS,
         "max_measured_load_duration_ns": MAX_MEASURED_LOAD_DURATION_NS,
         "controls": config.to_dict(),
