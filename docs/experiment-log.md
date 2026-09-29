@@ -595,3 +595,46 @@ decision blocks.
 - Interpretation: an observation-only replication of the frozen v5 protocol on
   a third GPU. It shows the same leader as both primary hosts and does not
   change the preregistered two-host decision.
+
+### 2026-09-29 — RTX 4060 Ti desktop pilot-v1 primary launches
+
+- Contributor: Qcsteeven.
+- Host role: **primary**, the desktop host of the two-host matrix (Issue #5).
+  Three independent launches provide the preregistered repeatability CV.
+- Code: `pilot-v1-code` = `0ffc091b4747533e6a2b9015a1c0a49ada88c1c1`.
+  Every manifest records that commit. At the tag, Python 3.12.14 passed
+  `ruff check`, `ruff format --check`, and the then-current 299 tests.
+- GPU: NVIDIA GeForce RTX 4060 Ti, 8 GiB; driver 560.94; power limit 160 W.
+- Runtime and model: Ollama 0.34.2; `llama3.2:3b-instruct-q4_K_M`, digest
+  `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72`.
+- Config and prompts: committed `configs/pilot-rtx4060ti.toml`, config hash
+  `c72031bb75c1…`, prompt-set hash `c7c4ae95e164…`.
+- Preflight returned `ok: true`, with the frozen runtime/digest, full GPU
+  placement, and total-energy-counter capability.
+- Conditions: desktop on mains power, Windows Balanced plan, wallpaper
+  renderer closed. Before each launch the GPU was in P8 at 12.4–12.6 W and
+  38–39 °C; peak temperature was 59 °C.
+- Run IDs:
+
+  | Launch | Run ID | Valid | Warm-up cached | Excess | Max load | Counter fallbacks |
+  | --- | --- | ---: | --- | --- | ---: | ---: |
+  | 1 | `pilot-v1-rtx4060ti-desktop-20260929T002903Z-552fa9` | 18/18 | 0, 20, 20, 20 | 0 × 18 | 2.5 ms | 5 |
+  | 2 | `pilot-v1-rtx4060ti-desktop-20260929T003009Z-f4bcf0` | 18/18 | 20, 20, 20, 20 | 0 × 16, +1 × 2 | 16.3 ms | 3 |
+  | 3 | `pilot-v1-rtx4060ti-desktop-20260929T003046Z-9daa3d` | 18/18 | 20, 20, 20, 20 | 0 × 16, +1 × 2 | 1.8 ms | 2 |
+
+- Every `validation.json` reports `ok: true`; each floor is 20 cached tokens.
+  Quality was 1.0 in every launch.
+- Energy source: 44 of 54 requests used the total-energy counter. Ten used
+  instantaneous-power integration with a recorded fallback reason.
+- Ratio-of-sums metrics per launch:
+
+  | Category | tok/s (1, 2, 3) | tok/J (1, 2, 3) | Repeatability CV | Threshold |
+  | --- | --- | --- | ---: | ---: |
+  | short | 105.8, 105.2, 105.0 | 0.939, 0.953, 0.952 | 0.9% | 5.0% |
+  | long | 92.7, 92.1, 92.3 | 0.891, 0.821, 0.870 | 4.2% | 12.5% |
+  | scored | 39.9, 35.6, 36.8 | 0.378, 0.248, 0.353 | 21.0% | 63.1% |
+
+  The threshold is `max(5%, 3 × max(CV_speed, CV_energy))`.
+- Anomalies: none affecting validity. The two-token `scored` answers last
+  about 40–50 ms and span only about two 100 ms telemetry samples, explaining
+  that block's high energy CV.
