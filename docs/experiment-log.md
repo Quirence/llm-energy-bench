@@ -343,3 +343,51 @@ decision blocks.
   yielding warm-up prefixes `00...`, `10...`, `20...`, `30...` while still
   assigning all 256 possible first bytes exactly once. A Qwen-specific short
   acceptance is required before another complete campaign.
+
+### 2026-09-29 — Qwen `uuid_slot_prefix_v3` hardware acceptance
+
+- Run: `cache-marker-acceptance-v3-maibenben-x16c-rtx5060-20260929T013223Z-1907d4`;
+  frozen commit/tag `9ea98b2e7dc23accbbcd62d17520b9875bdc022e` /
+  `benchmark-v1-code-v3`.
+- Environment: Ollama 0.34.2; RTX 5060 Laptop, driver 591.66, reported 80 W
+  power limit; Qwen3 4B Q4 frozen digest and full-GPU placement confirmed.
+- Result: 18/18 measured requests valid, `validation.ok=true`, scored quality
+  1.0. Warm-up cache counts were exactly `0, 3, 3, 3`; the applied floor was
+  three, every measured count was three, and maximum excess was zero.
+- Decision: the v3 ordering removes the Qwen warm-up-floor confound. Proceed
+  with the complete campaign from the same frozen commit without further code
+  or protocol changes.
+
+### 2026-09-29 — RTX 5060 `benchmark-v1` accepted campaign
+
+- Run: `benchmark-v1-maibenben-x16c-20260929T013445Z-dd13a1`; frozen
+  commit/tag `9ea98b2e7dc23accbbcd62d17520b9875bdc022e` /
+  `benchmark-v1-code-v3`.
+- Environment: Ollama 0.34.2; NVIDIA GeForce RTX 5060 Laptop GPU, driver
+  591.66, 8 GiB VRAM, reported 80 W power limit. All four model digests matched
+  the committed controls and every model was fully resident on the GPU.
+- Completion and validity: 16/16 warm-ups and 480/480 measured requests were
+  persisted; `validation.json` reports `ok=true`, zero errors/warnings and no
+  invalid request. Applied cache floors were `3, 3, 20, 20`; measured excess
+  never exceeded the registered one-token allowance. Maximum telemetry gap
+  was 141 ms, maximum temperature 71 °C, and maximum observed power sample
+  95.722 W.
+- Quality: Qwen3 Q4 and Q8 scored 1.0; Llama 3.2 Q4 scored 0.825; Llama 3.2
+  Q8 scored 0.75, exactly the preregistered eligibility threshold. All four
+  configurations therefore entered the ranking.
+- Observed aggregate result: speed and GPU-energy rankings were identical in
+  all three workload categories. Llama 3.2 Q4 ranked first throughout. For
+  long and short workloads the order was Llama Q4, Qwen Q4, Llama Q8, Qwen
+  Q8; for scored prompts it was Llama Q4, Llama Q8, Qwen Q4, Qwen Q8.
+- Scale: Llama Q4 ranged from 83.402 to 122.719 output tok/s and 1.041 to
+  1.553 output tok/J across categories. Qwen Q8 ranged from 32.967 to 67.148
+  output tok/s and 0.412 to 0.858 output tok/J.
+- Energy-source note: 468 requests used instantaneous-power integration after
+  the total-counter sanity check and 12 used the total-energy counter. An
+  instantaneous-only sensitivity recomputation preserved every energy rank;
+  for the 12 counter-selected requests the counter/instantaneous ratio ranged
+  from 0.571 to 1.420 (median 0.932).
+- Interpretation: this single-host campaign does not show an aggregate rank
+  inversion. It does not establish equivalence, satisfy the predeclared
+  bootstrap/material-effect criterion, or answer the two-host hypothesis.
+  The compatible RTX 4060 Ti campaign remains required.

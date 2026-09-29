@@ -32,11 +32,14 @@ VRAM-контекст. Это измерительный инструмент, �
 - CSV/Markdown report с ratios of sums, median/IQR, quality floor и ranking
   только внутри одного GPU/host workload block.
 - CI для Windows/Linux и hardware-independent fake implementations.
-- Зафиксированный срез проходит 300 автоматических тестов.
+- Зафиксированный срез проходит 305 автоматических тестов.
 - Тег `pilot-v1-code` указывает на merge commit `0ffc091`; это единственная
   кодовая база для сравнимых pilot-запусков.
 - Schema-v2 наблюдение Dimas на GTX 1080 принято через PR #23: 18/18 запросов
   валидны, raw hashes воспроизводятся, но данные не входят в primary matrix.
+- После двух исключённых диагностических попыток cache-marker policy v3 прошла
+  отдельную Qwen-приёмку и полный RTX 5060 benchmark: 480/480 valid,
+  `validation.ok=true`, exact commit `9ea98b2` (`benchmark-v1-code-v3`).
 
 ## Кто что сделал
 
@@ -76,9 +79,21 @@ VRAM-контекст. Это измерительный инструмент, �
   schema-v2 GTX 1080 observation-run и защиту byte-exact артефактов от Windows
   EOL-конверсии.
 
+## Первый результат основной матрицы
+
+На RTX 5060 aggregate speed- и energy-ranking совпали во всех трёх workload
+blocks. Llama 3.2 Q4 заняла первое место в каждом блоке; все четыре
+конфигурации прошли quality floor. Это корректный отрицательный результат для
+одного стенда, но не итог статьи: нужны совместимый RTX 4060 Ti benchmark и
+предзарегистрированный bootstrap/material-effect анализ.
+
+Из 480 запросов 468 использовали instantaneous-power integration и 12 —
+total-energy counter. Instantaneous-only sensitivity analysis сохранил все
+energy ranks. Энергия остаётся GPU-only оценкой.
+
 ## Что сейчас нельзя утверждать
 
-- Что speed- и energy-ranking совпадают или различаются на основной матрице.
+- Что совпадение ranking на RTX 5060 переносится на RTX 4060 Ti или другие GPU.
 - Что старые локальные прогоны RTX 4060 Ti автоматически стали публикационными.
 - Что NVML energy равна wall-system energy.
 - Что локальные незакоммиченные прогоны образуют публикационный датасет.
@@ -93,20 +108,16 @@ VRAM-контекст. Это измерительный инструмент, �
 4. Dimas опубликовал observation-only run с 18/18 valid measured requests и
    `validation.json: ok=true`.
 
-Следующий gate: Quirence и Qcsteeven создают result branches именно от тега и
-получают по три независимых validated launch на основных стендах.
-
-На текущем MAIBENBEN preflight уже подтверждает RTX 5060, NVML, полный GPU
-placement и правильный model digest, но установлен Ollama 0.34.4 вместо
-согласованного 0.34.2. Инструмент правильно блокирует такой запуск. Перед
-публикационным pilot нужно либо вернуть 0.34.2, либо отдельным решением изменить
-версию протокола сразу для всех стендов и повторить preflight.
+RTX 5060 уже работает на согласованном Ollama 0.34.2 и имеет принятый полный
+benchmark run. Ветка Qcsteeven содержит три RTX 4060 Ti pilot launch и должна
+быть отдельно проверена. Следующий gate — его полный benchmark строго от
+`benchmark-v1-code-v3` с `configs/benchmark-v1-rtx4060ti.toml`.
 
 ## Команды для запуска от зафиксированного тега
 
 ```text
 git fetch origin --prune --tags
-git switch --detach pilot-v1-code
+git switch --detach benchmark-v1-code-v3
 git rev-parse HEAD
 git tag --points-at HEAD
 py -3.12 -m venv .venv
@@ -114,8 +125,8 @@ py -3.12 -m venv .venv
 .venv\Scripts\python -m ruff check .
 .venv\Scripts\python -m ruff format --check .
 .venv\Scripts\python -m pytest -q
-.venv\Scripts\python -m llm_energy_bench doctor --config configs/pilot-rtx5060.toml --json
-.venv\Scripts\python -m llm_energy_bench run --config configs/pilot-rtx5060.toml
+.venv\Scripts\python -m llm_energy_bench doctor --config configs/benchmark-v1-rtx4060ti.toml --json
+.venv\Scripts\python -m llm_energy_bench run --config configs/benchmark-v1-rtx4060ti.toml
 ```
 
 Для второго основного хоста используется его отдельный committed config.

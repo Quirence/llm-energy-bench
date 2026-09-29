@@ -48,6 +48,10 @@ two-host dataset exists yet.
   not a two-host research result.
 - All four `benchmark-v1` model tags and exact digests are frozen for Ollama
   0.34.2 in the two primary-host configs.
+- `uuid_slot_prefix_v3` passed a Qwen-specific 18/18 hardware acceptance with
+  the expected three-token floor and zero excess cached tokens.
+- The RTX 5060 `benchmark-v1` campaign completed with 480/480 valid measured
+  requests and `validation.ok=true` from tag `benchmark-v1-code-v3`.
 
 ## In Progress
 
@@ -57,20 +61,22 @@ two-host dataset exists yet.
 - `uuid_slot_prefix_v2` passed a Llama acceptance but inflated Qwen's warm-up
   floor because sequential slots `00` through `03` share one leading
   character. The partial follow-up run is excluded.
-- `uuid_slot_prefix_v3` keeps unique first bytes and permutes sequential slots
-  to begin `00`, `10`, `20`, `30`. It needs a Qwen-specific short acceptance
-  before another 480-request run.
+- The accepted RTX 5060 aggregate speed and energy rankings agree in all three
+  workload categories. This is a single-host observation, not the final
+  hypothesis decision.
+- The RTX 4060 Ti pilot result branch exists and requires review; its complete
+  benchmark must use the same v3 tag before a two-host comparison is valid.
 
 ## Next Acceptance Gate
 
-1. Run the committed Qwen-specific marker acceptance and require its warm-up
-   floor to remain three tokens with 18/18 requests valid.
-2. Freeze and tag the corrected benchmark commit after collaborator review.
-3. Repeat the full 480-request RTX 5060 campaign; accept only
-   `validation.json: ok=true` with all 480 requests valid.
-4. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
+1. Review and publish the v3 fix, acceptance artifacts, and accepted RTX 5060
+   campaign without changing the frozen commit.
+2. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
    digests, and execute the committed companion config without code changes.
-5. Compare only the two complete compatible runs in the primary report.
+3. Accept only `validation.json: ok=true` with all 480 requests valid.
+4. Implement the preregistered bootstrap/material-effect analysis against the
+   two compatible primary runs.
+5. Compare only those complete compatible runs in the paper tables.
 
 ## Open Research Work
 
@@ -83,9 +89,8 @@ two-host dataset exists yet.
 
 ## Latest Validated Run
 
-The latest local validated artifact remains
-`pilot-v1-maibenben-x16c-rtx5060-20260929T012225Z-8f048a`: 18/18 valid requests
-under `uuid_slot_prefix_v2`. It is a Llama-only marker-policy acceptance, not
-the research campaign. Both later benchmark attempts are excluded (one
-invalid, one partial) and contribute no aggregates or rankings; there is still
-no compatible two-host research dataset.
+The latest validated artifact is
+`benchmark-v1-maibenben-x16c-20260929T013445Z-dd13a1`: 480/480 valid measured
+requests on RTX 5060 from `benchmark-v1-code-v3`. Its observed aggregate speed
+and energy rankings agree in 3/3 workload blocks. The result remains
+single-host; there is still no compatible two-host research dataset.

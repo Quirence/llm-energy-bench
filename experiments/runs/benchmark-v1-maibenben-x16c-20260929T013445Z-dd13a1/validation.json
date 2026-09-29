@@ -1,0 +1,35 @@
+{
+  "checksums": {
+    "config.resolved.toml": "edcffa36c797f03e4226a084aafe98284318203fff57a5a734d6fbba522d039f",
+    "manifest.json": "26f867562b2879ff5bdebc364b4c1ec8943816aff72d020b7abce3b1c622925d",
+    "outputs.jsonl": "15ac38bd1326d14f89204560e33fef7bbef4785e7babc8b7da8b557a98f7c069",
+    "report.md": "1d2ae5e1494c7ccc4f5864f9ac9826c40a3e1704760e56b0b054ee9e70654225",
+    "requests.jsonl": "5a86aaa791cadddf1a912805f240621c5552dcae6070263bbbf484894178b95b",
+    "summary.csv": "815aad25f8d97bd401c57c3f01eed40c3d191e29318f532e8cfae109a259f31b",
+    "telemetry.jsonl.gz": "a867803551d0e3f9c0d8ea0b37cfb7377f9e1ec43912963f502da5bf9bdb5bc9",
+    "validation.json": "19aecc6d6d40a271f9c718855130625d02ff96b909d6ced055188817cdfb6564",
+    "warmups.jsonl": "62f89366823152a0d7d7c1b7a2654de896767554e6fb1d0572430f41ea1d432c"
+  },
+  "errors": [],
+  "ok": true,
+  "record_counts": {
+    "outputs.jsonl": 480,
+    "requests.jsonl": 480,
+    "telemetry.jsonl.gz": 6126,
+    "warmups.jsonl": 16
+  },
+  "run_id": "benchmark-v1-maibenben-x16c-20260929T013445Z-dd13a1",
+  "sizes": {
+    "config.resolved.toml": 1099,
+    "manifest.json": 5178,
+    "outputs.jsonl": 1335473,
+    "report.md": 2344,
+    "requests.jsonl": 483540,
+    "summary.csv": 5726,
+    "telemetry.jsonl.gz": 206917,
+    "validation.json": 1257,
+    "warmups.jsonl": 5637
+  },
+  "status": "completed",
+  "warnings": []
+}

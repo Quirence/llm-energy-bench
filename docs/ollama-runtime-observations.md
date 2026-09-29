@@ -184,3 +184,10 @@ superseding `uuid_slot_prefix_v3` policy nibble-swaps the logical slot number:
 the first four prefixes are `00`, `10`, `20`, and `30`, while the mapping
 remains a permutation of all 256 byte values. This separates consecutive
 warm-up boundaries without weakening the one-token excess rule.
+
+The subsequent Qwen-specific acceptance observed warm-up cache counts
+`0, 3, 3, 3` and 18/18 measured counts at three. The complete 480-request
+campaign then retained the expected model floors `3, 3, 20, 20`, with no
+request above one excess token and `validation.ok=true`. This is the accepted
+cache-marker policy for the two-host benchmark; v1 and v2 remain recognized
+only so their diagnostic artifacts can be audited.
