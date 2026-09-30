@@ -545,3 +545,53 @@ decision blocks.
   bootstrap/material-effect criterion. The analysis must also decide how a
   configuration that is eligible on one host but not the other (Llama 3.2 Q8)
   enters the two-host comparison.
+
+### 2026-09-29 — GTX 1080 `benchmark-v1` observation campaign
+
+- Contributor: Skipl1 (Dimas)
+- Host role: **observation-only**, outside the primary two-host matrix. The
+  run must not enter the primary decision blocks or the hypothesis verdict.
+- Frozen code: `d587a5d`, tag `benchmark-v1-code-v5`, policy
+  `uuid_stable_slot_prefix_v4`; `ruff`, `ruff format --check` and 308 tests
+  pass at the tag. The run used a local copy of `configs/benchmark-v1.toml`
+  that differs only by `host_id = "gtx1080-observation"` and its leading
+  comment; the resolved config is committed in the run directory (config hash
+  `9f997c48945d…`, prompt-set hash `41331de11824…`).
+- Host: NVIDIA GeForce GTX 1080, 8 GiB, driver 582.66, 200 W limit; Ollama
+  0.34.2. `doctor --json` over that config returned `ok: true` with all four
+  frozen digests matched and full GPU placement for every model.
+- Conditions: desktop on mains power; no wallpaper renderer. Discord and the
+  desktop compositor held about 14% 3D utilization, and idle power was
+  9.9–10.5 W in P8 before the launch. NVML reports whole-GPU power, so this
+  small background share is included in the energy figures.
+- Run: `benchmark-v1-gtx1080-observation-20260929T114631Z-f56982`, 16
+  minutes.
+- Validity: 16/16 warm-ups and **480/480 measured requests valid**;
+  `validation.ok=true` with zero errors and warnings. Floors `3, 3, 20, 20`
+  (warm-up cache `0, 3, 3, 3` and `0, 20, 20, 20`); 457 requests at the floor
+  and 23 at the allowed one-token excess. No `load_duration` is missing and
+  the largest is 78.3 ms; the largest telemetry gap is 140 ms; the peak
+  temperature is 63 °C. Repeated steady-state reports are byte-idempotent.
+- Actual prompt-map check: the 120 unique `(prompt_id, repetition, prompt)`
+  records hash to
+  `6715d4c2c6fe9846a20356fe221c723aaf185278239c68f48b8d3503ede104a0`, identical
+  to both primary hosts.
+- Quality: Qwen3 Q4/Q8 = 1.0, Llama 3.2 Q4 = 0.825, Llama 3.2 Q8 = 0.75. All
+  four meet the frozen threshold on this host; Llama 3.2 Q8 sits exactly at
+  it, as on the RTX 5060.
+- Aggregate result: speed and energy select the same leader, Llama 3.2 Q4, in
+  3/3 workload blocks, ahead of the runner-up by 24–43% in tok/s and 18–30% in
+  tok/J. Long and scored order: Llama Q4, Llama Q8, Qwen Q4, Qwen Q8, for both
+  metrics. In `short`, ranks 2 and 3 swap: Qwen Q4 is second by speed (60.6 vs
+  56.7 tok/s) while Llama Q8 is second by energy (0.344 vs 0.331 tok/J).
+- Mechanism: mean GPU power was 182.3 W for both Q4 models and 164.9–167.4 W
+  for the Q8 models, close to the 200 W limit throughout; energy per token was
+  2.55 J (Llama Q4), 3.02 J (Llama Q8), 3.22 J (Qwen Q4) and 3.80 J (Qwen Q8).
+- Energy-source sensitivity: all 480 requests used the total-energy counter.
+  Recomputing every request from instantaneous power preserves all three
+  energy rankings; counter/instant ratios span 0.833–1.311 (median 1.004).
+  The largest instantaneous-power sample was 232.9 W, within the 120%
+  tolerance of the enforced limit.
+- Interpretation: an observation-only replication of the frozen v5 protocol on
+  a third GPU. It shows the same leader as both primary hosts and does not
+  change the preregistered two-host decision.
