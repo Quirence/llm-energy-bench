@@ -87,7 +87,33 @@ def test_report_accepts_multiple_run_dirs(tmp_path) -> None:
     assert args.run_dirs == [first, second]
 
 
-@pytest.mark.parametrize("command", ["doctor", "run", "report"])
+def test_analyze_parses_role_specific_inputs_and_output(tmp_path: Path) -> None:
+    calibration = [tmp_path / f"cal-{index}" for index in range(2)]
+    benchmark = [tmp_path / f"bench-{index}" for index in range(2)]
+    output = tmp_path / "study"
+
+    args = cli.build_parser().parse_args(
+        [
+            "analyze",
+            "--calibration",
+            str(calibration[0]),
+            "--calibration",
+            str(calibration[1]),
+            "--benchmark",
+            str(benchmark[0]),
+            "--benchmark",
+            str(benchmark[1]),
+            "--output-dir",
+            str(output),
+        ]
+    )
+
+    assert args.calibration == calibration
+    assert args.benchmark == benchmark
+    assert args.output_dir == output
+
+
+@pytest.mark.parametrize("command", ["doctor", "run", "report", "analyze"])
 def test_every_command_is_registered(command: str) -> None:
     assert command in cli.COMMANDS
 
@@ -204,6 +230,31 @@ def test_report_command_returns_validation_failure_after_writing_report(
     assert cli.main(["report", str(tmp_path / "run")]) == cli.EXIT_RUN_FAILED
     captured = capsys.readouterr()
     assert str(paths.report_markdown) in captured.out
+
+
+def test_analyze_command_writes_and_prints_all_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output_paths = tuple(
+        tmp_path / name for name in ("analysis.json", "calibration.csv", "report.md")
+    )
+    monkeypatch.setattr(cli, "analyze_study", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(cli, "write_study_analysis", lambda *_args, **_kwargs: output_paths)
+
+    code = cli.main(
+        [
+            "analyze",
+            "--calibration",
+            str(tmp_path / "calibration"),
+            "--benchmark",
+            str(tmp_path / "benchmark"),
+            "--output-dir",
+            str(tmp_path / "study"),
+        ]
+    )
+
+    assert code == cli.EXIT_OK
+    assert capsys.readouterr().out.splitlines() == [str(path) for path in output_paths]
 
 
 def test_keyboard_interrupt_maps_to_run_failed(monkeypatch: pytest.MonkeyPatch) -> None:

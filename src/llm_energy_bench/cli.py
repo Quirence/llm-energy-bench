@@ -14,6 +14,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
+from llm_energy_bench.analysis import AnalysisError, analyze_study, write_study_analysis
 from llm_energy_bench.config import ConfigError, ExperimentConfig, load_config
 from llm_energy_bench.nvml import EnergySource, NvmlError, NvmlSampler
 from llm_energy_bench.ollama import ModelNotFound, OllamaClient, OllamaError
@@ -220,6 +221,17 @@ def cmd_report(args: argparse.Namespace) -> int:
     return EXIT_OK if paths.validation_ok else EXIT_RUN_FAILED
 
 
+def cmd_analyze(args: argparse.Namespace) -> int:
+    try:
+        analysis = analyze_study(tuple(args.calibration), tuple(args.benchmark))
+        paths = write_study_analysis(analysis, args.output_dir)
+    except (AnalysisError, ResultsError, OSError) as error:
+        raise RunFailedError(str(error)) from error
+    for path in paths:
+        print(path)
+    return EXIT_OK
+
+
 def _safe_error(error: BaseException) -> str:
     detail = str(error) or type(error).__name__
     return "<redacted>" if scan_for_private_data(detail) else detail
@@ -262,6 +274,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "doctor": cmd_doctor,
     "run": cmd_run,
     "report": cmd_report,
+    "analyze": cmd_analyze,
 }
 
 
@@ -278,7 +291,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog=PROGRAM,
         description="Measure local LLM inference performance and GPU energy use.",
     )
-    subparsers = parser.add_subparsers(dest="command", metavar="{doctor,run,report}")
+    subparsers = parser.add_subparsers(dest="command", metavar="{doctor,run,report,analyze}")
 
     doctor = subparsers.add_parser(
         "doctor",
@@ -312,6 +325,31 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         metavar="<run-dir>",
         help="One or more completed run directories.",
+    )
+
+    analyze = subparsers.add_parser("analyze", help="Analyze the frozen two-host paper dataset.")
+    analyze.add_argument(
+        "--calibration",
+        required=True,
+        action="append",
+        type=Path,
+        metavar="<run-dir>",
+        help="Calibration run directory; repeat exactly six times.",
+    )
+    analyze.add_argument(
+        "--benchmark",
+        required=True,
+        action="append",
+        type=Path,
+        metavar="<run-dir>",
+        help="Primary benchmark run directory; repeat exactly twice.",
+    )
+    analyze.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path,
+        metavar="<study-dir>",
+        help="Directory for deterministic study-level artifacts.",
     )
 
     return parser

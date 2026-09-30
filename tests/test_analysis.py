@@ -15,6 +15,7 @@ from llm_energy_bench.analysis import (
     assess_pairwise_inversion,
     coefficient_of_variation,
     material_effect_threshold,
+    write_study_analysis,
 )
 
 ROOT = Path(__file__).parents[1]
@@ -167,3 +168,15 @@ def test_observation_run_cannot_enter_the_two_host_primary_verdict() -> None:
             seed=42,
             resamples=10,
         )
+
+
+def test_study_artifacts_are_byte_idempotent(tmp_path: Path) -> None:
+    analysis = analyze_study(CALIBRATION_DIRS, BENCHMARK_DIRS, seed=42, resamples=100)
+
+    first = write_study_analysis(analysis, tmp_path / "study")
+    first_bytes = tuple(path.read_bytes() for path in first)
+    second = write_study_analysis(analysis, tmp_path / "study")
+
+    assert second == first
+    assert tuple(path.read_bytes() for path in second) == first_bytes
+    assert [path.name for path in first] == ["analysis.json", "calibration.csv", "report.md"]

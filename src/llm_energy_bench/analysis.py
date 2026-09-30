@@ -7,6 +7,8 @@ increase the denominator of the primary two-host decision.
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import math
 import random
@@ -17,7 +19,14 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from llm_energy_bench.results import OUTPUTS, ResultsError, read_jsonl, validate_run
+from llm_energy_bench.results import (
+    OUTPUTS,
+    ResultsError,
+    read_jsonl,
+    validate_run,
+    write_json,
+    write_text,
+)
 
 QUALITY_FLOOR = 0.75
 MINIMUM_MATERIAL_EFFECT = 0.05
@@ -368,6 +377,159 @@ def analyze_study(
             "inversion exists elsewhere.",
         ),
     )
+
+
+def write_study_analysis(analysis: StudyAnalysis, output_dir: Path) -> tuple[Path, Path, Path]:
+    """Write deterministic machine-readable and human-readable study artifacts."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    analysis_path = output_dir / "analysis.json"
+    calibration_path = output_dir / "calibration.csv"
+    report_path = output_dir / "report.md"
+    write_json(analysis_path, analysis.to_dict())
+    write_text(calibration_path, _render_calibration_csv(analysis.thresholds))
+    write_text(report_path, _render_study_report(analysis))
+    return analysis_path, calibration_path, report_path
+
+
+def _render_calibration_csv(thresholds: tuple[CalibrationThreshold, ...]) -> str:
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(
+        (
+            "host_id",
+            "gpu_fingerprint",
+            "prompt_category",
+            "speed_cv",
+            "energy_cv",
+            "material_threshold",
+            "run_ids",
+        )
+    )
+    for item in thresholds:
+        writer.writerow(
+            (
+                item.host_id,
+                item.gpu_fingerprint,
+                item.category,
+                _decimal(item.speed_cv),
+                _decimal(item.energy_cv),
+                _decimal(item.threshold),
+                ";".join(item.run_ids),
+            )
+        )
+    return buffer.getvalue()
+
+
+def _render_study_report(analysis: StudyAnalysis) -> str:
+    lines = [
+        "# Frozen paper dataset v1",
+        "",
+        "## Primary result",
+        "",
+        f"- Hypothesis outcome: `{analysis.outcome.value}`.",
+        (
+            f"- Speed and energy winners agree in {analysis.blocks_agree}/"
+            f"{analysis.blocks_evaluated} host × workload blocks "
+            f"({analysis.agreement_rate:.1%})."
+        ),
+        (
+            "- Material pairwise rank inversions: "
+            f"{sum(item.material for item in analysis.inversions)}."
+        ),
+        f"- Quality floor: {analysis.quality_floor:.0%}, inclusive.",
+        (
+            f"- Bootstrap: {analysis.bootstrap_resamples:,} hierarchical paired resamples, "
+            f"seed {analysis.bootstrap_seed}."
+        ),
+        "",
+        (
+            "Within the frozen two-GPU domain, the energy-aware ranking did not change the "
+            "top engineering choice relative to speed-only ranking. This does not support the "
+            "rank-inversion hypothesis in the investigated domain."
+        ),
+        "",
+        "## Primary benchmark inputs",
+        "",
+    ]
+    lines.extend(f"- `{run_id}`" for run_id in analysis.benchmark_run_ids)
+    lines.extend(("", "## Calibration inputs", ""))
+    lines.extend(f"- `{run_id}`" for run_id in analysis.calibration_run_ids)
+    lines.extend(
+        (
+            "",
+            "## Repeatability thresholds",
+            "",
+            "| Host | Workload | Speed CV | Energy CV | Material threshold |",
+            "|---|---:|---:|---:|---:|",
+        )
+    )
+    for item in analysis.thresholds:
+        lines.append(
+            f"| {item.host_id} | {item.category} | {item.speed_cv:.2%} | "
+            f"{item.energy_cv:.2%} | {item.threshold:.2%} |"
+        )
+    lines.extend(
+        (
+            "",
+            "The threshold is `max(5%, 3 × max(CV_speed, CV_energy))` for each host and "
+            "workload category.",
+            "",
+            "## Decision blocks",
+            "",
+            "| Host | Workload | Speed winner | Energy winner | Agree | Eligible models |",
+            "|---|---:|---|---|---:|---:|",
+        )
+    )
+    for block in analysis.blocks:
+        lines.append(
+            f"| {block.host_id} | {block.category} | {block.speed_winner} | "
+            f"{block.energy_winner} | {'yes' if block.top_agrees else 'no'} | "
+            f"{len(block.eligible_models)} |"
+        )
+    lines.extend(("", "## Quality eligibility", ""))
+    if analysis.exclusions:
+        for item in analysis.exclusions:
+            score = "missing" if item.quality_score is None else f"{item.quality_score:.3f}"
+            lines.append(
+                f"- `{item.model}` on `{item.host_id}` was excluded: score {score} is below "
+                f"the inclusive {item.quality_floor:.3f} floor."
+            )
+    else:
+        lines.append("- Every configuration met the quality floor on its host.")
+    lines.extend(("", "## Pairwise rank inversions", ""))
+    if analysis.inversions:
+        for item in analysis.inversions:
+            lines.append(
+                f"- `{item.host_id}/{item.category}`: speed `{item.speed_winner}`, energy "
+                f"`{item.energy_winner}`; speed effect {item.speed_effect:.2%} "
+                f"(95% CI {item.speed_ci_low:.2%}–{item.speed_ci_high:.2%}), energy effect "
+                f"{item.energy_effect:.2%} (95% CI {item.energy_ci_low:.2%}–"
+                f"{item.energy_ci_high:.2%}); material={str(item.material).lower()}."
+            )
+    else:
+        lines.append("- No descriptive pairwise speed/energy rank inversions were found.")
+    lines.extend(
+        (
+            "",
+            "## Limitations",
+            "",
+        )
+    )
+    lines.extend(f"- {limitation}" for limitation in analysis.limitations)
+    lines.extend(
+        (
+            "",
+            "All throughput and efficiency values use ratio-of-sums. Scored-prompt quality "
+            "is averaged within prompt before prompts receive equal weight.",
+            "",
+        )
+    )
+    return "\n".join(lines)
+
+
+def _decimal(value: float) -> str:
+    return format(value, ".12g")
 
 
 def _load_run(path: Path) -> _LoadedRun:
