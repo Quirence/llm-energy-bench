@@ -460,3 +460,88 @@ decision blocks.
 - Interpretation: no aggregate rank inversion is observed on primary host A.
   The hypothesis remains undecided until primary host B runs the same v5 tag
   and the preregistered material-effect/bootstrap analysis is implemented.
+
+### 2026-09-29 — RTX 4060 Ti `benchmark-v1` first campaign attempt (invalid)
+
+- Contributor: Qcsteeven. Primary host B, RTX 4060 Ti desktop.
+- Run: `benchmark-v1-rtx4060ti-desktop-20260929T110448Z-98f860`; commit/tag
+  `d587a5d6fbeae039009a4e722f2af1249ebcbbf4` / `benchmark-v1-code-v5`,
+  policy `uuid_stable_slot_prefix_v4`, committed
+  `configs/benchmark-v1-rtx4060ti.toml`.
+- Preflight: at the tag, Python 3.12.14 passed `ruff check`,
+  `ruff format --check` and 308 tests. `doctor --config
+  configs/benchmark-v1-rtx4060ti.toml --json` returned `ok: true` with Ollama
+  0.34.2, all four frozen digests matched, every model reported
+  `fully_on_gpu: true` and `gpu_fraction: 1.0`, and the total-energy source
+  was available.
+- Environment: NVIDIA GeForce RTX 4060 Ti, 8 GiB, driver 560.94, 160 W power
+  limit. The desktop ran on mains power with the Windows Balanced power plan.
+  The wallpaper renderer was closed before `doctor`; the remaining GPU users
+  were the desktop compositor (about 3%), a browser (about 2%) and the Claude
+  app (about 1.5%). Idle before the launch was a median 9.8 W in P8 at 39 °C.
+- Completion and validity: 16/16 warm-ups and 480/480 measured requests were
+  persisted, with 478 valid. `validation.json` reports `ok: false`. Floors
+  were `3, 3, 20, 20`, and every model's warm-ups reported `0, floor, floor,
+  floor`. Cache excess was 0 on 457 requests and 1 on 23, with no cache
+  rejection. The logical prompt map hashes to
+  `6715d4c2c6fe9846a20356fe221c723aaf185278239c68f48b8d3503ede104a0`,
+  identical to primary host A.
+- Rejections: `request-00189` (`qwen3:4b-instruct-2507-q8_0`, `scored-02`,
+  repetition 0) and `request-00292` (`llama3.2:3b-instruct-q4_K_M`,
+  `scored-01`, repetition 2). In both, Ollama's final chunk omitted
+  `load_duration`, so they were marked `load_duration_missing`. Both requests
+  completed normally in 0.119 s and 0.040 s, with cached counts exactly at
+  their floors (3 and 20), and their neighbours reported loads of 1.0–1.8 ms.
+  The Ollama server log shows model loads only at the four model switches, not
+  inside those blocks. This is consistent with Ollama omitting a zero
+  duration (`omitempty`) rather than with a reload, but the registered rule
+  rejects any missing value, so the attempt is excluded.
+- Artifacts: the raw run and its `validation.json` are committed unchanged
+  for audit and are not part of the comparison dataset.
+
+### 2026-09-29 — RTX 4060 Ti `benchmark-v1` accepted campaign
+
+- Contributor: Qcsteeven. Primary host B, RTX 4060 Ti desktop.
+- Run: `benchmark-v1-rtx4060ti-desktop-20260929T111918Z-f5692c`; the same
+  tag, commit, policy, config and preflight as the invalid attempt above,
+  launched 2 minutes after it with no environment change. The GPU had not
+  fully settled: after reaching P8, idle sampled at a median 17.9 W across
+  P2–P8 and 40–43 °C.
+- Config and prompts: config hash `58e9697ba7b6…`, prompt-set hash
+  `41331de11824…`. The logical prompt map's 120 unique
+  `(prompt_id, repetition, prompt)` records hash to
+  `6715d4c2c6fe9846a20356fe221c723aaf185278239c68f48b8d3503ede104a0`,
+  identical to primary host A.
+- Completion and validity: 16/16 warm-ups and 480/480 measured requests were
+  persisted and valid. `validation.json` reports `ok=true` with zero errors
+  and warnings. Floors were `3, 3, 20, 20`; cache excess was 0 on 457
+  requests and 1 on 23. Every request reported a load duration, the largest
+  14.8 ms. Maximum telemetry gap was 188 ms, peak GPU temperature 62 °C, and
+  the maximum observed power sample 146.653 W. Steady-state `report`
+  regeneration is byte-identical.
+- Quality: Qwen3 Q4 and Q8 scored 1.0 and Llama 3.2 Q4 scored 0.85. Llama 3.2
+  Q8 scored **0.725**, below the frozen 0.75 threshold, so it is not eligible
+  on this host. The invalid attempt produced the same four quality scores. On
+  primary host A the same configuration scored 0.75 with byte-identical
+  request text, so this eligibility difference comes from the host's outputs,
+  not the prompts.
+- Observed aggregate result among the three eligible configurations: speed and
+  GPU-energy rankings were identical in all three workload categories, with
+  Llama Q4, then Qwen Q4, then Qwen Q8 in each.
+
+  | Category | Llama Q4 tok/s, tok/J | Qwen Q4 tok/s, tok/J | Qwen Q8 tok/s, tok/J | Llama Q8 (ineligible) |
+  | --- | --- | --- | --- | --- |
+  | short | 102.4, 0.919 | 82.6, 0.734 | 52.3, 0.543 | 64.5, 0.687 |
+  | long | 96.0, 0.866 | 76.7, 0.687 | 49.7, 0.516 | 62.5, 0.658 |
+  | scored | 84.4, 0.731 | 44.0, 0.428 | 33.7, 0.384 | 50.7, 0.506 |
+
+- Energy-source note: 444 requests used the total-energy counter and 36 used
+  instantaneous-power integration after the counter sanity check. Recomputing
+  every valid request from instantaneous power preserves all three energy
+  rankings. For the 444 counter-selected requests the counter/instantaneous
+  ratio ranged from 0.508 to 1.749 (median 0.887).
+- Interpretation: this second primary host shows no aggregate rank inversion
+  among its eligible configurations. It does not satisfy the preregistered
+  bootstrap/material-effect criterion. The analysis must also decide how a
+  configuration that is eligible on one host but not the other (Llama 3.2 Q8)
+  enters the two-host comparison.
