@@ -1,0 +1,569 @@
+{
+  "aggregates": [
+    {
+      "category": "long",
+      "eligible": true,
+      "gpu_energy_joules": 2265.611688001104,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 28.997637699969346,
+      "model": "llama3.2:3b-instruct-q4_K_M",
+      "model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "output_tokens": 3228.0,
+      "quality_score": 0.85,
+      "request_count": 40,
+      "tokens_per_joule": 1.4247807852933476,
+      "tokens_per_second": 111.31941275352276
+    },
+    {
+      "category": "long",
+      "eligible": true,
+      "gpu_energy_joules": 3090.357262499881,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 39.50896590000775,
+      "model": "llama3.2:3b-instruct-q8_0",
+      "model_digest": "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a",
+      "output_tokens": 3104.0,
+      "quality_score": 0.75,
+      "request_count": 40,
+      "tokens_per_joule": 1.0044146149914988,
+      "tokens_per_second": 78.56444554524245
+    },
+    {
+      "category": "long",
+      "eligible": true,
+      "gpu_energy_joules": 2492.917524002984,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 31.953137900025467,
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "output_tokens": 2671.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 1.0714353661051175,
+      "tokens_per_second": 83.59116429682079
+    },
+    {
+      "category": "long",
+      "eligible": true,
+      "gpu_energy_joules": 3552.0215285016557,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 46.20338599999377,
+      "model": "qwen3:4b-instruct-2507-q8_0",
+      "model_digest": "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374",
+      "output_tokens": 2853.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 0.8032045912749513,
+      "tokens_per_second": 61.74872118680619
+    },
+    {
+      "category": "scored",
+      "eligible": true,
+      "gpu_energy_joules": 425.7472144965483,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 5.772302400073386,
+      "model": "llama3.2:3b-instruct-q4_K_M",
+      "model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "output_tokens": 476.0,
+      "quality_score": 0.85,
+      "request_count": 40,
+      "tokens_per_joule": 1.1180343259858465,
+      "tokens_per_second": 82.46276217163336
+    },
+    {
+      "category": "scored",
+      "eligible": true,
+      "gpu_energy_joules": 486.17301249733725,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 5.898758799972711,
+      "model": "llama3.2:3b-instruct-q8_0",
+      "model_digest": "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a",
+      "output_tokens": 331.0,
+      "quality_score": 0.75,
+      "request_count": 40,
+      "tokens_per_joule": 0.6808275891328148,
+      "tokens_per_second": 56.11349967412318
+    },
+    {
+      "category": "scored",
+      "eligible": true,
+      "gpu_energy_joules": 360.7917185002796,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 4.551236100043752,
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "output_tokens": 165.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 0.45732757028310816,
+      "tokens_per_second": 36.25388715791163
+    },
+    {
+      "category": "scored",
+      "eligible": true,
+      "gpu_energy_joules": 379.81261549977893,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 5.104893000010634,
+      "model": "qwen3:4b-instruct-2507-q8_0",
+      "model_digest": "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374",
+      "output_tokens": 165.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 0.4344247485905218,
+      "tokens_per_second": 32.32193113541386
+    },
+    {
+      "category": "short",
+      "eligible": true,
+      "gpu_energy_joules": 5826.248363499633,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 73.62387149999267,
+      "model": "llama3.2:3b-instruct-q4_K_M",
+      "model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "output_tokens": 9025.0,
+      "quality_score": 0.85,
+      "request_count": 40,
+      "tokens_per_joule": 1.5490242497281703,
+      "tokens_per_second": 122.58252406627241
+    },
+    {
+      "category": "short",
+      "eligible": true,
+      "gpu_energy_joules": 8457.861418502685,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 107.40955390002637,
+      "model": "llama3.2:3b-instruct-q8_0",
+      "model_digest": "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a",
+      "output_tokens": 9090.0,
+      "quality_score": 0.75,
+      "request_count": 40,
+      "tokens_per_joule": 1.0747397657893079,
+      "tokens_per_second": 84.62934320033303
+    },
+    {
+      "category": "short",
+      "eligible": true,
+      "gpu_energy_joules": 6364.773687999554,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 81.16182890001801,
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "output_tokens": 7587.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 1.1920298147135835,
+      "tokens_per_second": 93.47990431987809
+    },
+    {
+      "category": "short",
+      "eligible": true,
+      "gpu_energy_joules": 9338.207569996071,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "latency_seconds": 118.79479179995542,
+      "model": "qwen3:4b-instruct-2507-q8_0",
+      "model_digest": "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374",
+      "output_tokens": 7946.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 0.8509127624803207,
+      "tokens_per_second": 66.88845427988689
+    },
+    {
+      "category": "long",
+      "eligible": true,
+      "gpu_energy_joules": 3742.81700000001,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 33.77124000000458,
+      "model": "llama3.2:3b-instruct-q4_K_M",
+      "model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "output_tokens": 3243.0,
+      "quality_score": 0.85,
+      "request_count": 40,
+      "tokens_per_joule": 0.8664596746247523,
+      "tokens_per_second": 96.02845498120767
+    },
+    {
+      "category": "long",
+      "eligible": false,
+      "gpu_energy_joules": 4715.927000000083,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 49.68097790000229,
+      "model": "llama3.2:3b-instruct-q8_0",
+      "model_digest": "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a",
+      "output_tokens": 3103.0,
+      "quality_score": 0.725,
+      "request_count": 40,
+      "tokens_per_joule": 0.6579830434185994,
+      "tokens_per_second": 62.4585129190836
+    },
+    {
+      "category": "long",
+      "eligible": true,
+      "gpu_energy_joules": 3869.5479999999225,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 34.65056299999924,
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "output_tokens": 2658.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 0.6869019327322088,
+      "tokens_per_second": 76.70871033177897
+    },
+    {
+      "category": "long",
+      "eligible": true,
+      "gpu_energy_joules": 5389.06799999997,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 55.88190340000165,
+      "model": "qwen3:4b-instruct-2507-q8_0",
+      "model_digest": "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374",
+      "output_tokens": 2779.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 0.5156735821481591,
+      "tokens_per_second": 49.72987373225226
+    },
+    {
+      "category": "scored",
+      "eligible": true,
+      "gpu_energy_joules": 659.0109104999427,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 5.711993500002791,
+      "model": "llama3.2:3b-instruct-q4_K_M",
+      "model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "output_tokens": 482.0,
+      "quality_score": 0.85,
+      "request_count": 40,
+      "tokens_per_joule": 0.7313991199847395,
+      "tokens_per_second": 84.38384952639818
+    },
+    {
+      "category": "scored",
+      "eligible": false,
+      "gpu_energy_joules": 545.0678659999454,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 5.440405299998929,
+      "model": "llama3.2:3b-instruct-q8_0",
+      "model_digest": "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a",
+      "output_tokens": 276.0,
+      "quality_score": 0.725,
+      "request_count": 40,
+      "tokens_per_joule": 0.5063589641148055,
+      "tokens_per_second": 50.73151443331884
+    },
+    {
+      "category": "scored",
+      "eligible": true,
+      "gpu_energy_joules": 385.45297149994684,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 3.752134900002602,
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "output_tokens": 165.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 0.4280677856961929,
+      "tokens_per_second": 43.97496475936555
+    },
+    {
+      "category": "scored",
+      "eligible": true,
+      "gpu_energy_joules": 429.7384074999925,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 4.89208779999899,
+      "model": "qwen3:4b-instruct-2507-q8_0",
+      "model_digest": "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374",
+      "output_tokens": 165.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 0.3839545107450115,
+      "tokens_per_second": 33.727931048178256
+    },
+    {
+      "category": "short",
+      "eligible": true,
+      "gpu_energy_joules": 10002.787000000011,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 89.71697660000245,
+      "model": "llama3.2:3b-instruct-q4_K_M",
+      "model_digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "output_tokens": 9191.0,
+      "quality_score": 0.85,
+      "request_count": 40,
+      "tokens_per_joule": 0.9188439181999967,
+      "tokens_per_second": 102.4443795177974
+    },
+    {
+      "category": "short",
+      "eligible": false,
+      "gpu_energy_joules": 13173.477000000014,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 140.33414270000048,
+      "model": "llama3.2:3b-instruct-q8_0",
+      "model_digest": "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a",
+      "output_tokens": 9051.0,
+      "quality_score": 0.725,
+      "request_count": 40,
+      "tokens_per_joule": 0.6870623450437565,
+      "tokens_per_second": 64.49606507625724
+    },
+    {
+      "category": "short",
+      "eligible": true,
+      "gpu_energy_joules": 10379.990000000078,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 92.20806800000082,
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "model_digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "output_tokens": 7619.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 0.7340084142662895,
+      "tokens_per_second": 82.6283444090807
+    },
+    {
+      "category": "short",
+      "eligible": true,
+      "gpu_energy_joules": 14481.430999999953,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "latency_seconds": 150.14406919999965,
+      "model": "qwen3:4b-instruct-2507-q8_0",
+      "model_digest": "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374",
+      "output_tokens": 7858.0,
+      "quality_score": 1.0,
+      "request_count": 40,
+      "tokens_per_joule": 0.542625932478636,
+      "tokens_per_second": 52.336399578545716
+    }
+  ],
+  "agreement_rate": 1.0,
+  "benchmark_run_ids": [
+    "benchmark-v1-maibenben-x16c-20260929T021056Z-ad31b3",
+    "benchmark-v1-rtx4060ti-desktop-20260929T111918Z-f5692c"
+  ],
+  "blocks": [
+    {
+      "category": "long",
+      "eligible_models": [
+        "llama3.2:3b-instruct-q4_K_M",
+        "llama3.2:3b-instruct-q8_0",
+        "qwen3:4b-instruct-2507-q4_K_M",
+        "qwen3:4b-instruct-2507-q8_0"
+      ],
+      "energy_winner": "llama3.2:3b-instruct-q4_K_M",
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "material_threshold": 0.0896528389753777,
+      "speed_winner": "llama3.2:3b-instruct-q4_K_M",
+      "top_agrees": true
+    },
+    {
+      "category": "scored",
+      "eligible_models": [
+        "llama3.2:3b-instruct-q4_K_M",
+        "llama3.2:3b-instruct-q8_0",
+        "qwen3:4b-instruct-2507-q4_K_M",
+        "qwen3:4b-instruct-2507-q8_0"
+      ],
+      "energy_winner": "llama3.2:3b-instruct-q4_K_M",
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "material_threshold": 0.23162953974886039,
+      "speed_winner": "llama3.2:3b-instruct-q4_K_M",
+      "top_agrees": true
+    },
+    {
+      "category": "short",
+      "eligible_models": [
+        "llama3.2:3b-instruct-q4_K_M",
+        "llama3.2:3b-instruct-q8_0",
+        "qwen3:4b-instruct-2507-q4_K_M",
+        "qwen3:4b-instruct-2507-q8_0"
+      ],
+      "energy_winner": "llama3.2:3b-instruct-q4_K_M",
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "material_threshold": 0.1432398245440105,
+      "speed_winner": "llama3.2:3b-instruct-q4_K_M",
+      "top_agrees": true
+    },
+    {
+      "category": "long",
+      "eligible_models": [
+        "llama3.2:3b-instruct-q4_K_M",
+        "qwen3:4b-instruct-2507-q4_K_M",
+        "qwen3:4b-instruct-2507-q8_0"
+      ],
+      "energy_winner": "llama3.2:3b-instruct-q4_K_M",
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "material_threshold": 0.12471914936229606,
+      "speed_winner": "llama3.2:3b-instruct-q4_K_M",
+      "top_agrees": true
+    },
+    {
+      "category": "scored",
+      "eligible_models": [
+        "llama3.2:3b-instruct-q4_K_M",
+        "qwen3:4b-instruct-2507-q4_K_M",
+        "qwen3:4b-instruct-2507-q8_0"
+      ],
+      "energy_winner": "llama3.2:3b-instruct-q4_K_M",
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "material_threshold": 0.6314291517410713,
+      "speed_winner": "llama3.2:3b-instruct-q4_K_M",
+      "top_agrees": true
+    },
+    {
+      "category": "short",
+      "eligible_models": [
+        "llama3.2:3b-instruct-q4_K_M",
+        "qwen3:4b-instruct-2507-q4_K_M",
+        "qwen3:4b-instruct-2507-q8_0"
+      ],
+      "energy_winner": "llama3.2:3b-instruct-q4_K_M",
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "material_threshold": 0.05,
+      "speed_winner": "llama3.2:3b-instruct-q4_K_M",
+      "top_agrees": true
+    }
+  ],
+  "blocks_agree": 6,
+  "blocks_evaluated": 6,
+  "bootstrap_resamples": 10000,
+  "bootstrap_seed": 42,
+  "calibration_run_ids": [
+    "pilot-v1-maibenben-x16c-rtx5060-20260928T171653Z-c4b749",
+    "pilot-v1-maibenben-x16c-rtx5060-20260928T172727Z-ddd922",
+    "pilot-v1-maibenben-x16c-rtx5060-20260928T172842Z-eeabf6",
+    "pilot-v1-rtx4060ti-desktop-20260929T002903Z-552fa9",
+    "pilot-v1-rtx4060ti-desktop-20260929T003009Z-f4bcf0",
+    "pilot-v1-rtx4060ti-desktop-20260929T003046Z-9daa3d"
+  ],
+  "exclusions": [
+    {
+      "host_id": "rtx4060ti-desktop",
+      "model": "llama3.2:3b-instruct-q8_0",
+      "model_digest": "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a",
+      "quality_floor": 0.75,
+      "quality_score": 0.725
+    }
+  ],
+  "inversions": [],
+  "limitations": [
+    "Energy is GPU-only NVML telemetry, not wall-system energy.",
+    "The primary domain contains two NVIDIA GPUs, one runtime, and four model/quantization configurations.",
+    "Quality eligibility is host-local because deterministic settings did not guarantee byte-identical output across GPUs.",
+    "Absence of a material inversion in this domain is not evidence that no inversion exists elsewhere."
+  ],
+  "outcome": "not_supported",
+  "quality_floor": 0.75,
+  "schema_version": 1,
+  "thresholds": [
+    {
+      "category": "long",
+      "energy_cv": 0.02988427965845923,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "run_ids": [
+        "pilot-v1-maibenben-x16c-rtx5060-20260928T171653Z-c4b749",
+        "pilot-v1-maibenben-x16c-rtx5060-20260928T172727Z-ddd922",
+        "pilot-v1-maibenben-x16c-rtx5060-20260928T172842Z-eeabf6"
+      ],
+      "speed_cv": 0.01567905128213731,
+      "threshold": 0.0896528389753777
+    },
+    {
+      "category": "scored",
+      "energy_cv": 0.06030273865885052,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "run_ids": [
+        "pilot-v1-maibenben-x16c-rtx5060-20260928T171653Z-c4b749",
+        "pilot-v1-maibenben-x16c-rtx5060-20260928T172727Z-ddd922",
+        "pilot-v1-maibenben-x16c-rtx5060-20260928T172842Z-eeabf6"
+      ],
+      "speed_cv": 0.07720984658295346,
+      "threshold": 0.23162953974886039
+    },
+    {
+      "category": "short",
+      "energy_cv": 0.04774660818133683,
+      "gpu_fingerprint": "e9a2b1cd50c10172",
+      "host_id": "maibenben-x16c",
+      "run_ids": [
+        "pilot-v1-maibenben-x16c-rtx5060-20260928T171653Z-c4b749",
+        "pilot-v1-maibenben-x16c-rtx5060-20260928T172727Z-ddd922",
+        "pilot-v1-maibenben-x16c-rtx5060-20260928T172842Z-eeabf6"
+      ],
+      "speed_cv": 0.0035023192819399274,
+      "threshold": 0.1432398245440105
+    },
+    {
+      "category": "long",
+      "energy_cv": 0.041573049787432016,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "run_ids": [
+        "pilot-v1-rtx4060ti-desktop-20260929T002903Z-552fa9",
+        "pilot-v1-rtx4060ti-desktop-20260929T003009Z-f4bcf0",
+        "pilot-v1-rtx4060ti-desktop-20260929T003046Z-9daa3d"
+      ],
+      "speed_cv": 0.00316519586292003,
+      "threshold": 0.12471914936229606
+    },
+    {
+      "category": "scored",
+      "energy_cv": 0.21047638391369042,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "run_ids": [
+        "pilot-v1-rtx4060ti-desktop-20260929T002903Z-552fa9",
+        "pilot-v1-rtx4060ti-desktop-20260929T003009Z-f4bcf0",
+        "pilot-v1-rtx4060ti-desktop-20260929T003046Z-9daa3d"
+      ],
+      "speed_cv": 0.05949952455033995,
+      "threshold": 0.6314291517410713
+    },
+    {
+      "category": "short",
+      "energy_cv": 0.00856840783661743,
+      "gpu_fingerprint": "8a7c37ae035a1091",
+      "host_id": "rtx4060ti-desktop",
+      "run_ids": [
+        "pilot-v1-rtx4060ti-desktop-20260929T002903Z-552fa9",
+        "pilot-v1-rtx4060ti-desktop-20260929T003009Z-f4bcf0",
+        "pilot-v1-rtx4060ti-desktop-20260929T003046Z-9daa3d"
+      ],
+      "speed_cv": 0.00398215010351225,
+      "threshold": 0.05
+    }
+  ]
+}

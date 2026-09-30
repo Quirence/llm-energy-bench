@@ -663,3 +663,27 @@ decision blocks.
   and derived summaries and must remain visible in later analysis.
 - Scope: primary-host repeatability evidence. It does not test a speed-versus-
   energy rank inversion because only the Q4 pilot model is present.
+
+### 2026-09-30 — Frozen two-host paper dataset v1
+
+- Inputs: six accepted `pilot-v1` calibration launches (three per primary GPU)
+  and the accepted RTX 5060 / RTX 4060 Ti `benchmark-v1-code-v5` campaigns.
+- Compatibility gate: both benchmark runs use Ollama 0.34.2, commit
+  `d587a5d6fbeae039009a4e722f2af1249ebcbbf4`, the same prompt-set and logical
+  prompt map, and all four frozen model digests. Both validate at 480/480.
+- Calibration result: material thresholds are 14.32%, 8.97%, and 23.16% on
+  RTX 5060 for short, long, and scored; 5.00%, 12.47%, and 63.14% on RTX 4060
+  Ti. The formula is `max(5%, 3 × max(CV_speed, CV_energy))`.
+- Quality gate: Llama 3.2 Q8 scores 0.750 on RTX 5060 and remains eligible; it
+  scores 0.725 on RTX 4060 Ti and is excluded only on that host. Quality uses
+  equal prompt weighting after averaging repetitions within each prompt.
+- Decision result: speed and GPU-energy leaders agree in all 6/6 primary
+  `host × category` blocks. Llama 3.2 Q4 leads every block. Exhaustive eligible
+  pair comparison finds no descriptive rank inversion, hence no bootstrap
+  candidate can meet the material-inversion rule.
+- Verdict: the preregistered hypothesis is `not_supported` in the investigated
+  two-GPU, one-runtime, four-configuration domain. No broader null claim is
+  made. GTX 1080 remains observation-only and does not change the denominator.
+- Artifacts: `experiments/studies/paper-dataset-v1/{analysis.json,
+  calibration.csv,report.md}`. Two consecutive CLI generations were
+  byte-identical.

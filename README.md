@@ -18,7 +18,7 @@ Does the preferred local LLM configuration change when comparing models, quantiz
 
 The repository now contains the tested building blocks for the MVP:
 
-- a Python 3.12 package and CLI shell with `doctor`, `run`, and `report`
+- a Python 3.12 package and CLI shell with `doctor`, `run`, `report`, and `analyze`
   subcommands plus frozen RTX 5060, RTX 4060 Ti, and GTX 1080 observation
   pilot configs;
 - strict TOML configuration and JSONL prompt contracts;
@@ -34,15 +34,16 @@ The repository now contains the tested building blocks for the MVP:
 - human/JSON environment diagnosis plus CSV and Markdown aggregate reports;
 - a frozen 24-prompt, four-configuration `benchmark-v1` protocol for the two
   main GPU hosts;
+- six accepted calibration launches, two compatible 480-request primary
+  campaigns, and one separately labelled GTX 1080 observation;
+- deterministic study-level JSON/CSV/Markdown artifacts with the frozen
+  two-host hypothesis verdict;
 - Windows and Linux CI with lint, format, and hardware-independent tests.
 
-Earlier local checks on the RTX 5060 Laptop and contributor GPUs remain
-diagnostic only. They exposed cache-floor variability and an accepted cold
-model reload, so the stabilized policy now records four warm-ups, tolerates at
-most one marker-boundary cache token, and aborts a run after a runtime failure
-or model reload during a cache-floor warm-up or measured request. The first
-publishable pilot must be repeated from the reviewed `pilot-v1-code` tag on
-both primary hosts.
+The frozen primary result covers RTX 5060 Laptop and RTX 4060 Ti with Ollama
+0.34.2. Speed and GPU-energy winners agree in all 6/6 host-by-workload blocks;
+the preregistered rank-inversion hypothesis is therefore not supported in this
+investigated domain. This is not a claim about all runtimes, models, or GPUs.
 
 ## Minimal Scope
 
@@ -97,6 +98,7 @@ warm-ups, and three measured repetitions (18 measured requests per host).
 python -m llm_energy_bench doctor --config configs/pilot-rtx5060.toml --json
 python -m llm_energy_bench run --config configs/pilot.toml
 python -m llm_energy_bench report experiments/runs/<run-id>
+python -m llm_energy_bench analyze --calibration <run-dir> [...] --benchmark <run-dir> [...] --output-dir experiments/studies/paper-dataset-v1
 ```
 
 `doctor` is read-only: it checks the configured Ollama instance, NVML energy
@@ -104,6 +106,8 @@ source, frozen runtime version, installed model digests, and complete GPU
 placement. `run` never pulls
 models automatically. `report` regenerates derived CSV/Markdown summaries from
 the raw artifacts and returns exit code 4 if any supplied run fails validation.
+`analyze` requires six explicitly labelled calibration runs and exactly two
+primary benchmark runs; observation-only evidence cannot enter its verdict.
 The shipped configs send `num_gpu = 999` during both preload and generation so
 Ollama requests every model layer on the GPU. That request is not treated as
 proof: `doctor` and `run` still require `/api/ps` to report complete placement.
@@ -123,3 +127,4 @@ and the selected source is stored in the request record.
 - [Diagnostic contributor observations](docs/diagnostic-observations.md)
 - [Project state and contribution report](docs/project-state-for-owner.md)
 - [Paper draft outline and author work split](docs/paper-draft.md)
+- [Frozen paper-dataset result](experiments/studies/paper-dataset-v1/report.md)

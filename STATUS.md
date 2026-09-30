@@ -1,103 +1,58 @@
 # Project Status
 
-Last updated: 2026-09-29
+Last updated: 2026-09-30
 
 ## Current Milestone
 
-M2 — Two-GPU Study. Primary host A (RTX 5060 Laptop) has a complete validated
-campaign from `benchmark-v1-code-v5`; primary host B (RTX 4060 Ti) is pending.
+M3 — Paper Dataset. The two-primary-GPU dataset and its preregistered analysis
+are complete. The branch `analysis/freeze-paper-dataset` is awaiting review
+before merge and tagging.
 
 ## Done
 
-- The Python 3.12 CLI implements `doctor`, `run`, and `report` with stable exit
-  codes and more than 300 Windows/Linux hardware-independent tests.
-- Strict TOML and prompt contracts, Ollama streaming/TTFT, full-GPU placement,
-  request-scoped NVML telemetry, power-source fallbacks, atomic artifacts,
-  privacy guards, and aggregate reports are implemented.
-- The pilot model is pinned to Ollama 0.34.2 and digest
-  `a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72`.
-- Before any publishable data was collected, the two-host protocol was amended
-  to the hardware actually available: RTX 5060 Laptop and RTX 4060 Ti desktop.
-  GTX 1080 has a committed observation-only pilot config.
-- Schema v2 records four excluded warm-ups. The first is a cold-start
-  exclusion; the minimum cached count from the next three is the auditable
-  template floor.
-- At most one cache token above that floor is accepted for the unique marker
-  boundary. Raw, cached, and uncached prompt-token counts remain distinct.
-- A model load longer than 100 ms in a cache-floor warm-up or measured request
-  is invalid and aborts the launch; runtime failures also abort instead of
-  contaminating later requests.
-- Validation fails closed on unknown schemas and independently checks frozen
-  runtime/digests, placement, warm-up floor, request counts, manifest counters,
-  hashes, telemetry order/coverage, cache excess, load duration, and energy.
-- Reports exclude entire invalid runs and rank configurations only within one
-  `host_id × prompt category` block.
-- Contributions from Qcsteeven and Dimas are integrated and attributed in
-  `docs/project-state-for-owner.md`. Their later hardware observations are
-  preserved separately as diagnostic evidence.
-- PR #17 was independently approved, passed Windows/Linux CI, and was
-  squash-merged as `0ffc091`. The immutable `pilot-v1-code` tag points exactly
-  to that commit.
-- PR #23 preserves Dimas's schema-v2 GTX 1080 observation: 18/18 measured
-  requests valid, full GPU placement, frozen Ollama/model identity, and
-  byte-exact raw artifacts. It remains outside the primary comparison.
-- Completed milestones M0 Bootstrap and M1 Measured Pilot are closed.
-- Three complete RTX 5060 pilot repeatability launches passed validation with
-  54/54 measured requests. They support instrument repeatability only and are
-  not a two-host research result.
-- All four `benchmark-v1` model tags and exact digests are frozen for Ollama
-  0.34.2 in the two primary-host configs.
-- `uuid_slot_prefix_v3` passed a Qwen-specific 18/18 hardware acceptance with
-  the expected three-token floor and zero excess cached tokens.
-- Two RTX 5060 full calibration campaigns completed with 480/480 valid
-  measured requests and identical aggregate ranks.
-- Derived validation is idempotent: `validation.json` does not recursively hash
-  itself, and repeated report generation leaves its bytes unchanged.
-- `uuid_stable_slot_prefix_v4` makes measured prompt text byte-identical across
-  hosts and independent launches; its Qwen hardware acceptance passed 18/18.
-- The final RTX 5060 campaign from `benchmark-v1-code-v5` passed 480/480 with
-  zero validation errors or warnings.
+- Python 3.12 CLI commands `doctor`, `run`, `report`, and `analyze` are covered
+  by Windows/Linux hardware-independent tests.
+- Ollama streaming, TTFT, full-GPU placement, schema-v2 cache/load controls,
+  request-scoped NVML telemetry, atomic artifacts, validation, privacy guards,
+  and deterministic reports are implemented.
+- Runtime Ollama 0.34.2, the four model digests, prompt set, inference controls,
+  and `benchmark-v1-code-v5` commit are frozen.
+- Three independent `pilot-v1` calibration launches are accepted on each
+  primary GPU: RTX 5060 Laptop and RTX 4060 Ti desktop (108/108 valid requests).
+- The compatible primary campaigns contain 480/480 valid requests on each GPU.
+  Their logical prompt maps, runtime, code commit, and model digests match.
+- The GTX 1080 campaign is retained as observation-only evidence and cannot
+  enter the primary hypothesis verdict.
+- `analyze` validates role-specific inputs, requires exactly three calibration
+  launches per primary GPU, applies equal-prompt quality weighting, computes
+  ratio-of-sums metrics, and evaluates all pairwise rank inversions.
+- Study artifacts are frozen under `experiments/studies/paper-dataset-v1/` and
+  regenerate byte-identically.
 
-## In Progress
+## Frozen Result
 
-- The first RTX 5060 `benchmark-v1` attempt completed 480/480 requests but is
-  excluded because two Qwen requests exceeded the registered cache-boundary
-  allowance. The complete diagnostic run is preserved in `experiments/runs/`.
-- `uuid_slot_prefix_v2` passed a Llama acceptance but inflated Qwen's warm-up
-  floor because sequential slots `00` through `03` share one leading
-  character. The partial follow-up run is excluded.
-- Earlier v3/v4 full runs are retained as calibration evidence; their aggregate
-  rankings agree with v5 but their random marker text excludes them from the
-  final cross-host dataset.
-- Final RTX 5060 speed and energy rankings agree in all three workload
-  categories. This is one primary host, not the final hypothesis decision.
-- The RTX 4060 Ti pilot result branch exists and requires review; its complete
-  benchmark must use the same v5 tag before a two-host comparison is valid.
+- Speed and GPU-energy winners agree in 6/6 primary `host × workload` blocks.
+- Llama 3.2 Q4 is the top eligible configuration in every primary block.
+- No descriptive or material pairwise speed/energy rank inversion is present.
+- The preregistered rank-inversion hypothesis is therefore **not supported in
+  the investigated domain**. This is not a universal equivalence claim.
+- Llama 3.2 Q8 is quality-eligible on RTX 5060 (0.750) but excluded locally on
+  RTX 4060 Ti (0.725); the other three configurations are eligible on both.
+- Repeatability-based material thresholds range from 5.00% to 63.14%, with the
+  largest value in the very short scored block on RTX 4060 Ti.
 
-## Next Acceptance Gate
+## Remaining Before Article Drafting
 
-1. Review and publish the v5 protocol plus the final RTX 5060 artifacts.
-2. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
-   digests, and execute the committed companion config without code changes.
-3. Accept only `validation.json: ok=true` with all 480 requests valid.
-4. Verify the RTX 4060 Ti logical prompt-map SHA-256 matches primary A.
-5. Implement the preregistered bootstrap/material-effect analysis against the
-   two compatible primary runs.
-6. Compare only those complete compatible runs in the paper tables.
+1. Obtain independent review from Qcsteeven and Skipl1.
+2. Merge the finalization PR and tag the merge commit `paper-dataset-v1`.
+3. Treat `experiments/studies/paper-dataset-v1/analysis.json` as the numeric
+   source of truth while writing the article.
+4. Select the target journal and adapt formatting and bibliography.
+5. If stronger energy claims are desired, run a separate wall-meter validation;
+   current conclusions are GPU-only NVML conclusions.
 
-## Open Research Work
+## Latest Validated Evidence
 
-- RTX 5060 and RTX 4060 Ti publishable pilots plus three independent
-  calibration launches on each primary host.
-- A corrected implementation of the rank-inversion analysis after clean,
-  compatible campaign data exists. PR #18 is not the frozen implementation.
-- External wattmeter validation remains outside MVP; all reported energy and
-  cost values are GPU-only estimates.
-
-## Latest Validated Run
-
-The latest validated artifact is the final primary-A run
-`benchmark-v1-maibenben-x16c-20260929T021056Z-ad31b3`: 480/480 valid measured
-requests on RTX 5060 from `benchmark-v1-code-v5`. Aggregate speed and energy
-rankings agree in 3/3 workload blocks. There is still no compatible two-host
-research dataset until RTX 4060 Ti completes the same protocol.
+- RTX 5060: `benchmark-v1-maibenben-x16c-20260929T021056Z-ad31b3`.
+- RTX 4060 Ti: `benchmark-v1-rtx4060ti-desktop-20260929T111918Z-f5692c`.
+- Study report: `experiments/studies/paper-dataset-v1/report.md`.

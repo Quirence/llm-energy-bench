@@ -1,9 +1,9 @@
 # Черновик статьи: структура и распределение работы
 
-Статус: каркас с финальным RTX 5060 primary-host run от frozen protocol v5.
-Прогон подтвердил pipeline и стабильность aggregate ranks; итоговый
-двухстендовый вывод откладывается до совместимого RTX 4060 Ti run и
-предзарегистрированного bootstrap/material-effect анализа.
+Статус: каркас с замороженным двухстендовым датасетом и воспроизводимым
+итоговым анализом. Числа для раздела результатов берутся из
+`experiments/studies/paper-dataset-v1/analysis.json`; литературный обзор и
+оформление под выбранный журнал ещё не выполнены.
 
 ## Рабочее название
 
@@ -105,44 +105,53 @@ artifact hashes и исключение всего invalid run из агрега
 
 ## 5. Результаты
 
-Заполняется после review result PRs.
-
 ### 5.1. Повторяемость pilot/calibration
 
-TODO: median/IQR и CV по host × workload category.
+На каждом primary GPU выполнено по три независимых `pilot-v1` запуска. Для
+каждой категории сначала вычислялись run-level `Σtokens/Σtime` и
+`Σtokens/Σenergy`, затем выборочный CV между тремя запусками. Материальным
+считался эффект не меньше `max(5%, 3 × max(CV_speed, CV_energy))`.
+
+| Стенд | short | long | scored |
+| --- | ---: | ---: | ---: |
+| RTX 5060 Laptop | 14,32% | 8,97% | 23,16% |
+| RTX 4060 Ti | 5,00% | 12,47% | 63,14% |
+
+Высокий scored-порог на RTX 4060 Ti связан с двухтокенными ответами длительностью
+около 40–50 мс и малым числом 100-мс telemetry samples. Поэтому scored-блок
+имеет заметно меньшую способность обнаруживать умеренные энергетические эффекты.
 
 ### 5.2. Основная матрица
 
-Финальный RTX 5060 primary-host run:
-`benchmark-v1-maibenben-x16c-20260929T021056Z-ad31b3`, 480/480 valid,
-Ollama 0.34.2, tag `benchmark-v1-code-v5`. Все четыре конфигурации прошли
-quality floor: Qwen3 Q4/Q8 — 1.0, Llama 3.2 Q4 — 0.85, Llama 3.2 Q8 — 0.75.
+Оба primary runs выполнены на Ollama 0.34.2 от `benchmark-v1-code-v5` и прошли
+валидацию 480/480. Prompt set, logical prompt map и четыре model digest совпадают.
 
-Наблюдаемые aggregate speed/energy ranks совпали во всех трёх workload blocks:
+| Стенд | Quality-eligible конфигурации | Лидер tok/s и tok/J |
+| --- | ---: | --- |
+| RTX 5060 Laptop | 4/4 | Llama 3.2 Q4 |
+| RTX 4060 Ti | 3/4 | Llama 3.2 Q4 |
 
-| Workload | Порядок от лучшего к худшему по tok/s и tok/J |
-| --- | --- |
-| long | Llama Q4 → Qwen Q4 → Llama Q8 → Qwen Q8 |
-| scored | Llama Q4 → Llama Q8 → Qwen Q4 → Qwen Q8 |
-| short | Llama Q4 → Qwen Q4 → Llama Q8 → Qwen Q8 |
+На RTX 5060 оценки качества равны 1,0 для Qwen Q4/Q8, 0,85 для Llama Q4 и
+0,750 для Llama Q8. На RTX 4060 Ti первые три значения сохраняются, а Llama Q8
+получает 0,725 и исключается только на этом хосте. Это host-local quality gate,
+а не удаление конфигурации из другого стенда.
 
-Диапазон Llama Q4: 82.463–122.583 output tok/s и 1.118–1.549 output tok/J.
-Диапазон Qwen Q8: 32.322–66.888 output tok/s и 0.434–0.851 output tok/J.
-Полные latency, TTFT, prefill/decode, power, energy и temperature values берутся
-из committed `summary.csv`, а не округлённого текста этого раздела.
-
-Из 480 запросов 474 использовали instantaneous-power integration, 6 —
-total-energy counter после sanity check. Sensitivity-пересчёт всех запросов
-только по instantaneous power сохранил каждый energy rank. Внешней wall-energy
-валидации это не заменяет.
+В каждой из шести комбинаций `host × workload` верхнее место по output tok/s и
+output tok/J занимает Llama 3.2 Q4. Полные агрегаты находятся в
+`analysis.json`; latency, TTFT, prefill/decode, power и temperature — в
+`summary.csv` соответствующих run directories.
 
 ### 5.3. Rank inversion
 
-На финальном RTX 5060 primary-host run aggregate speed- и energy-top совпали
-в 3/3 блоках. Это ещё не проверка material inversion: TODO остаются effect threshold
-`max(5%, 3 × repeatability CV)`, bootstrap 95% CI и совместимый второй primary
-host. Поэтому текущая формулировка — «инверсия не наблюдалась на одном стенде»,
-а не «гипотеза опровергнута».
+Aggregate speed- и energy-top совпали в 6/6 primary blocks (100%). Проверка всех
+пар quality-eligible конфигураций не обнаружила даже описательной смены порядка,
+поэтому кандидатов на material inversion и paired hierarchical bootstrap нет.
+
+По заранее зафиксированному правилу (не менее 90% совпадений top и отсутствие
+устойчивых material inversions) гипотеза **не поддержана в исследованной
+области**. Корректная формулировка не равна «энергетическая оптимизация никогда
+не меняет выбор»: она ограничена двумя GPU, Ollama 0.34.2, четырьмя
+model/quantization configurations и данным prompt set.
 
 GTX 1080 показывается отдельно как observation и не увеличивает знаменатель
 основного двухстендового вывода.
@@ -158,22 +167,24 @@ GTX 1080 показывается отдельно как observation и не у
 
 ## 7. Заключение
 
-Формулируется условно после анализа:
-
-- если есть устойчивая material inversion — указать точные hosts/workloads и
-  размер эффекта без обобщения за пределы матрицы;
-- если rankings совпадают минимум в 90% blocks и устойчивых инверсий нет —
-  сообщить, что гипотеза не поддержана в исследованной области.
+В исследованной области учёт GPU-energy не изменил лучший инженерный выбор по
+сравнению со speed-only ranking: Llama 3.2 Q4 лидировала по обеим метрикам во
+всех шести primary blocks. Практическая ценность результата — не в обещанной
+экономии, а в измерительной методике, отрицательном результате и наблюдении,
+что quality eligibility одной конфигурации различалась между GPU даже при
+совпадающих seed, prompt text, runtime и digest.
 
 ## Контроль заполнения
 
 - [x] PR #17 merged и merge commit tagged `pilot-v1-code`.
-- [ ] Все три участника подтвердили commit, Python, Ollama и model digest.
-- [ ] Три validated launch на каждом primary host.
+- [x] Все три участника работали от зафиксированных runtime/model contracts.
+- [x] Три validated launch на каждом primary host.
 - [x] Один validated GTX 1080 observation launch.
 - [x] Benchmark digests предзарегистрированы до основной кампании.
-- [x] Два RTX 5060 calibration benchmark: по 480/480 valid.
+- [x] Два совместимых primary benchmark: по 480/480 valid.
 - [x] Финальный RTX 5060 benchmark с byte-identical cross-host markers.
-- [ ] Result PRs содержат raw artifacts, hashes и experiment-log entries.
-- [ ] Числа в тексте воспроизводятся из committed `summary.csv`/report command.
-- [ ] Вывод не сильнее собранных данных.
+- [x] Result PRs содержат raw artifacts, hashes и experiment-log entries.
+- [x] Числа воспроизводятся из committed artifacts командой `analyze`.
+- [x] Вывод ограничен исследованной областью и GPU-only NVML energy.
+- [ ] Подобраны и проверены литературные источники.
+- [ ] Текст оформлен по требованиям выбранного журнала.

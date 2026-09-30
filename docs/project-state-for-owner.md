@@ -1,139 +1,122 @@
 # Состояние проекта для владельца
 
-Дата среза: 2026-09-29.
+Дата среза: 2026-09-30.
 
-## Что представляет собой проект
+## Короткий ответ
 
-`llm-energy-bench` — CLI-стенд на Python 3.12 для воспроизводимого измерения
-локального Ollama-инференса. Он сохраняет latency, TTFT, token counts,
-throughput, NVML power/energy, joules/token, tokens/joule, температурный и
-VRAM-контекст. Это измерительный инструмент, а не веб-платформа и не готовое
-«решение для ЦОД».
+Техническая часть, необходимая для начала полноценного черновика статьи,
+готова. Собраны и проверены два основных стенда, три calibration launch на
+каждом, отдельное наблюдение GTX 1080 и воспроизводимый итоговый анализ. После
+review и merge текущей ветки датасет следует пометить тегом `paper-dataset-v1`
+и больше не менять задним числом.
 
-Исследовательская гипотеза остаётся прежней: energy-aware ranking может
-отличаться от speed-only ranking. Отрицательный результат допустим и должен
-быть зафиксирован без расширения гипотезы задним числом.
+## Что создано
 
-## Что уже реализовано
+`llm-energy-bench` — CLI-инструмент на Python 3.12 для последовательного warm
+LLM-инференса через Ollama. Он измеряет latency, TTFT, prompt/output tokens,
+throughput, NVML power/energy, joules/token, tokens/joule, temperature, power
+limit и VRAM. В проекте нет dashboard, сервера или маркетинговой платформы.
 
-- CLI: `doctor`, `run`, `report`, фиксированные exit codes.
-- Строгая TOML-конфигурация и versioned JSONL prompt sets.
-- Ollama preload/inventory, проверка полного GPU placement, streaming, TTFT,
-  token/runtime counters и сохранение частичных ошибок.
-- NVML capability probe, request-scoped sampling и проверяемые fallback-пути:
-  total-energy counter → instantaneous power → legacy power.
-- Атомарные JSON/JSONL/gzip artifacts, hashes, privacy scan и лимит размера.
-- Последовательный runner с deterministic request order, warm-up и немедленной
-  записью каждого запроса, ответа и telemetry.
-- Schema v2: четыре warm-up записи, проверяемый cache floor, допуск только
-  одного служебного cache token и запрет холодного model reload в measured run.
-- Validator, который независимо перепроверяет digests, placement, hashes,
-  counts, cache, load duration, telemetry и energy.
-- CSV/Markdown report с ratios of sums, median/IQR, quality floor и ranking
-  только внутри одного GPU/host workload block.
-- CI для Windows/Linux и hardware-independent fake implementations.
-- Зафиксированный срез проходит 308 автоматических тестов.
-- Тег `pilot-v1-code` указывает на merge commit `0ffc091`; это единственная
-  кодовая база для сравнимых pilot-запусков.
-- Schema-v2 наблюдение Dimas на GTX 1080 принято через PR #23: 18/18 запросов
-  валидны, raw hashes воспроизводятся, но данные не входят в primary matrix.
-- Cache-marker policy v3 прошла отдельную Qwen-приёмку и два полных RTX 5060
-  benchmark по 480/480 valid. Сравнение этих runs обнаружило, что random run ID
-  менял UUID-текст и Llama quality. Новая policy требует byte-identical markers
-  между независимыми runs до финальной двухстендовой серии.
-- Stable-marker policy v4 исключила run/host identity из measured prompt text.
-  Финальный tagged run `benchmark-v1-code-v5` завершён с 480/480 valid; его
-  logical prompt-map SHA-256 зафиксирован для сверки со вторым стендом.
+Реализованы:
+
+- строгие TOML и prompt-set contracts;
+- Ollama preload, streaming, TTFT и контроль полного размещения на GPU;
+- NVML capability probe, request-scoped telemetry и проверяемые fallback paths;
+- schema v2 с auditable warm-up, template cache floor и model-reload gate;
+- атомарные raw artifacts, SHA-256, gzip, privacy и size guards;
+- fail-closed validator и детерминированные CSV/Markdown reports;
+- `analyze`, который не позволяет смешать calibration, primary benchmark и
+  observation-only evidence;
+- статистический анализ ratio-of-sums, equal-prompt quality, sample CV,
+  repeatability threshold и paired hierarchical bootstrap для инверсий;
+- Windows/Linux CI и 318 hardware-independent тестов на момент среза.
+
+## Какие данные приняты
+
+| Роль | GPU | Calibration | Benchmark | Статус |
+| --- | --- | ---: | ---: | --- |
+| Primary A | RTX 5060 Laptop | 3 × 18/18 | 480/480 | принят |
+| Primary B | RTX 4060 Ti | 3 × 18/18 | 480/480 | принят |
+| Observation | GTX 1080 | — | 480/480 | отдельно от verdict |
+
+Оба primary benchmark используют Ollama 0.34.2, commit
+`d587a5d6fbeae039009a4e722f2af1249ebcbbf4`, одинаковый prompt set, logical
+prompt map и четыре точных model digest. Первый неудачный RTX 4060 Ti launch
+с двумя отсутствующими `load_duration` сохранён для аудита, но в анализ не
+входит.
+
+## Итог научной проверки
+
+- Верхние speed- и energy-ranks совпали в 6/6 primary `host × workload` blocks.
+- Во всех шести блоках лидирует `llama3.2:3b-instruct-q4_K_M`.
+- Среди всех допустимых пар нет описательной speed/energy rank inversion;
+  следовательно, нет и material inversion с ненулевым bootstrap CI.
+- Предзарегистрированная гипотеза имеет итог `not_supported` **в исследованной
+  области**, а не опровергнута универсально.
+- Llama Q8 показывает важное вторичное наблюдение: quality 0.750 на RTX 5060 и
+  0.725 на RTX 4060 Ti при одинаковых prompt, seed, runtime и digest. Поэтому
+  eligibility применяется по хосту.
+- Material thresholds: RTX 5060 — 14.32% short, 8.97% long, 23.16% scored;
+  RTX 4060 Ti — 5.00%, 12.47%, 63.14% соответственно.
+
+Смысл для статьи: на двух исследованных GPU оптимизация только по скорости уже
+выбрала ту же конфигурацию, что и GPU-energy efficiency. Поэтому нельзя обещать
+отдельную экономию от energy-aware ranking на этой матрице. Научная ценность —
+в проверяемой методике, воспроизводимом отрицательном результате и выявленных
+границах измерения/качества.
 
 ## Кто что сделал
 
-Функциональная атрибуция важнее числа строк:
+- **Quirence/Codex**: исследовательский протокол, runner, schema/validation,
+  cache/load gates, интеграция, RTX 5060 campaigns, финальный статистический
+  анализ и документация.
+- **Qcsteeven (Лев)**: ранние package/CI и data contracts, основная NVML
+  telemetry/fallback реализация, три RTX 4060 Ti calibration launch и оба
+  desktop benchmark attempts, включая принятый 480/480 run.
+- **Skipl1 (Димас)**: Ollama inventory/preload/streaming/TTFT, live-runtime
+  проверки и диагностика cache/reload behavior, независимые reviews и
+  GTX 1080 observation 480/480.
 
-- **Quirence/Codex**: исследовательский протокол, runner, интеграция,
-  validation/reporting, GPU-placement и NVML sanity gates, документация,
-  RTX 5060 acceptance и финальная стабилизация.
-- **Qcsteeven (Лев)**: package/CI и config/result contracts на раннем этапе,
-  основная NVML telemetry-реализация, fallback sources, RTX 4060 Ti
-  диагностические прогоны и первая реализация rank-inversion анализа.
-- **Skipl1 (Димас)**: Ollama inventory/preload/streaming/TTFT boundary, live
-  runtime-проверка, обнаружение cold reload после падения runtime, независимый
-  approval финальной стабилизации и validated GTX 1080 observation.
+Проценты строк кода не следует переносить в статью как авторский вклад: merge
+и последующая переработка сильно искажают такую метрику. Для author
+contributions лучше использовать роли выше.
 
-Для ориентировочного технического среза на интеграционном коммите `a683a57`
-доля добавленных строк была около 49% Quirence, 33% Qcsteeven и 18% Dimas
-(имена `Dimas` и `Skipl1` объединены). Это **не оценка научного вклада**:
-метрика зависит от тестов, документации, merge history и последующей
-переработки. В статье вклад лучше описывать по ролям выше.
+## Где брать числа
 
-## Что показало ревью веток
+- Итог: `experiments/studies/paper-dataset-v1/analysis.json`.
+- Краткий читаемый результат: `experiments/studies/paper-dataset-v1/report.md`.
+- Calibration table: `experiments/studies/paper-dataset-v1/calibration.csv`.
+- Полные request-level данные: соответствующие директории в
+  `experiments/runs/`.
+- Хронология решений и отклонённых запусков: `docs/experiment-log.md`.
+- Каркас статьи: `docs/paper-draft.md`.
 
-- **PR #17** — утверждённая точка консолидации. Во время ревью исправлены
-  aggregate prefill, fail-open schema validation, неаудируемый cache floor и
-  пропуск cold reload; PR одобрен Dimas, прошёл CI и влит в `main`.
-- **PR #18** — закрыт без merge: мог использовать невалидные run directories,
-  смешивать разные model digests, сравнивать неполные prompt sets и выдавать
-  ложный вывод «гипотеза не поддержана». Требования сохраняются в Issue #6.
-- **PR #19** — закрыт без merge; полезная RTX 4060 Ti диагностика не содержала
-  raw artifacts. Само железо позже было внесено в протокол отдельной
-  предрегистрационной поправкой до сбора публикационных данных.
-- **PR #22** — закрыт без merge; полезная GTX 1080 диагностика, но ветка
-  наследовала #19, а один calibration run содержал cold reload.
-  Исследовательские выводы отброшены.
-- **PR #23** — влит после независимой перепроверки. Он содержит один валидный
-  schema-v2 GTX 1080 observation-run и защиту byte-exact артефактов от Windows
-  EOL-конверсии.
+## Что можно и нельзя писать
 
-## Первый результат основной матрицы
+Можно:
 
-На финальном RTX 5060 primary-host run aggregate speed- и energy-ranking
-совпали во всех трёх workload blocks. Llama 3.2 Q4 заняла первое место в каждом
-блоке; все четыре конфигурации прошли quality floor. Это результат первого
-стенда, но не итог статьи: нужны совместимый RTX 4060 Ti benchmark и
-предзарегистрированный bootstrap/material-effect анализ.
+- «в исследованной области speed- и GPU-energy ranking выбрали одного лидера»;
+- «гипотеза о material rank inversion не поддержана на двух primary GPU»;
+- «методика фиксирует runtime, digest, prompt map, quality и telemetry»;
+- «quality eligibility одной конфигурации различалась между хостами».
 
-Из 480 запросов 474 использовали instantaneous-power integration и 6 —
-total-energy counter. Instantaneous-only sensitivity analysis сохранил все
-energy ranks. Энергия остаётся GPU-only оценкой.
+Нельзя:
 
-## Что сейчас нельзя утверждать
+- «energy-aware выбор бесполезен для любых LLM/GPU»;
+- «измерена энергия/стоимость всего кластера»;
+- «NVML заменяет внешний ваттметр»;
+- включать GTX 1080 в знаменатель primary verdict;
+- подменять отсутствие обнаруженного эффекта доказанной эквивалентностью.
 
-- Что совпадение ranking на RTX 5060 переносится на RTX 4060 Ti или другие GPU.
-- Что старые локальные прогоны RTX 4060 Ti автоматически стали публикационными.
-- Что NVML energy равна wall-system energy.
-- Что локальные незакоммиченные прогоны образуют публикационный датасет.
+## Что осталось организационно
 
-## Состояние закрепления базы
-
-Выполнено:
-
-1. PR #17 получил approval и зелёный CI на Windows/Linux.
-2. PR #17 squash-merged в `main` как `0ffc091`.
-3. Merge commit получил тег `pilot-v1-code`.
-4. Dimas опубликовал observation-only run с 18/18 valid measured requests и
-   `validation.json: ok=true`.
-
-RTX 5060 уже работает на согласованном Ollama 0.34.2 и имеет финальный полный
-benchmark run от `benchmark-v1-code-v5`. Ветка Qcsteeven содержит три RTX 4060
-Ti pilot launch и должна быть отдельно проверена. Следующий gate — его полный
-benchmark строго от `benchmark-v1-code-v5` с
-`configs/benchmark-v1-rtx4060ti.toml`.
-
-## Команды для запуска от зафиксированного тега
-
-```text
-git fetch origin --prune --tags
-git switch --detach benchmark-v1-code-v5
-git rev-parse HEAD
-git tag --points-at HEAD
-py -3.12 -m venv .venv
-.venv\Scripts\python -m pip install ".[dev]"
-.venv\Scripts\python -m ruff check .
-.venv\Scripts\python -m ruff format --check .
-.venv\Scripts\python -m pytest -q
-.venv\Scripts\python -m llm_energy_bench doctor --config configs/benchmark-v1-rtx4060ti.toml --json
-.venv\Scripts\python -m llm_energy_bench run --config configs/benchmark-v1-rtx4060ti.toml
-```
-
-Для второго основного хоста используется его отдельный committed config.
-Эксперимент нельзя публиковать, если tag, Ollama version, digest, prompt hash,
-placement или validation отличаются от frozen baseline.
+1. Qcsteeven и Skipl1 проверяют финальный PR, особенно attribution, hardware
+   conditions и интерпретацию собственных прогонов.
+2. После approval PR вливается в `main` и merge commit получает annotated tag
+   `paper-dataset-v1`.
+3. Выбирается журнал и форматирование; источники проверяются по оригинальным
+   статьям, стандартам и официальной документации.
+4. Авторы заполняют свои разделы из `docs/paper-draft.md`, не меняя frozen
+   artifacts и decision rule.
+5. Внешний ваттметр остаётся отдельным будущим экспериментом, если журнал или
+   рецензент потребует wall-system energy.
