@@ -1,0 +1,33 @@
+{
+  "checksums": {
+    "config.resolved.toml": "edcffa36c797f03e4226a084aafe98284318203fff57a5a734d6fbba522d039f",
+    "manifest.json": "af3829842062e203c01607b2c03f6786bc3c536bafee5f8aacc6c70fb0566cde",
+    "outputs.jsonl": "1925cb9f4d0efeebe86a6735e2b54a8fada1b754296aa7ae2c491575f8859501",
+    "report.md": "60d06d8a47b638430a3484bf7eefb8069aad92f1860546977709b2590024f918",
+    "requests.jsonl": "a7fe49ae37a5a0c85b4fa970e7860f21e5fc607e4354d6052a8d8263a558ec2f",
+    "summary.csv": "b1773d08785fe9240ce836c638ad0c1efa1fac5b60390d1fd7e965db7388d6eb",
+    "telemetry.jsonl.gz": "21e73056ea41d57f7b6ac76c70d1ba644c4712edc5f71468145f4fbd7069d321",
+    "warmups.jsonl": "42e4b2e327080327759ce88ceca367a0ed4c397fecce2dd3611aee0a9999d77c"
+  },
+  "errors": [],
+  "ok": true,
+  "record_counts": {
+    "outputs.jsonl": 480,
+    "requests.jsonl": 480,
+    "telemetry.jsonl.gz": 6175,
+    "warmups.jsonl": 16
+  },
+  "run_id": "benchmark-v1-maibenben-x16c-20260929T015412Z-1099aa",
+  "sizes": {
+    "config.resolved.toml": 1099,
+    "manifest.json": 5178,
+    "outputs.jsonl": 1337662,
+    "report.md": 2343,
+    "requests.jsonl": 483540,
+    "summary.csv": 5738,
+    "telemetry.jsonl.gz": 208862,
+    "warmups.jsonl": 5636
+  },
+  "status": "completed",
+  "warnings": []
+}

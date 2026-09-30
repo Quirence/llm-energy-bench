@@ -4,13 +4,13 @@ Last updated: 2026-09-29
 
 ## Current Milestone
 
-M2 — Two-GPU Study. The implementation is frozen at `pilot-v1-code`; the
-primary RTX 5060 Laptop and RTX 4060 Ti pilot launches are ready to start.
+M2 — Two-GPU Study. Primary host A (RTX 5060 Laptop) has a complete validated
+campaign from `benchmark-v1-code-v5`; primary host B (RTX 4060 Ti) is pending.
 
 ## Done
 
 - The Python 3.12 CLI implements `doctor`, `run`, and `report` with stable exit
-  codes and 300 Windows/Linux hardware-independent tests.
+  codes and more than 300 Windows/Linux hardware-independent tests.
 - Strict TOML and prompt contracts, Ollama streaming/TTFT, full-GPU placement,
   request-scoped NVML telemetry, power-source fallbacks, atomic artifacts,
   privacy guards, and aggregate reports are implemented.
@@ -41,29 +41,49 @@ primary RTX 5060 Laptop and RTX 4060 Ti pilot launches are ready to start.
 - PR #23 preserves Dimas's schema-v2 GTX 1080 observation: 18/18 measured
   requests valid, full GPU placement, frozen Ollama/model identity, and
   byte-exact raw artifacts. It remains outside the primary comparison.
-- Completed milestones M0 Bootstrap and M1 Measured Pilot are closed. There
-  are no open pull requests or obsolete remote development branches.
+- Completed milestones M0 Bootstrap and M1 Measured Pilot are closed.
+- Three complete RTX 5060 pilot repeatability launches passed validation with
+  54/54 measured requests. They support instrument repeatability only and are
+  not a two-host research result.
+- All four `benchmark-v1` model tags and exact digests are frozen for Ollama
+  0.34.2 in the two primary-host configs.
+- `uuid_slot_prefix_v3` passed a Qwen-specific 18/18 hardware acceptance with
+  the expected three-token floor and zero excess cached tokens.
+- Two RTX 5060 full calibration campaigns completed with 480/480 valid
+  measured requests and identical aggregate ranks.
+- Derived validation is idempotent: `validation.json` does not recursively hash
+  itself, and repeated report generation leaves its bytes unchanged.
+- `uuid_stable_slot_prefix_v4` makes measured prompt text byte-identical across
+  hosts and independent launches; its Qwen hardware acceptance passed 18/18.
+- The final RTX 5060 campaign from `benchmark-v1-code-v5` passed 480/480 with
+  zero validation errors or warnings.
 
 ## In Progress
 
-- The RTX 5060 host must replace its observed Ollama 0.34.4 with the frozen
-  0.34.2 before launching its primary pilot.
-- Quirence and Qcsteeven must independently run the tagged primary configs on
-  RTX 5060 Laptop and RTX 4060 Ti respectively, then publish only validated
-  raw artifacts through reviewed result PRs.
-- All four benchmark model digests must be frozen before `benchmark-v1` is
-  enabled on either primary host.
+- The first RTX 5060 `benchmark-v1` attempt completed 480/480 requests but is
+  excluded because two Qwen requests exceeded the registered cache-boundary
+  allowance. The complete diagnostic run is preserved in `experiments/runs/`.
+- `uuid_slot_prefix_v2` passed a Llama acceptance but inflated Qwen's warm-up
+  floor because sequential slots `00` through `03` share one leading
+  character. The partial follow-up run is excluded.
+- Earlier v3/v4 full runs are retained as calibration evidence; their aggregate
+  rankings agree with v5 but their random marker text excludes them from the
+  final cross-host dataset.
+- Final RTX 5060 speed and energy rankings agree in all three workload
+  categories. This is one primary host, not the final hypothesis decision.
+- The RTX 4060 Ti pilot result branch exists and requires review; its complete
+  benchmark must use the same v5 tag before a two-host comparison is valid.
 
 ## Next Acceptance Gate
 
-1. Check out the exact `pilot-v1-code` tag on each primary host.
-2. Run `doctor` with the committed host config and confirm Ollama 0.34.2, the
-   frozen digest, full GPU placement, and usable NVML energy telemetry.
-3. Produce three independent 18-request launches per primary host without
-   changing code, prompts, runtime, model digest, or validity policy.
-4. Accept only runs with `validation.json: ok=true`; publish raw artifacts and
-   the append-only log entry through a reviewed result PR.
-5. Freeze all four benchmark model digests before enabling `benchmark-v1`.
+1. Review and publish the v5 protocol plus the final RTX 5060 artifacts.
+2. Have the RTX 4060 Ti contributor pull the same tag, confirm the four pinned
+   digests, and execute the committed companion config without code changes.
+3. Accept only `validation.json: ok=true` with all 480 requests valid.
+4. Verify the RTX 4060 Ti logical prompt-map SHA-256 matches primary A.
+5. Implement the preregistered bootstrap/material-effect analysis against the
+   two compatible primary runs.
+6. Compare only those complete compatible runs in the paper tables.
 
 ## Open Research Work
 
@@ -76,7 +96,8 @@ primary RTX 5060 Laptop and RTX 4060 Ti pilot launches are ready to start.
 
 ## Latest Validated Run
 
-The latest validated artifact is
-`pilot-v1-observation-gtx1080-observation-20260928T155322Z-989238`: 18/18 valid
-requests on GTX 1080. It is observation-only and cannot enter primary decision
-blocks. No primary-host run has been published yet.
+The latest validated artifact is the final primary-A run
+`benchmark-v1-maibenben-x16c-20260929T021056Z-ad31b3`: 480/480 valid measured
+requests on RTX 5060 from `benchmark-v1-code-v5`. Aggregate speed and energy
+rankings agree in 3/3 workload blocks. There is still no compatible two-host
+research dataset until RTX 4060 Ti completes the same protocol.

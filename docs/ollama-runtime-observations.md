@@ -157,3 +157,52 @@ above, record every warm-up plus the floor/excess/uncached counts, and abort
 before measured requests when the floor cannot be established. The prompt
 nonce also moved ahead of every static character. These methodology fixes do
 not turn the GTX 1080 observation into an experimental run.
+
+## RTX 5060 full-campaign marker-boundary observation
+
+The first 480-request `benchmark-v1` attempt exposed a case too rare for the
+18-request acceptance workload. Qwen3 reused one cache token for one matching
+leading UUID character and two cache tokens for two matching characters. The
+only two adjacent two-character matches in 240 Qwen requests were also the
+only requests above the registered one-token excess limit. Llama 3.2 remained
+within its one-token allowance.
+
+The failed campaign is retained unchanged and excluded from analysis. The
+prospective `uuid_slot_prefix_v2` policy keeps the UUID v4 representation but
+sets its first byte from a unique logical request slot. Thus no two warm-up or
+measured markers for one model can share the first two hex characters. The
+MVP permits at most 256 such slots per model and refuses a larger experiment
+before creating a run directory. Schema-v2 validation continues to recognize
+the historical `uuid_prefix_v1` policy so diagnostic artifacts remain
+auditable.
+
+A short Llama acceptance could not reveal that sequential v2 warm-up slots
+`00` through `03` share their first character. In the next Qwen launch this
+made all post-cold warm-ups report four cached tokens instead of the known
+three-token template floor. The launch was stopped and excluded. The
+superseding `uuid_slot_prefix_v3` policy nibble-swaps the logical slot number:
+the first four prefixes are `00`, `10`, `20`, and `30`, while the mapping
+remains a permutation of all 256 byte values. This separates consecutive
+warm-up boundaries without weakening the one-token excess rule.
+
+The subsequent Qwen-specific acceptance observed warm-up cache counts
+`0, 3, 3, 3` and 18/18 measured counts at three. The complete 480-request
+campaign then retained the expected model floors `3, 3, 20, 20`, with no
+request above one excess token and `validation.ok=true`. This is the accepted
+cache-marker policy for the two-host benchmark; v1 and v2 remain recognized
+only so their diagnostic artifacts can be audited.
+
+Two independent full runs then exposed a cross-run issue outside the cache
+counts: the UUID digest still included the random run-directory name. The
+actual marker text therefore differed between hosts and Llama scored quality
+changed despite fixed sampling controls. `uuid_stable_slot_prefix_v4` removes
+run and host identity from the digest key; measured markers depend only on
+experiment ID, prompt ID, repetition, and the canonical slot. Unit tests now
+require byte-identical markers across model configurations and independent
+run directories. Four warm-ups overwrite the prior sequential context before
+measurement, while the cache validator still rejects any unexpected reuse.
+
+The v5 hardware acceptance retained Qwen's `0, 3, 3, 3` warm-up sequence and
+zero measured excess across 18 requests. The following full campaign completed
+480/480 valid requests with floors `3, 3, 20, 20`. This stable-key policy is
+the frozen cross-host protocol; earlier policies remain diagnostic history.

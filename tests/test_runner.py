@@ -27,6 +27,7 @@ from llm_energy_bench.results import WARMUPS, read_gzip_jsonl, read_jsonl
 from llm_energy_bench.runner import (
     RunnerError,
     RunnerPreflightError,
+    _cache_busted_prompt,
     _integrate_power,
     derive_request_metrics,
     run_experiment,
@@ -653,6 +654,8 @@ def test_every_generation_has_a_unique_leading_cache_buster(tmp_path: Path) -> N
         parts[1] == "[llm-energy-bench request marker; ignore this marker]" for parts in lines
     )
     assert len(prefixes) == len(set(prefixes))
+    assert len({prefix[:2] for prefix in prefixes}) == len(prefixes)
+    assert [prefix[:2] for prefix in prefixes[:4]] == ["00", "10", "20", "30"]
     assert all("kv_cache" not in request.options for request in client.requests)
     assert all(request.options["num_ctx"] == 4096 for request in client.requests)
     assert all(request.options["num_gpu"] == 999 for request in client.requests)
@@ -660,6 +663,16 @@ def test_every_generation_has_a_unique_leading_cache_buster(tmp_path: Path) -> N
         {"num_ctx": 4096, "num_gpu": 999},
         {"num_ctx": 4096, "num_gpu": 999},
     ]
+
+
+def test_cache_buster_slot_owns_the_first_uuid_byte() -> None:
+    markers = [
+        _cache_busted_prompt("same-key", "prompt", marker_slot=slot).splitlines()[0]
+        for slot in (0, 1, 15, 16, 255)
+    ]
+
+    assert [marker[:2] for marker in markers] == ["00", "10", "f0", "01", "ff"]
+    assert all(UUID(marker).version == 4 for marker in markers)
 
 
 def test_measured_cache_marker_is_stable_across_model_configurations(tmp_path: Path) -> None:
@@ -685,7 +698,42 @@ def test_measured_cache_marker_is_stable_across_model_configurations(tmp_path: P
     assert all(len(values) == 1 for values in markers.values())
     assert len({next(iter(values)) for values in markers.values()}) == len(markers)
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["cache_buster_policy"] == "uuid_prefix_v1"
+    assert manifest["cache_buster_policy"] == "uuid_stable_slot_prefix_v4"
+
+
+def test_measured_cache_marker_is_stable_across_independent_runs(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    first_dir = run_experiment(
+        config,
+        client_factory=lambda _url: FakeClient(),
+        sampler_factory=lambda **_kwargs: FakeSampler(),
+    )
+    second_dir = run_experiment(
+        config,
+        client_factory=lambda _url: FakeClient(),
+        sampler_factory=lambda **_kwargs: FakeSampler(),
+    )
+
+    def markers(run_dir: Path) -> dict[tuple[str, int], str]:
+        return {
+            (record["prompt_id"], record["repetition"]): record["prompt"].splitlines()[0]
+            for record in read_jsonl(run_dir / "requests.jsonl")
+        }
+
+    assert markers(first_dir) == markers(second_dir)
+
+
+def test_run_rejects_more_than_256_unique_cache_marker_slots(tmp_path: Path) -> None:
+    config = make_config(tmp_path, repetitions=127)
+
+    with pytest.raises(RunnerPreflightError, match="cache marker slots"):
+        run_experiment(
+            config,
+            client_factory=lambda _url: FakeClient(),
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+
+    assert not config.output_dir.exists()
 
 
 def test_run_requires_four_warmups_to_establish_a_cache_floor(tmp_path: Path) -> None:

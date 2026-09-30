@@ -1,0 +1,102 @@
+{
+  "artifact_sha256": {
+    "config.resolved.toml": "4fa497a56d5f067038cce298388b8718d9d8009a5bd37b8299fd11c3a3242d51",
+    "outputs.jsonl": "2ac3873b84330a09d86e2a83ae6cef35548d001e726b2aa9219d95cc36ecd64d",
+    "requests.jsonl": "d333aca4c01caedcfb024b9aa2edf89e895012f8d0badf246181b2808c9caf71",
+    "telemetry.jsonl.gz": "ceb373bbb64e582b386e868489c8a782f0cfe508bf5d1b73d825a977ae7dbc57",
+    "warmups.jsonl": "6393d9c34c50985a722d2b3dd1654c71904f1c800be4c7e95513e267ca5a3d0d"
+  },
+  "cache_buster_policy": "uuid_slot_prefix_v2",
+  "completed_requests": 18,
+  "completed_warmups": 4,
+  "config_sha256": "4fa497a56d5f067038cce298388b8718d9d8009a5bd37b8299fd11c3a3242d51",
+  "controls": {
+    "concurrency": 1,
+    "currency": null,
+    "expected_model_digests": {
+      "llama3.2:3b-instruct-q4_K_M": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+    },
+    "expected_runtime_version": "0.34.2",
+    "experiment_id": "pilot-v1",
+    "gpu_index": 0,
+    "host_id": "maibenben-x16c-rtx5060",
+    "models": [
+      "llama3.2:3b-instruct-q4_K_M"
+    ],
+    "ollama_url": "http://127.0.0.1:11434",
+    "options": {
+      "kv_cache": "f16",
+      "num_ctx": 4096,
+      "num_gpu": 999,
+      "num_predict": 256,
+      "seed": 42,
+      "temperature": 0.0
+    },
+    "order_seed": 42,
+    "repetitions": 3,
+    "tariff_per_kwh": null,
+    "telemetry_interval_ms": 100,
+    "warmup_requests": 4
+  },
+  "ended_utc": "2026-09-29T01:22:40.685938+00:00",
+  "experiment_id": "pilot-v1",
+  "failure": null,
+  "git_commit": "d8ef5dad69c811b92363b106143befe52998c1e8",
+  "gpu": {
+    "driver_version": "591.66",
+    "energy_fallback_reason": null,
+    "energy_source": "total_energy_counter",
+    "field_errors": {},
+    "gpu_fingerprint": "e9a2b1cd50c10172",
+    "gpu_index": 0,
+    "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "power_limit_watts": 80.0,
+    "supports_clocks": true,
+    "supports_power_instant": true,
+    "supports_power_legacy": true,
+    "supports_power_limit": true,
+    "supports_temperature": true,
+    "supports_total_energy": true,
+    "supports_utilization": true,
+    "unsupported_fields": [],
+    "vram_total_bytes": 8546942976
+  },
+  "host": {
+    "architecture": "AMD64",
+    "os": "Windows",
+    "os_release": "11"
+  },
+  "host_id": "maibenben-x16c-rtx5060",
+  "max_cache_excess_tokens": 1,
+  "max_measured_load_duration_ns": 100000000,
+  "models": [
+    {
+      "context_length": 4096,
+      "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "family": "llama",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "llama3.2:3b-instruct-q4_K_M",
+      "name": "llama3.2:3b-instruct-q4_K_M",
+      "parameter_size": "3.2B",
+      "quantization": "Q4_K_M",
+      "size_bytes": 2554708622,
+      "size_vram_bytes": 2554708622,
+      "template_cache_baseline_tokens": 20
+    }
+  ],
+  "prompt_cache_policy": "template_floor_v2",
+  "prompt_count": 6,
+  "prompt_set_sha256": "c7c4ae95e16441f28227e7614308de06b412ef7f7d3a7fbf7880a9982c03e9d7",
+  "repetitions": 3,
+  "run_id": "pilot-v1-maibenben-x16c-rtx5060-20260929T012225Z-8f048a",
+  "runtime": {
+    "name": "ollama",
+    "version": "0.34.2"
+  },
+  "schema_version": 2,
+  "started_requests": 18,
+  "started_utc": "2026-09-29T01:22:25.985218+00:00",
+  "status": "completed",
+  "valid_requests": 18
+}

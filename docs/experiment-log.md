@@ -270,3 +270,193 @@ decision blocks.
 - Historical data: all earlier RTX 4060 Ti and GTX 1080 local launches remain
   diagnostics. The amendment does not retroactively validate them; every
   accepted run must be repeated from the tagged schema-v2 baseline.
+
+### 2026-09-29 — RTX 5060 `benchmark-v1` first campaign attempt (invalid)
+
+- Contributor: Quirence/Codex; frozen code commit `f40fedefc625e9df3c8a2ae30c611637e2078cda`
+  (`benchmark-v1-code`).
+- Run: `benchmark-v1-maibenben-x16c-20260928T175309Z-cd0a58`; Ollama
+  0.34.2; RTX 5060 Laptop, driver 591.66, reported 80 W power limit; all four
+  pinned model digests matched and every model was fully resident on the GPU.
+- Completion: all 16 warm-ups and all 480 measured requests were persisted.
+  Validation rejected the campaign: 478 requests passed and two Qwen requests
+  exceeded the registered one-token cache-boundary allowance.
+- Exact failures: Qwen3 Q4 request 104 and Qwen3 Q8 request 145 each reported
+  five cached prompt tokens against a three-token floor (`excess = 2`). The
+  requests were warm (`load_duration` 3.211 ms and 2.6811 ms), so neither was
+  a model reload.
+- Root cause: in both failures the preceding UUID marker shared exactly its
+  first two hexadecimal characters (`32...` then `32...`; `55...` then
+  `55...`). Across all 240 Qwen observations, a one-character prefix match
+  accounted for the accepted `+1` cases and the only two-character matches
+  accounted for the two rejected `+2` cases. Prompt bodies differed, so this
+  is marker-token boundary reuse rather than semantic prompt reuse.
+- Decision: retain the complete run as diagnostic evidence and exclude it
+  from every aggregate, rank, and research claim. Do not relax the registered
+  cache-excess threshold after observing the data.
+- Prospective correction: `uuid_slot_prefix_v2` assigns a unique first UUID
+  byte to every warm-up and measured logical request within a model. This
+  preserves valid UUID v4 markers and cross-model prompt identity while
+  preventing any pair from sharing two leading hex characters. The correction
+  must pass synthetic tests and a fresh hardware acceptance run before the
+  complete campaign is repeated under a new frozen commit.
+
+### 2026-09-29 — RTX 5060 `uuid_slot_prefix_v2` hardware acceptance
+
+- Contributor: Quirence/Codex; code commit
+  `d8ef5dad69c811b92363b106143befe52998c1e8` after merging the current
+  `origin/main` baseline.
+- Run: `pilot-v1-maibenben-x16c-rtx5060-20260929T012225Z-8f048a`; Ollama
+  0.34.2; RTX 5060 Laptop, driver 591.66, reported 80 W power limit; frozen
+  Llama 3.2 Q4 digest and full-GPU placement confirmed by `doctor`.
+- Synthetic gate: `ruff check`, `ruff format --check`, and the complete test
+  suite passed before the launch.
+- Result: all four warm-ups and all 18 measured requests were persisted;
+  `validation.json` reports `ok: true` with 18/18 valid requests and no errors.
+- Cache result: the template floor was 20 tokens; measured counts were only 20
+  or 21, maximum excess was one, and all 18 measured first-byte slots were
+  unique. Scored-prompt quality was 1.0.
+- Energy note: all accepted requests selected instantaneous-power integration
+  after the per-request total-counter sanity check. This remains a GPU-only
+  estimate and does not establish wall-energy accuracy.
+- Decision: the prospective correction passes short hardware acceptance. This
+  is instrumentation evidence, not the four-configuration research campaign;
+  the complete 480-request RTX 5060 run must be repeated from the frozen
+  corrected commit.
+
+### 2026-09-29 — Qwen warm-up floor check (partial, excluded)
+
+- Run: `benchmark-v1-maibenben-x16c-20260929T012531Z-474a9e`, launched from
+  local tag `benchmark-v1-code-v2` after the Llama acceptance above.
+- Observation: Qwen3 Q4 completed 120 measured requests without an invalid
+  request. During the next Qwen3 Q8 block, inspection showed a four-token
+  warm-up baseline instead of the known three-token template floor.
+- Root cause: slot-prefix v2 used sequential marker bytes for warm-ups, so the
+  first lines began `00...`, `01...`, `02...`, and `03...`. All post-cold
+  warm-ups shared the first character with their predecessor, adding one
+  tokenizer-boundary cache token to every floor candidate.
+- Action: the operator stopped the launch after 152 measured outputs. The
+  Windows PTY termination did not reach Python's exception handler, so the
+  raw manifest still says `running`; validation explicitly classifies the
+  directory as partial. It is diagnostic only and contributes no aggregates.
+- Prospective correction: `uuid_slot_prefix_v3` nibble-swaps the logical slot,
+  yielding warm-up prefixes `00...`, `10...`, `20...`, `30...` while still
+  assigning all 256 possible first bytes exactly once. A Qwen-specific short
+  acceptance is required before another complete campaign.
+
+### 2026-09-29 — Qwen `uuid_slot_prefix_v3` hardware acceptance
+
+- Run: `cache-marker-acceptance-v3-maibenben-x16c-rtx5060-20260929T013223Z-1907d4`;
+  frozen commit/tag `9ea98b2e7dc23accbbcd62d17520b9875bdc022e` /
+  `benchmark-v1-code-v3`.
+- Environment: Ollama 0.34.2; RTX 5060 Laptop, driver 591.66, reported 80 W
+  power limit; Qwen3 4B Q4 frozen digest and full-GPU placement confirmed.
+- Result: 18/18 measured requests valid, `validation.ok=true`, scored quality
+  1.0. Warm-up cache counts were exactly `0, 3, 3, 3`; the applied floor was
+  three, every measured count was three, and maximum excess was zero.
+- Decision: the v3 ordering removes the Qwen warm-up-floor confound. Proceed
+  with the complete campaign from the same frozen commit without further code
+  or protocol changes.
+
+### 2026-09-29 — RTX 5060 `benchmark-v1` accepted campaign
+
+- Run: `benchmark-v1-maibenben-x16c-20260929T013445Z-dd13a1`; frozen
+  commit/tag `9ea98b2e7dc23accbbcd62d17520b9875bdc022e` /
+  `benchmark-v1-code-v3`.
+- Environment: Ollama 0.34.2; NVIDIA GeForce RTX 5060 Laptop GPU, driver
+  591.66, 8 GiB VRAM, reported 80 W power limit. All four model digests matched
+  the committed controls and every model was fully resident on the GPU.
+- Completion and validity: 16/16 warm-ups and 480/480 measured requests were
+  persisted; `validation.json` reports `ok=true`, zero errors/warnings and no
+  invalid request. Applied cache floors were `3, 3, 20, 20`; measured excess
+  never exceeded the registered one-token allowance. Maximum telemetry gap
+  was 141 ms, maximum temperature 71 °C, and maximum observed power sample
+  95.722 W.
+- Quality: Qwen3 Q4 and Q8 scored 1.0; Llama 3.2 Q4 scored 0.825; Llama 3.2
+  Q8 scored 0.75, exactly the preregistered eligibility threshold. All four
+  configurations therefore entered the ranking.
+- Observed aggregate result: speed and GPU-energy rankings were identical in
+  all three workload categories. Llama 3.2 Q4 ranked first throughout. For
+  long and short workloads the order was Llama Q4, Qwen Q4, Llama Q8, Qwen
+  Q8; for scored prompts it was Llama Q4, Llama Q8, Qwen Q4, Qwen Q8.
+- Scale: Llama Q4 ranged from 83.402 to 122.719 output tok/s and 1.041 to
+  1.553 output tok/J across categories. Qwen Q8 ranged from 32.967 to 67.148
+  output tok/s and 0.412 to 0.858 output tok/J.
+- Energy-source note: 468 requests used instantaneous-power integration after
+  the total-counter sanity check and 12 used the total-energy counter. An
+  instantaneous-only sensitivity recomputation preserved every energy rank;
+  for the 12 counter-selected requests the counter/instantaneous ratio ranged
+  from 0.571 to 1.420 (median 0.932).
+- Interpretation: this single-host campaign does not show an aggregate rank
+  inversion. It does not establish equivalence, satisfy the predeclared
+  bootstrap/material-effect criterion, or answer the two-host hypothesis.
+  The compatible RTX 4060 Ti campaign remains required.
+
+### 2026-09-29 — Derived-validation idempotence correction
+
+- A post-campaign verification reran `report` without changing any raw
+  artifact. It exposed that `validation.json` included the checksum and size
+  of its own previous bytes, so every regeneration changed only those two
+  self-referential fields.
+- Correction: validation no longer hashes or sizes its own output. Raw and
+  derived peer artifacts remain covered, semantic validation is unchanged,
+  and repeated validation now produces byte-identical JSON.
+- Scope: post-processing integrity only. The accepted inference records,
+  telemetry, manifest, metrics, ranks, tag and validity verdict are unchanged.
+
+### 2026-09-29 — RTX 5060 v4 confirmation and marker-stability finding
+
+- Run: `benchmark-v1-maibenben-x16c-20260929T015412Z-1099aa`; commit/tag
+  `382443895afaaa5bf7d01ad18078130b864f3cb4` / `benchmark-v1-code-v4`.
+- Result: 480/480 measured requests valid, zero validation errors/warnings,
+  floors `3, 3, 20, 20`, and the same speed/energy order as v3 in all three
+  workload categories. Steady-state `report` regeneration was byte-idempotent.
+- New cross-run evidence: despite fixed temperature and seed, Llama quality
+  changed from 0.825/0.75 in v3 to 0.875/0.8 in v4. Inspection showed that the
+  UUID digest included the random run-directory ID. Thus logical
+  prompt/repetition pairs were identical only inside one run, not across hosts
+  or independent launches.
+- Decision: v3 and v4 remain valid single-host calibration measurements but
+  are not the final two-host primary dataset. The superseding marker key must
+  exclude run and host identity so actual request text is byte-identical for
+  the same experiment/prompt/repetition everywhere.
+
+### 2026-09-29 — Stable-marker acceptance and final RTX 5060 campaign
+
+- Frozen code: `d587a5d6fbeae039009a4e722f2af1249ebcbbf4`, tag
+  `benchmark-v1-code-v5`, policy `uuid_stable_slot_prefix_v4`.
+- Measured UUIDs now depend only on experiment ID, prompt ID, repetition, and
+  canonical slot. Tests require byte-identical marker text across models,
+  hosts, and independent run directories.
+- Qwen acceptance:
+  `cache-marker-acceptance-v3-maibenben-x16c-rtx5060-20260929T020837Z-4c48dd`
+  (the diagnostic experiment ID retains its historical v3 name). Result:
+  18/18 valid, warm-up cache `0, 3, 3, 3`, floor 3, measured cache 3, zero
+  excess, scored quality 1.0.
+- Final primary-A run:
+  `benchmark-v1-maibenben-x16c-20260929T021056Z-ad31b3`. Ollama 0.34.2,
+  RTX 5060 Laptop, driver 591.66, reported 80 W power limit, all four frozen
+  digests matched, full-GPU placement confirmed.
+- Validity: 16/16 warm-ups and 480/480 measured requests persisted;
+  `validation.ok=true`, zero errors/warnings, floors `3, 3, 20, 20`, maximum
+  cache excess 1, maximum telemetry gap 141 ms, temperature peak 71 °C, and
+  maximum observed power sample 95.018 W. Repeated steady-state reports are
+  byte-idempotent.
+- Quality: Qwen3 Q4/Q8 = 1.0, Llama 3.2 Q4 = 0.85, Llama 3.2 Q8 = 0.75. All
+  meet the frozen quality threshold.
+- Aggregate result: speed and energy ranks agree in 3/3 workload blocks.
+  Long/short order: Llama Q4, Qwen Q4, Llama Q8, Qwen Q8. Scored order: Llama
+  Q4, Llama Q8, Qwen Q4, Qwen Q8.
+- Energy-source sensitivity: 474 requests used instantaneous-power integration
+  and 6 used the total-energy counter. Recomputing every request from
+  instantaneous power preserves all three energy rankings; counter/instant
+  ratios for the six selected counter requests span 0.563–1.222 (median
+  0.907).
+- Actual prompt-map check: the 120 unique `(prompt_id, repetition, prompt)`
+  records hash to SHA-256
+  `6715d4c2c6fe9846a20356fe221c723aaf185278239c68f48b8d3503ede104a0`
+  under canonical compact JSON. The RTX 4060 Ti campaign must reproduce this
+  logical prompt map.
+- Interpretation: no aggregate rank inversion is observed on primary host A.
+  The hypothesis remains undecided until primary host B runs the same v5 tag
+  and the preregistered material-effect/bootstrap analysis is implemented.

@@ -11,6 +11,7 @@ import pytest
 from llm_energy_bench.results import (
     MAX_ARTIFACT_BYTES,
     REQUIRED_RAW_ARTIFACTS,
+    VALIDATION,
     WARMUPS,
     GzipJsonlWriter,
     JsonlWriter,
@@ -515,6 +516,18 @@ def test_the_validation_report_serializes(tmp_path: Path) -> None:
     assert "requests.jsonl" in payload["checksums"]
 
 
+def test_validation_is_idempotent_and_does_not_hash_itself(tmp_path: Path) -> None:
+    run_dir = complete_run(tmp_path)
+    write_json(run_dir / VALIDATION, validate_run(run_dir).to_dict())
+    first = validate_run(run_dir)
+    write_json(run_dir / VALIDATION, first.to_dict())
+    second = validate_run(run_dir)
+
+    assert first.to_dict() == second.to_dict()
+    assert VALIDATION not in second.checksums
+    assert VALIDATION not in second.sizes
+
+
 def test_every_required_raw_artifact_is_checked(tmp_path: Path) -> None:
     for name in REQUIRED_RAW_ARTIFACTS:
         run_dir = complete_run(tmp_path / name.replace(".", "_"))
@@ -531,6 +544,24 @@ def test_schema_v1_run_passes_semantic_validation(tmp_path: Path) -> None:
 
 def test_schema_v2_run_passes_semantic_validation(tmp_path: Path) -> None:
     report = validate_run(schema_v2_run(tmp_path))
+
+    assert report.ok is True
+    assert report.errors == ()
+
+
+@pytest.mark.parametrize(
+    "policy",
+    ["uuid_slot_prefix_v2", "uuid_slot_prefix_v3", "uuid_stable_slot_prefix_v4"],
+)
+def test_schema_v2_accepts_the_slot_prefixed_cache_buster_policy(
+    tmp_path: Path, policy: str
+) -> None:
+    run_dir = schema_v2_run(tmp_path)
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["cache_buster_policy"] = policy
+    write_json(run_dir / "manifest.json", manifest)
+
+    report = validate_run(run_dir)
 
     assert report.ok is True
     assert report.errors == ()

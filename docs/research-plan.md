@@ -32,9 +32,11 @@ research comparison begins.
   temperature 0, seed 42, concurrency 1, and f16 KV cache;
 - `benchmark-v1`: 24 prompts and five measured repetitions per configuration.
 
-Model tags and digests must be checked before the campaign. A run records the
-actual Ollama digest, runtime and driver versions, prompt/config hashes, power
-limit, temperature, VRAM context, and the telemetry source used.
+Model tags and digests must be checked before the campaign. The four full
+digests are pinned in both host configs and enforced by `doctor`; a shortened
+Ollama ID is not an acceptable substitute. A run records the actual Ollama
+digest, runtime and driver versions, prompt/config hashes, power limit,
+temperature, VRAM context, and the telemetry source used.
 `num_gpu = 999` asks Ollama to place every layer on the GPU during preload and
 measured generation. It does not replace the `/api/ps` full-placement gate;
 partial CPU offload still invalidates a primary run.
@@ -44,9 +46,30 @@ The four tags were rechecked against the official
 [Llama 3.2](https://ollama.com/library/llama3.2/tags) registries on
 2026-09-19. Tags are configuration names, not immutable identities, so this
 check does not replace the digest captured by each run. The checked-in
-`benchmark-v1.toml` is the MAIBENBEN copy; the RTX 4060 Ti copy changes only
-`host_id`, while prompt, runtime, model, GPU-sampling, and inference controls
-remain byte-for-byte equivalent.
+`benchmark-v1.toml` is the MAIBENBEN copy;
+`benchmark-v1-rtx4060ti.toml` is the RTX 4060 Ti copy. A contract test requires
+their resolved controls to differ only by `host_id`.
+
+### Benchmark entry gate
+
+Each primary host manually pulls the four configured tags, checks out the
+same reviewed benchmark-preflight revision, and runs only its assigned
+`doctor` command first:
+
+```powershell
+# MAIBENBEN X16C / RTX 5060 Laptop
+python -m llm_energy_bench doctor --config configs/benchmark-v1.toml --json
+
+# RTX 4060 Ti desktop
+python -m llm_energy_bench doctor --config configs/benchmark-v1-rtx4060ti.toml --json
+```
+
+The research run may begin only when `ok` is `true`, Ollama is exactly 0.34.2,
+all four full digests match, every model reports `fully_on_gpu == true` and
+`gpu_fraction == 1.0`, and an NVML energy source is available. A failed gate
+is recorded and corrected; it is never bypassed by editing expected values.
+After both hosts pass, the corresponding `run --config ...` command is the
+first research-data-producing action.
 
 The originally planned RTX 4060 desktop was replaced prospectively by the
 actually available RTX 4060 Ti desktop on 2026-09-28, before any publishable
