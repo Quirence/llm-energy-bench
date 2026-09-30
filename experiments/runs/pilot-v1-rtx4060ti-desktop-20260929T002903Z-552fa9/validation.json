@@ -3,7 +3,9 @@
     "config.resolved.toml": "c72031bb75c13d4b62f4a7b2bc92cd1e0ceafb80576fbffbef4d8e3d041ec6fa",
     "manifest.json": "7ea0a22107bd530d927d01ccc77bc0f33c8e3ebd4a88e01f780545d83e63114a",
     "outputs.jsonl": "54b754b897b840d813110b092608151e479e7a81cfc702555de75ae5dd377ff7",
+    "report.md": "ac99b07d829f1fea16d412d67a7486e9370298faa432e97a6bfeb8ce8d2776da",
     "requests.jsonl": "0d8fc9fdf941682a1fd06aa0e031d9d8a4f7749ad3b550e7e45897c8422b5b66",
+    "summary.csv": "84eac97bad1d27de1a9987338e228e849ff21ac39772e100665e8a2c3f182933",
     "telemetry.jsonl.gz": "e49e1d263f6f4b862646ceeea43ed5a8bf0bbee466af56bdd0b7d4d3dc1f29e3",
     "warmups.jsonl": "77b44aec9915e09d1b771ff5424d79296eece962d1c7f1053890239844dc725a"
   },
@@ -20,14 +22,12 @@
     "config.resolved.toml": 701,
     "manifest.json": 3316,
     "outputs.jsonl": 45728,
+    "report.md": 889,
     "requests.jsonl": 23736,
+    "summary.csv": 1913,
     "telemetry.jsonl.gz": 5801,
     "warmups.jsonl": 1403
   },
   "status": "completed",
-  "warnings": [
-    "validation.json has not been generated yet",
-    "summary.csv has not been generated yet",
-    "report.md has not been generated yet"
-  ]
+  "warnings": []
 }

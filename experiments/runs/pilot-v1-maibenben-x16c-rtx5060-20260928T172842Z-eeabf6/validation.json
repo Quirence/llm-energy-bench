@@ -7,7 +7,6 @@
     "requests.jsonl": "5e573994f719e7edbe5f4f6744bf9d1f1c7edcaeea49c362c05081b96e863464",
     "summary.csv": "09b59290cccae81462484d48c379408cb4a3cdd803ba856529b96325910f74d4",
     "telemetry.jsonl.gz": "7f6e7b1e0f199a70d62e880a2af112285b20477339ed1131e4647865695db43c",
-    "validation.json": "4244917ce258d7e472ae5f4ab4788959c9c1f71505715486de64edad46fd8689",
     "warmups.jsonl": "869ed23c315f1882d90e77323cbd1896d0b00a56cad83a5aff0aeb56be012230"
   },
   "errors": [],
@@ -27,7 +26,6 @@
     "requests.jsonl": 23826,
     "summary.csv": 1959,
     "telemetry.jsonl.gz": 4804,
-    "validation.json": 1378,
     "warmups.jsonl": 1423
   },
   "status": "completed",
