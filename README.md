@@ -127,4 +127,6 @@ and the selected source is stored in the request record.
 - [Diagnostic contributor observations](docs/diagnostic-observations.md)
 - [Project state and contribution report](docs/project-state-for-owner.md)
 - [Paper draft outline and author work split](docs/paper-draft.md)
+- [Indexed reading list](docs/reading-index.md)
+- [Implemented methodology and formulas](docs/methodology-and-formulas.md)
 - [Frozen paper-dataset result](experiments/studies/paper-dataset-v1/report.md)
