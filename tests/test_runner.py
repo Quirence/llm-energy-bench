@@ -11,6 +11,7 @@ from uuid import UUID
 
 import pytest
 
+import llm_energy_bench.runner as runner_module
 from llm_energy_bench.config import (
     ExperimentConfig,
     InferenceOptions,
@@ -121,6 +122,7 @@ def sample(
     energy_j: float | None,
     instant_w: float | None,
     legacy_w: float | None = 11.0,
+    power_limit_watts: float | None = 80.0,
 ) -> TelemetrySample:
     return TelemetrySample(
         request_id=request_id,
@@ -136,7 +138,7 @@ def sample(
         memory_utilization_percent=70,
         sm_clock_mhz=2_000,
         memory_clock_mhz=8_000,
-        power_limit_watts=80.0,
+        power_limit_watts=power_limit_watts,
     )
 
 
@@ -147,6 +149,7 @@ def result(
     output_tokens: int = 4,
     valid: bool = True,
     load_duration_ns: int | None = 10_000_000,
+    text: str = "4",
 ) -> InferenceResult:
     return InferenceResult(
         request_id=request_id,
@@ -160,7 +163,7 @@ def result(
         t_end_s=12.0,
         ttft_s=0.2,
         latency_s=2.0,
-        text="4",
+        text=text,
         chunk_count=2,
         done=True,
         done_reason="stop",
@@ -175,6 +178,15 @@ def result(
         valid=valid,
         invalid_kind=None,
         invalid_reason=None,
+    )
+
+
+def exact_prompt(expected: str) -> PromptCase:
+    return PromptCase(
+        prompt_id="exact",
+        category=PromptCategory.SCORED,
+        prompt="Answer with the number only.",
+        expect_exact=expected,
     )
 
 
@@ -280,6 +292,47 @@ class FakeSampler:
 
 def prompt() -> PromptCase:
     return PromptCase("scored-01", PromptCategory.SCORED, "2+2?", ("4",))
+
+
+@pytest.mark.parametrize(
+    ("text", "score"),
+    [("16", 1.0), (" 16\n", 1.0), ("160", 0.0), ("Ответ: 16", 0.0)],
+)
+def test_exact_scoring_is_strict(text: str, score: float) -> None:
+    assert runner_module.score_response(exact_prompt("16"), text) == score
+
+
+def test_request_metrics_reject_power_limit_drift() -> None:
+    changed = (
+        sample(
+            "request-1",
+            0.0,
+            energy_j=10.0,
+            instant_w=10.0,
+            power_limit_watts=80.0,
+        ),
+        sample(
+            "request-1",
+            1.0,
+            energy_j=20.0,
+            instant_w=10.0,
+            power_limit_watts=60.0,
+        ),
+    )
+
+    metrics = derive_request_metrics(
+        result(text="16"),
+        changed,
+        capabilities(),
+        exact_prompt("16"),
+        repetition=0,
+        expected_power_limit_watts=80.0,
+        power_limit_tolerance_watts=1.0,
+    )
+
+    assert metrics.valid is False
+    assert "power_limit_mismatch" in metrics.invalid_reasons
+    assert "power_limit_changed" in metrics.invalid_reasons
 
 
 def test_total_energy_counter_takes_precedence_over_power_integration() -> None:

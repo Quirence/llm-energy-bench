@@ -28,6 +28,7 @@ from llm_energy_bench.config import (
     load_prompts,
     prompts_fingerprint,
 )
+from llm_energy_bench.environment import request_power_limit_problems
 from llm_energy_bench.nvml import (
     EnergySource,
     GpuCapabilities,
@@ -149,6 +150,8 @@ def derive_request_metrics(
     template_cache_baseline_tokens: int = 0,
     tariff_per_kwh: float | None = None,
     currency: str | None = None,
+    expected_power_limit_watts: float | None = None,
+    power_limit_tolerance_watts: float | None = None,
 ) -> RequestMetrics:
     """Derive one request's rates, energy, efficiency, and optional cost."""
     if any(
@@ -233,9 +236,16 @@ def derive_request_metrics(
     vram = _present(item.vram_used_bytes for item in ordered)
     power_limits = _present(item.power_limit_watts for item in ordered)
 
-    quality_score = None
-    if prompt.is_scored:
-        quality_score = float(all(expected in result.text for expected in prompt.expect_contains))
+    if expected_power_limit_watts is not None and power_limit_tolerance_watts is not None:
+        reasons.extend(
+            request_power_limit_problems(
+                ordered,
+                expected_power_limit_watts,
+                power_limit_tolerance_watts,
+            )
+        )
+
+    quality_score = score_response(prompt, result.text)
 
     return RequestMetrics(
         request_id=result.request_id,
@@ -273,6 +283,15 @@ def derive_request_metrics(
         vram_peak_bytes=max(vram) if vram else None,
         quality_score=quality_score,
     )
+
+
+def score_response(prompt: PromptCase, text: str) -> float | None:
+    """Score one response using the prompt's frozen legacy or exact contract."""
+    if not prompt.is_scored:
+        return None
+    if prompt.expect_exact is not None:
+        return float(text.strip() == prompt.expect_exact)
+    return float(all(expected in text for expected in prompt.expect_contains))
 
 
 def run_experiment(
