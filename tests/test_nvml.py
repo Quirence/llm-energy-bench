@@ -40,6 +40,30 @@ def test_probe_reports_full_support() -> None:
     assert caps.unsupported_fields == ()
 
 
+@pytest.mark.parametrize("supported", [True, False])
+def test_probe_reports_power_limit_profile_or_explicit_nulls(supported: bool) -> None:
+    enabled = (
+        FULL_SUPPORT
+        if supported
+        else tuple(
+            field
+            for field in FULL_SUPPORT
+            if field not in {"power_limit_constraints_mw", "power_limit_default_mw"}
+        )
+    )
+    caps = NvmlSampler(binding=FakeNvml(supported=enabled)).probe(0)
+
+    if supported:
+        assert caps.power_limit_watts == pytest.approx(60.0)
+        assert caps.power_limit_default_watts == pytest.approx(80.0)
+        assert caps.power_limit_min_watts == pytest.approx(5.0)
+        assert caps.power_limit_max_watts == pytest.approx(115.0)
+    else:
+        assert caps.power_limit_default_watts is None
+        assert caps.power_limit_min_watts is None
+        assert caps.power_limit_max_watts is None
+
+
 def test_probe_never_exposes_the_raw_gpu_uuid() -> None:
     fake = FakeNvml()
     caps = NvmlSampler(binding=fake).probe(0)

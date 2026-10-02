@@ -20,6 +20,8 @@ FULL_SUPPORT = (
     "utilization",
     "clocks_mhz",
     "enforced_power_limit_mw",
+    "power_limit_constraints_mw",
+    "power_limit_default_mw",
     "memory",
 )
 
@@ -37,6 +39,10 @@ class FakeNvml:
     vram_total: int = 4 * 1024**3
     vram_used: int = 1 * 1024**3
     power_mw: int = 45_000
+    power_limit_mw: int = 60_000
+    default_power_limit_mw: int = 80_000
+    min_power_limit_mw: int = 5_000
+    max_power_limit_mw: int = 115_000
     energy_mj: int = 1_000_000
     init_calls: int = 0
     shutdown_calls: int = 0
@@ -112,4 +118,12 @@ class FakeNvml:
 
     def enforced_power_limit_mw(self, handle: Any) -> int:
         self._field("enforced_power_limit_mw")
-        return 60_000
+        return self.power_limit_mw
+
+    def power_limit_constraints_mw(self, handle: Any) -> tuple[int, int]:
+        self._field("power_limit_constraints_mw")
+        return self.min_power_limit_mw, self.max_power_limit_mw
+
+    def power_limit_default_mw(self, handle: Any) -> int:
+        self._field("power_limit_default_mw")
+        return self.default_power_limit_mw

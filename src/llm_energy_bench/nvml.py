@@ -82,6 +82,8 @@ class NvmlBinding(Protocol):
     def utilization(self, handle: Any) -> tuple[int, int]: ...
     def clocks_mhz(self, handle: Any) -> tuple[int, int]: ...
     def enforced_power_limit_mw(self, handle: Any) -> int: ...
+    def power_limit_constraints_mw(self, handle: Any) -> tuple[int, int]: ...
+    def power_limit_default_mw(self, handle: Any) -> int: ...
 
 
 class PynvmlBinding:
@@ -201,6 +203,16 @@ class PynvmlBinding:
     def enforced_power_limit_mw(self, handle: Any) -> int:
         return int(self._call(self._api.nvmlDeviceGetEnforcedPowerLimit, handle))
 
+    def power_limit_constraints_mw(self, handle: Any) -> tuple[int, int]:
+        minimum, maximum = self._call(
+            self._api.nvmlDeviceGetPowerManagementLimitConstraints,
+            handle,
+        )
+        return int(minimum), int(maximum)
+
+    def power_limit_default_mw(self, handle: Any) -> int:
+        return int(self._call(self._api.nvmlDeviceGetPowerManagementDefaultLimit, handle))
+
 
 def _as_text(value: Any) -> str:
     return value.decode("utf-8") if isinstance(value, bytes) else str(value)
@@ -239,6 +251,9 @@ class GpuCapabilities:
     power_limit_watts: float | None
     energy_source: EnergySource
     energy_fallback_reason: str | None
+    power_limit_default_watts: float | None = None
+    power_limit_min_watts: float | None = None
+    power_limit_max_watts: float | None = None
     unsupported_fields: tuple[str, ...] = ()
     field_errors: dict[str, str] = field(default_factory=dict)
 
@@ -257,6 +272,9 @@ class GpuCapabilities:
             "supports_clocks": self.supports_clocks,
             "supports_power_limit": self.supports_power_limit,
             "power_limit_watts": self.power_limit_watts,
+            "power_limit_default_watts": self.power_limit_default_watts,
+            "power_limit_min_watts": self.power_limit_min_watts,
+            "power_limit_max_watts": self.power_limit_max_watts,
             "energy_source": self.energy_source.value,
             "energy_fallback_reason": self.energy_fallback_reason,
             "unsupported_fields": list(self.unsupported_fields),
@@ -428,6 +446,11 @@ class NvmlSampler:
                 ("utilization", lambda: self._binding.utilization(handle)),
                 ("clocks_mhz", lambda: self._binding.clocks_mhz(handle)),
                 ("enforced_power_limit_mw", lambda: self._binding.enforced_power_limit_mw(handle)),
+                (
+                    "power_limit_constraints_mw",
+                    lambda: self._binding.power_limit_constraints_mw(handle),
+                ),
+                ("power_limit_default_mw", lambda: self._binding.power_limit_default_mw(handle)),
             )
         }
 
@@ -437,6 +460,16 @@ class NvmlSampler:
         power_limit_mw = self._read(
             "enforced_power_limit_mw",
             lambda: self._binding.enforced_power_limit_mw(handle),
+            errors,
+        )
+        power_limit_constraints_mw = self._read(
+            "power_limit_constraints_mw",
+            lambda: self._binding.power_limit_constraints_mw(handle),
+            errors,
+        )
+        power_limit_default_mw = self._read(
+            "power_limit_default_mw",
+            lambda: self._binding.power_limit_default_mw(handle),
             errors,
         )
 
@@ -462,6 +495,13 @@ class NvmlSampler:
             power_limit_watts=_milli(power_limit_mw),
             energy_source=source,
             energy_fallback_reason=reason,
+            power_limit_default_watts=_milli(power_limit_default_mw),
+            power_limit_min_watts=(
+                _milli(power_limit_constraints_mw[0]) if power_limit_constraints_mw else None
+            ),
+            power_limit_max_watts=(
+                _milli(power_limit_constraints_mw[1]) if power_limit_constraints_mw else None
+            ),
             unsupported_fields=tuple(
                 name for name, ok in supports.items() if not ok and name not in errors
             ),
