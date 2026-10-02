@@ -261,6 +261,34 @@ def test_analyze_command_writes_and_prints_all_artifacts(
     assert code == cli.EXIT_OK
     assert capsys.readouterr().out.splitlines() == [str(path) for path in output_paths]
 
+    power_paths = tuple(
+        tmp_path / name
+        for name in (
+            "power-quality-runs.csv",
+            "power-quality-summary.csv",
+            "power-quality-report.md",
+        )
+    )
+    monkeypatch.setattr(cli, "analyze_power_quality", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(cli, "write_power_quality_analysis", lambda *_args, **_kwargs: power_paths)
+    code = cli.main(
+        [
+            "analyze-power-quality",
+            "--run",
+            str(tmp_path / "run"),
+            "--primary-host",
+            "rtx5060",
+            "--primary-host",
+            "rtx4060ti",
+            "--external-host",
+            "gtx1080",
+            "--output-dir",
+            str(tmp_path / "power-study"),
+        ]
+    )
+    assert code == cli.EXIT_OK
+    assert capsys.readouterr().out.splitlines() == [str(path) for path in power_paths]
+
 
 def test_keyboard_interrupt_maps_to_run_failed(monkeypatch: pytest.MonkeyPatch) -> None:
     def interrupt(_args: object) -> int:

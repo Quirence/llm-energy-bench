@@ -19,6 +19,11 @@ from llm_energy_bench.config import ConfigError, ExperimentConfig, load_config
 from llm_energy_bench.environment import MeasurementEnvironmentError
 from llm_energy_bench.nvml import EnergySource, NvmlError, NvmlSampler
 from llm_energy_bench.ollama import ModelNotFound, OllamaClient, OllamaError
+from llm_energy_bench.power_quality import (
+    PowerQualityError,
+    analyze_power_quality,
+    write_power_quality_analysis,
+)
 from llm_energy_bench.results import (
     ResultsError,
     assert_public_safe,
@@ -260,6 +265,24 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_analyze_power_quality(args: argparse.Namespace) -> int:
+    try:
+        primary_hosts = tuple(args.primary_host)
+        if len(primary_hosts) != 2:
+            raise PowerQualityError("exactly two --primary-host values are required")
+        analysis = analyze_power_quality(
+            tuple(args.run),
+            (primary_hosts[0], primary_hosts[1]),
+            args.external_host,
+        )
+        paths = write_power_quality_analysis(analysis, args.output_dir)
+    except (PowerQualityError, ResultsError, OSError) as error:
+        raise RunFailedError(str(error)) from error
+    for path in paths:
+        print(path)
+    return EXIT_OK
+
+
 def _safe_error(error: BaseException) -> str:
     detail = str(error) or type(error).__name__
     return "<redacted>" if scan_for_private_data(detail) else detail
@@ -315,6 +338,7 @@ COMMANDS: dict[str, Callable[[argparse.Namespace], int]] = {
     "run": cmd_run,
     "report": cmd_report,
     "analyze": cmd_analyze,
+    "analyze-power-quality": cmd_analyze_power_quality,
 }
 
 
@@ -331,7 +355,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog=PROGRAM,
         description="Measure local LLM inference performance and GPU energy use.",
     )
-    subparsers = parser.add_subparsers(dest="command", metavar="{doctor,run,report,analyze}")
+    subparsers = parser.add_subparsers(
+        dest="command", metavar="{doctor,run,report,analyze,analyze-power-quality}"
+    )
 
     doctor = subparsers.add_parser(
         "doctor",
@@ -390,6 +416,39 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         metavar="<study-dir>",
         help="Directory for deterministic study-level artifacts.",
+    )
+
+    power = subparsers.add_parser(
+        "analyze-power-quality",
+        help="Analyze a complete power-quality-v2 campaign.",
+    )
+    power.add_argument(
+        "--run",
+        required=True,
+        action="append",
+        type=Path,
+        metavar="<run-dir>",
+        help="Validated schema-v3 run directory; repeat for every campaign run.",
+    )
+    power.add_argument(
+        "--primary-host",
+        required=True,
+        action="append",
+        metavar="<host-id>",
+        help="Primary host id; provide exactly twice.",
+    )
+    power.add_argument(
+        "--external-host",
+        required=True,
+        metavar="<host-id>",
+        help="External observation host id.",
+    )
+    power.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path,
+        metavar="<study-dir>",
+        help="Directory for deterministic power-quality artifacts.",
     )
 
     return parser
