@@ -699,15 +699,22 @@ def _check_scalar(value: str, location: str) -> None:
 # --------------------------------------------------------------------------
 
 
-def create_run_dir(output_dir: Path, experiment_id: str, host_id: str) -> Path:
+def create_run_dir(
+    output_dir: Path,
+    experiment_id: str,
+    host_id: str,
+    *,
+    compact_prefix: str | None = None,
+) -> Path:
     """Create a fresh run directory.
 
     A run is never resumed in place: a retry receives a new identifier, so an
     earlier interrupted run keeps its artifacts and stays auditable.
     """
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    prefix = compact_prefix or f"{experiment_id}-{host_id}"
     for _ in range(100):
-        run_dir = output_dir / f"{experiment_id}-{host_id}-{stamp}-{secrets.token_hex(3)}"
+        run_dir = output_dir / f"{prefix}-{stamp}-{secrets.token_hex(3)}"
         try:
             run_dir.mkdir(parents=True, exist_ok=False)
         except FileExistsError:

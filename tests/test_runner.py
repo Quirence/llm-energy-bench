@@ -397,6 +397,7 @@ def test_v2_run_preserves_failed_environment_manifest(tmp_path: Path) -> None:
         )
 
     run_dir = next(config.output_dir.iterdir())
+    assert run_dir.name.startswith("pqv2-")
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == 3
     assert manifest["status"] == "failed"

@@ -365,7 +365,12 @@ def run_experiment(
         else:
             models = _preflight_models(client, config, load_options)
 
-        run_dir = create_run_dir(config.output_dir, config.experiment_id, config.host_id)
+        run_dir = create_run_dir(
+            config.output_dir,
+            config.experiment_id,
+            config.host_id,
+            compact_prefix="pqv2" if is_power_quality_v2 else None,
+        )
         resolved_config = _resolved_config_toml(config, prompts_fingerprint(prompts))
         assert_public_safe(resolved_config)
         write_text(run_dir / RESOLVED_CONFIG, resolved_config)
