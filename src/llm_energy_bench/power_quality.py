@@ -132,6 +132,8 @@ def analyze_power_quality(
     samples: list[PowerQualitySample] = []
     run_rows: list[dict[str, Any]] = []
     conditions: dict[tuple[str, str, float], set[int]] = defaultdict(set)
+    compatibility_signature: tuple[Any, ...] | None = None
+    model_digests: dict[str, str] = {}
     expected_hosts = {*primary_hosts, external_host}
     for run_dir in run_dirs:
         manifest_path = run_dir / "manifest.json"
@@ -165,6 +167,15 @@ def analyze_power_quality(
         model = _required_string(models[0], "name", run_dir)
         controls = _required_mapping(manifest, "controls", run_dir)
         power = _required_positive_number(controls, "expected_power_limit_watts", run_dir)
+        signature = _compatibility_signature(manifest, controls, run_dir)
+        if compatibility_signature is None:
+            compatibility_signature = signature
+        elif signature != compatibility_signature:
+            raise PowerQualityError("incompatible campaign controls between schema-v3 runs")
+        digest = _required_string(models[0], "digest", run_dir)
+        if model in model_digests and model_digests[model] != digest:
+            raise PowerQualityError(f"model digest drift for {model!r}")
+        model_digests[model] = digest
         condition_key = (host_id, model, power)
         if launch in conditions[condition_key]:
             raise PowerQualityError(f"duplicate launch for condition {condition_key!r}")
@@ -400,6 +411,35 @@ def _required_launch(study: dict[str, Any], run_dir: Path) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value not in {1, 2, 3}:
         raise PowerQualityError(f"run {run_dir.name!r} has invalid launch_index")
     return value
+
+
+def _compatibility_signature(
+    manifest: dict[str, Any], controls: dict[str, Any], run_dir: Path
+) -> tuple[Any, ...]:
+    runtime = _required_mapping(manifest, "runtime", run_dir)
+    prompt_hash = _required_string(manifest, "prompt_set_sha256", run_dir)
+    options = controls.get("options")
+    if not isinstance(options, dict):
+        raise PowerQualityError(f"run {run_dir.name!r} has no inference options")
+    shared_controls = {
+        key: controls.get(key)
+        for key in (
+            "warmup_requests",
+            "repetitions",
+            "order_seed",
+            "concurrency",
+            "telemetry_interval_ms",
+        )
+    }
+    if any(value is None for value in shared_controls.values()):
+        raise PowerQualityError(f"run {run_dir.name!r} has incomplete shared controls")
+    return (
+        runtime.get("name"),
+        runtime.get("version"),
+        prompt_hash,
+        json.dumps(options, sort_keys=True, separators=(",", ":")),
+        json.dumps(shared_controls, sort_keys=True, separators=(",", ":")),
+    )
 
 
 def _render_csv(rows: tuple[dict[str, Any], ...]) -> str:

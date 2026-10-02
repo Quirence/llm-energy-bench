@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -120,6 +121,7 @@ def _write_synthetic_run(
         "run_id": run_dir.name,
         "status": "completed",
         "host_id": host,
+        "prompt_set_sha256": "frozen-prompt-hash",
         "runtime": {"name": "ollama", "version": "test"},
         "gpu": {
             "power_limit_watts": power,
@@ -158,6 +160,17 @@ def _write_synthetic_run(
             "models": [model],
             "warmup_requests": 4,
             "repetitions": 1,
+            "order_seed": 42,
+            "concurrency": 1,
+            "telemetry_interval_ms": 100,
+            "options": {
+                "num_ctx": 4096,
+                "num_gpu": 999,
+                "temperature": 0.0,
+                "seed": 42,
+                "num_predict": 256,
+                "kv_cache": "f16",
+            },
             "expected_runtime_version": "test",
             "expected_model_digests": {model: digest},
             "study": study,
@@ -277,6 +290,14 @@ def test_analysis_rejects_legacy_and_incomplete_matrix(tmp_path: Path) -> None:
     runs = synthetic_v2_matrix(tmp_path / "incomplete", omit=("rtx4060ti", "qwen3", 120.0, 3))
     with pytest.raises(PowerQualityError, match="incomplete matrix"):
         analyze_power_quality(runs, ("rtx5060", "rtx4060ti"), "gtx1080")
+
+    drifted = synthetic_v2_matrix(tmp_path / "drifted")
+    manifest_path = drifted[0] / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["prompt_set_sha256"] = "different-prompt-hash"
+    write_json(manifest_path, manifest)
+    with pytest.raises(PowerQualityError, match="incompatible campaign controls"):
+        analyze_power_quality(drifted, ("rtx5060", "rtx4060ti"), "gtx1080")
 
 
 def test_energy_per_correct_uses_sums_and_zero_is_null() -> None:
