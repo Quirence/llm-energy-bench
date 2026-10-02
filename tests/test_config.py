@@ -50,6 +50,26 @@ kv_cache = "f16"
 concurrency = 1
 """
 
+POWER_QUALITY_CONFIG = VALID_CONFIG.replace(
+    "telemetry_interval_ms = 100\n",
+    """telemetry_interval_ms = 100
+expected_power_limit_watts = 80.0
+power_limit_tolerance_watts = 1.0
+
+[study]
+protocol_id = "power-quality-v2"
+host_role = "primary"
+condition_id = "llama32-q4-p80"
+launch_index = 1
+
+[environment]
+idle_probe_seconds = 15.0
+max_gpu_utilization_p95_percent = 5.0
+max_start_temperature_c = 55
+max_idle_vram_used_mib = 512.0
+""",
+)
+
 
 def write_config(tmp_path: Path, body: str = VALID_CONFIG) -> Path:
     path = tmp_path / "experiment.toml"
@@ -153,6 +173,44 @@ def test_a_changed_control_changes_the_config_fingerprint(tmp_path: Path) -> Non
     second = load_config(write_config(other, changed))
 
     assert first.fingerprint() != second.fingerprint()
+
+
+def test_power_quality_v2_loads_complete_controls_and_rejects_partial(tmp_path: Path) -> None:
+    config = load_config(write_config(tmp_path, POWER_QUALITY_CONFIG))
+
+    assert config.study.protocol_id == "power-quality-v2"
+    assert config.study.host_role.value == "primary"
+    assert config.study.condition_id == "llama32-q4-p80"
+    assert config.study.launch_index == 1
+    assert config.expected_power_limit_watts == 80.0
+    assert config.power_limit_tolerance_watts == 1.0
+    assert config.environment.idle_probe_seconds == 15.0
+    assert config.environment.max_gpu_utilization_p95_percent == 5.0
+    assert config.environment.max_start_temperature_c == 55
+    assert config.environment.max_idle_vram_used_mib == 512.0
+
+    broken_cases = (
+        ("expected_power_limit_watts = 80.0\n", "expected_power_limit_watts"),
+        ("launch_index = 1", "launch_index = 0"),
+        ('host_role = "primary"', 'host_role = "worker"'),
+        ("power_limit_tolerance_watts = 1.0", "power_limit_tolerance_watts = 0.0"),
+    )
+    for original, replacement in broken_cases:
+        broken = POWER_QUALITY_CONFIG.replace(original, replacement)
+        with pytest.raises(ConfigError):
+            load_config(write_config(tmp_path, broken))
+
+
+def test_legacy_contract_keeps_config_fingerprint_and_prompt_shape(tmp_path: Path) -> None:
+    config = load_config(write_config(tmp_path, VALID_CONFIG))
+    prompt = load_prompts(write_prompts(tmp_path, SCORED))[0]
+
+    assert config.fingerprint() == (
+        "db5ae3196c7d6cc6432e21e13933e47f29a2dac04c62ef2fdfc28e4997838ebc"
+    )
+    assert "study" not in config.to_dict()
+    assert "expect_exact" not in prompt.to_dict()
+    assert prompt.expect_contains == ("4",)
 
 
 # --------------------------------------------------------------------------
@@ -378,6 +436,23 @@ def test_unscored_prompts_carry_no_expectations(tmp_path: Path) -> None:
 
     assert prompts[0].expect_contains == ()
     assert prompts[0].is_scored is False
+
+
+def test_scored_prompt_accepts_exactly_one_scoring_contract(tmp_path: Path) -> None:
+    exact = {key: value for key, value in SCORED.items() if key != "expect_contains"}
+    prompt = load_prompts(write_prompts(tmp_path, {**exact, "expect_exact": "16"}))[0]
+
+    assert prompt.expect_exact == "16"
+    assert prompt.expect_contains == ()
+
+    invalid = (
+        {**exact, "expect_exact": ""},
+        {**SCORED, "expect_exact": "4"},
+        {**SHORT, "expect_exact": "red"},
+    )
+    for record in invalid:
+        with pytest.raises(ConfigError):
+            load_prompts(write_prompts(tmp_path, record))
 
 
 def test_blank_lines_are_ignored(tmp_path: Path) -> None:

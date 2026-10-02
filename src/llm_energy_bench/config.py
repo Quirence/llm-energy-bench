@@ -64,6 +64,13 @@ class PromptCategory(StrEnum):
     SCORED = "scored"
 
 
+class HostRole(StrEnum):
+    """How a host contributes to the power-quality-v2 study."""
+
+    PRIMARY = "primary"
+    EXTERNAL = "external"
+
+
 @dataclass(frozen=True, slots=True)
 class PromptCase:
     """One prompt, identified by a stable ID that survives into every artifact."""
@@ -72,17 +79,57 @@ class PromptCase:
     category: PromptCategory
     prompt: str
     expect_contains: tuple[str, ...] = ()
+    expect_exact: str | None = None
 
     @property
     def is_scored(self) -> bool:
         return self.category is PromptCategory.SCORED
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "id": self.prompt_id,
             "category": self.category.value,
             "prompt": self.prompt,
             "expect_contains": list(self.expect_contains),
+        }
+        if self.expect_exact is not None:
+            payload["expect_exact"] = self.expect_exact
+        return payload
+
+
+@dataclass(frozen=True, slots=True)
+class StudyControls:
+    """Identity of one independently repeatable power-quality-v2 condition."""
+
+    protocol_id: str
+    host_role: HostRole
+    condition_id: str
+    launch_index: int
+
+    def to_dict(self) -> dict[str, str | int]:
+        return {
+            "protocol_id": self.protocol_id,
+            "host_role": self.host_role.value,
+            "condition_id": self.condition_id,
+            "launch_index": self.launch_index,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class EnvironmentLimits:
+    """Fail-closed idle-state limits for a power-quality-v2 run."""
+
+    idle_probe_seconds: float
+    max_gpu_utilization_p95_percent: float
+    max_start_temperature_c: int
+    max_idle_vram_used_mib: float
+
+    def to_dict(self) -> dict[str, int | float]:
+        return {
+            "idle_probe_seconds": self.idle_probe_seconds,
+            "max_gpu_utilization_p95_percent": self.max_gpu_utilization_p95_percent,
+            "max_start_temperature_c": self.max_start_temperature_c,
+            "max_idle_vram_used_mib": self.max_idle_vram_used_mib,
         }
 
 
@@ -130,6 +177,10 @@ class ExperimentConfig:
     source_path: Path
     expected_runtime_version: str | None = None
     expected_model_digests: dict[str, str] = field(default_factory=dict)
+    study: StudyControls | None = None
+    expected_power_limit_watts: float | None = None
+    power_limit_tolerance_watts: float | None = None
+    environment: EnvironmentLimits | None = None
 
     @property
     def cost_reporting_enabled(self) -> bool:
@@ -142,7 +193,7 @@ class ExperimentConfig:
         Absolute paths are deliberately excluded: they carry usernames and home
         directories, which must never reach a public artifact.
         """
-        return {
+        payload = {
             "experiment_id": self.experiment_id,
             "host_id": self.host_id,
             "ollama_url": self.ollama_url,
@@ -159,6 +210,14 @@ class ExperimentConfig:
             "tariff_per_kwh": self.tariff_per_kwh,
             "currency": self.currency,
         }
+        if self.study is not None:
+            payload["study"] = self.study.to_dict()
+            payload["expected_power_limit_watts"] = self.expected_power_limit_watts
+            payload["power_limit_tolerance_watts"] = self.power_limit_tolerance_watts
+            payload["environment"] = (
+                None if self.environment is None else self.environment.to_dict()
+            )
+        return payload
 
     def fingerprint(self) -> str:
         """Hash the controls so a run can be tied to the settings that produced it."""
@@ -179,7 +238,19 @@ _SECTIONS: dict[str, set[str]] = {
         "order_seed",
     },
     "runtime": {"ollama_url", "models", "expected_version", "expected_digests"},
-    "gpu": {"index", "telemetry_interval_ms"},
+    "gpu": {
+        "index",
+        "telemetry_interval_ms",
+        "expected_power_limit_watts",
+        "power_limit_tolerance_watts",
+    },
+    "study": {"protocol_id", "host_role", "condition_id", "launch_index"},
+    "environment": {
+        "idle_probe_seconds",
+        "max_gpu_utilization_p95_percent",
+        "max_start_temperature_c",
+        "max_idle_vram_used_mib",
+    },
     "prompts": {"path"},
     "options": {
         "num_ctx",
@@ -218,6 +289,9 @@ def load_config(path: Path | str) -> ExperimentConfig:
     experiment = raw["experiment"]
     runtime = raw["runtime"]
     gpu = raw.get("gpu", {})
+    study, environment, expected_power_limit, power_limit_tolerance = _load_study_controls(
+        raw.get("study"), raw.get("environment"), gpu
+    )
     options_table = raw.get("options", {})
     cost = raw.get("cost", {})
     base = path.parent
@@ -246,6 +320,10 @@ def load_config(path: Path | str) -> ExperimentConfig:
         models=tuple(models),
         expected_runtime_version=expected_runtime_version,
         expected_model_digests=expected_model_digests,
+        study=study,
+        expected_power_limit_watts=expected_power_limit,
+        power_limit_tolerance_watts=power_limit_tolerance,
+        environment=environment,
         prompt_path=_as_path(raw["prompts"], "path", "prompts", base),
         gpu_index=_as_int(gpu, "index", "gpu", 0, minimum=0),
         telemetry_interval_ms=_as_int(
@@ -309,6 +387,75 @@ def _load_cost(table: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _load_study_controls(
+    study: dict[str, Any] | None,
+    environment: dict[str, Any] | None,
+    gpu: dict[str, Any],
+) -> tuple[StudyControls | None, EnvironmentLimits | None, float | None, float | None]:
+    power_keys_present = any(
+        key in gpu for key in ("expected_power_limit_watts", "power_limit_tolerance_watts")
+    )
+    if study is None:
+        if environment is not None or power_keys_present:
+            raise ConfigError(
+                "[study] is required when power-limit or environment controls are configured"
+            )
+        return None, None, None, None
+
+    protocol_id = _as_identifier(study, "protocol_id", "study")
+    if protocol_id != "power-quality-v2":
+        raise ConfigError(f"[study]: protocol_id must be 'power-quality-v2', got {protocol_id!r}")
+
+    raw_role = _as_str(study, "host_role", "study")
+    try:
+        host_role = HostRole(raw_role)
+    except ValueError as error:
+        raise ConfigError("[study]: host_role must be primary or external") from error
+
+    launch_index = _as_int(study, "launch_index", "study", minimum=1)
+    if launch_index > 3:
+        raise ConfigError(f"[study]: launch_index must be between 1 and 3, got {launch_index}")
+
+    expected_power_limit = _as_float(gpu, "expected_power_limit_watts", "gpu", minimum=0.0)
+    if expected_power_limit <= 0:
+        raise ConfigError("[gpu]: expected_power_limit_watts must be > 0")
+    tolerance = _as_float(gpu, "power_limit_tolerance_watts", "gpu", minimum=0.0)
+    if tolerance <= 0:
+        raise ConfigError("[gpu]: power_limit_tolerance_watts must be > 0")
+    if environment is None:
+        raise ConfigError("missing required section [environment] for power-quality-v2")
+
+    idle_probe_seconds = _as_float(environment, "idle_probe_seconds", "environment", minimum=0.0)
+    if idle_probe_seconds <= 0:
+        raise ConfigError("[environment]: idle_probe_seconds must be > 0")
+    max_utilization = _as_float(
+        environment,
+        "max_gpu_utilization_p95_percent",
+        "environment",
+        minimum=0.0,
+    )
+    if max_utilization > 100:
+        raise ConfigError("[environment]: max_gpu_utilization_p95_percent must be <= 100")
+
+    limits = EnvironmentLimits(
+        idle_probe_seconds=idle_probe_seconds,
+        max_gpu_utilization_p95_percent=max_utilization,
+        max_start_temperature_c=_as_int(
+            environment, "max_start_temperature_c", "environment", minimum=0
+        ),
+        max_idle_vram_used_mib=_as_float(
+            environment, "max_idle_vram_used_mib", "environment", minimum=0.0
+        ),
+    )
+    controls = StudyControls(
+        protocol_id=protocol_id,
+        host_role=host_role,
+        condition_id=_as_identifier(study, "condition_id", "study"),
+        launch_index=launch_index,
+    )
+    return controls, limits, expected_power_limit, tolerance
+
+
 def load_prompts(path: Path | str) -> tuple[PromptCase, ...]:
     """Load and validate a JSONL prompt set, preserving file order."""
     path = Path(path)
@@ -339,7 +486,7 @@ def load_prompts(path: Path | str) -> tuple[PromptCase, ...]:
     return tuple(prompts)
 
 
-_PROMPT_FIELDS = {"id", "category", "prompt", "expect_contains"}
+_PROMPT_FIELDS = {"id", "category", "prompt", "expect_contains", "expect_exact"}
 
 
 def _parse_prompt(line: str, number: int, file_name: str) -> PromptCase:
@@ -371,14 +518,17 @@ def _parse_prompt(line: str, number: int, file_name: str) -> PromptCase:
     expect = record.get("expect_contains", [])
     if not isinstance(expect, list) or not all(isinstance(item, str) for item in expect):
         raise ConfigError(f"{where}: expect_contains must be a list of strings")
-    if category is PromptCategory.SCORED and not expect:
+    raw_exact = record.get("expect_exact")
+    if raw_exact is not None and (not isinstance(raw_exact, str) or not raw_exact.strip()):
+        raise ConfigError(f"{where}: expect_exact must be a non-empty string")
+    exact = raw_exact.strip() if isinstance(raw_exact, str) else None
+    if category is PromptCategory.SCORED and bool(expect) == bool(exact):
         raise ConfigError(
-            f"{where}: a scored prompt needs a non-empty expect_contains; "
-            "without it the quality floor cannot be applied"
+            f"{where}: a scored prompt needs exactly one of expect_contains or expect_exact"
         )
-    if category is not PromptCategory.SCORED and expect:
+    if category is not PromptCategory.SCORED and (expect or exact):
         raise ConfigError(
-            f"{where}: expect_contains is only meaningful for scored prompts; "
+            f"{where}: expect_contains/expect_exact are only meaningful for scored prompts; "
             f"category is {category.value}"
         )
 
@@ -387,6 +537,7 @@ def _parse_prompt(line: str, number: int, file_name: str) -> PromptCase:
         category=category,
         prompt=body,
         expect_contains=tuple(expect),
+        expect_exact=exact,
     )
 
 
