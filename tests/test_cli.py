@@ -10,6 +10,7 @@ import pytest
 
 from llm_energy_bench import cli
 from llm_energy_bench.config import ConfigError
+from llm_energy_bench.environment import MeasurementEnvironmentError
 from llm_energy_bench.nvml import NvmlUnavailable
 from llm_energy_bench.ollama import OllamaUnavailable
 from llm_energy_bench.results import ResultsError
@@ -161,7 +162,11 @@ def test_run_command_returns_validation_failure_without_hiding_artifacts(
 
 @pytest.mark.parametrize(
     "error",
-    [OllamaUnavailable("connection refused"), NvmlUnavailable("NVML unavailable")],
+    [
+        OllamaUnavailable("connection refused"),
+        NvmlUnavailable("NVML unavailable"),
+        MeasurementEnvironmentError("busy GPU"),
+    ],
 )
 def test_run_command_maps_known_preflight_failures_without_a_traceback(
     tmp_path: Path,

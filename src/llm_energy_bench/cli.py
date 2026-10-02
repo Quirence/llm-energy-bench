@@ -16,6 +16,7 @@ from typing import Any
 
 from llm_energy_bench.analysis import AnalysisError, analyze_study, write_study_analysis
 from llm_energy_bench.config import ConfigError, ExperimentConfig, load_config
+from llm_energy_bench.environment import MeasurementEnvironmentError
 from llm_energy_bench.nvml import EnergySource, NvmlError, NvmlSampler
 from llm_energy_bench.ollama import ModelNotFound, OllamaClient, OllamaError
 from llm_energy_bench.results import (
@@ -121,6 +122,28 @@ def doctor_environment(
         ) as sampler:
             capabilities = sampler.probe(config.gpu_index)
             gpu = {"available": True, **capabilities.to_dict(), "error": None}
+            if config.study is not None:
+                expected = config.expected_power_limit_watts
+                tolerance = config.power_limit_tolerance_watts
+                current = capabilities.power_limit_watts
+                profile_complete = all(
+                    value is not None
+                    for value in (
+                        current,
+                        capabilities.power_limit_default_watts,
+                        capabilities.power_limit_min_watts,
+                        capabilities.power_limit_max_watts,
+                    )
+                )
+                matches = (
+                    expected is not None
+                    and tolerance is not None
+                    and current is not None
+                    and abs(current - expected) <= tolerance
+                )
+                gpu["expected_power_limit_watts"] = expected
+                gpu["power_limit_profile_complete"] = profile_complete
+                gpu["power_limit_matches_expected"] = matches
     except (NvmlError, OSError, ValueError) as error:
         gpu["error"] = _safe_error(error)
 
@@ -136,6 +159,10 @@ def doctor_environment(
         config.expected_runtime_version is not None
         and runtime["version"] == config.expected_runtime_version
     )
+    power_controls_ok = config.study is None or (
+        gpu.get("power_limit_profile_complete") is True
+        and gpu.get("power_limit_matches_expected") is True
+    )
     report = {
         "schema_version": 1,
         "ok": (
@@ -144,6 +171,7 @@ def doctor_environment(
             and gpu.get("available") is True
             and gpu.get("energy_source") != EnergySource.UNAVAILABLE.value
             and models_ok
+            and power_controls_ok
         ),
         "runtime": runtime,
         "gpu": gpu,
@@ -194,7 +222,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         raise UsageError(str(error)) from error
     except RunnerPreflightError as error:
         raise PreflightError(str(error)) from error
-    except (OllamaError, NvmlError) as error:
+    except (OllamaError, NvmlError, MeasurementEnvironmentError) as error:
         raise PreflightError(str(error)) from error
     except (RunnerError, ResultsError) as error:
         raise RunFailedError(str(error)) from error
@@ -261,6 +289,18 @@ def _print_doctor(report: dict[str, Any]) -> None:
     if gpu.get("name"):
         print(f"  device: {gpu['name']}")
         print(f"  energy source: {gpu['energy_source']}")
+        print(f"  current power limit: {gpu.get('power_limit_watts')} W")
+        print(f"  default power limit: {gpu.get('power_limit_default_watts')} W")
+        print(
+            "  supported power range: "
+            f"{gpu.get('power_limit_min_watts')}..{gpu.get('power_limit_max_watts')} W"
+        )
+        if "power_limit_matches_expected" in gpu:
+            print(
+                "  expected power limit: "
+                f"{gpu.get('expected_power_limit_watts')} W "
+                f"({'ok' if gpu['power_limit_matches_expected'] else 'mismatch'})"
+            )
     if gpu.get("error"):
         print(f"  error: {gpu['error']}")
     for model in report["models"]:

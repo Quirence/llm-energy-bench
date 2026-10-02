@@ -942,6 +942,8 @@ def _validate_completed_schema(
         _validate_schema_v1(run_dir, errors)
     elif schema == 2:
         _validate_schema_v2(run_dir, manifest, counts, checksums, errors)
+    elif schema == 3:
+        _validate_schema_v3(run_dir, manifest, counts, checksums, errors)
     else:
         errors.append(f"{MANIFEST} has unsupported schema_version {schema!r}")
 
@@ -952,8 +954,14 @@ def _validate_schema_v2(
     counts: dict[str, int],
     checksums: dict[str, str],
     errors: list[str],
+    *,
+    allow_v3_controls: bool = False,
 ) -> None:
     """Validate the auditable warm-cache schema-v2 contract independently."""
+    if not allow_v3_controls and (
+        manifest.get("study") is not None or manifest.get("environment_baseline") is not None
+    ):
+        errors.append(f"{MANIFEST} schema v2 contains schema v3 controls")
     if manifest.get("prompt_cache_policy") != "template_floor_v2":
         errors.append(f"{MANIFEST} schema v2 has no recognized prompt cache policy")
     if manifest.get("cache_buster_policy") not in {
@@ -1072,6 +1080,153 @@ def _validate_schema_v2(
     _validate_measured_records(
         requests, outputs, telemetry, expected_digests, expected_cache_floors, errors
     )
+
+
+def _validate_schema_v3(
+    run_dir: Path,
+    manifest: dict[str, Any],
+    counts: dict[str, int],
+    checksums: dict[str, str],
+    errors: list[str],
+) -> None:
+    """Validate power-quality-v2 controls independently of runner conclusions."""
+    _validate_schema_v2(
+        run_dir,
+        manifest,
+        counts,
+        checksums,
+        errors,
+        allow_v3_controls=True,
+    )
+
+    study = manifest.get("study")
+    controls = manifest.get("controls")
+    if not isinstance(study, dict):
+        errors.append(f"{MANIFEST} schema v3 has no study controls")
+        return
+    if study.get("protocol_id") != "power-quality-v2":
+        errors.append(f"{MANIFEST} schema v3 has an unexpected protocol id")
+    if study.get("host_role") not in {"primary", "external"}:
+        errors.append(f"{MANIFEST} schema v3 has an invalid host role")
+    if not isinstance(study.get("condition_id"), str) or not study["condition_id"]:
+        errors.append(f"{MANIFEST} schema v3 has no condition id")
+    launch_index = study.get("launch_index")
+    if (
+        not isinstance(launch_index, int)
+        or isinstance(launch_index, bool)
+        or launch_index not in {1, 2, 3}
+    ):
+        errors.append(f"{MANIFEST} schema v3 has an invalid launch index")
+    if not isinstance(controls, dict) or controls.get("study") != study:
+        errors.append(f"{MANIFEST} schema v3 study controls are inconsistent")
+        return
+
+    expected = _strict_positive_number(controls.get("expected_power_limit_watts"))
+    tolerance = _strict_positive_number(controls.get("power_limit_tolerance_watts"))
+    if expected is None or tolerance is None:
+        errors.append(f"{MANIFEST} schema v3 has invalid power-limit controls")
+
+    environment = controls.get("environment")
+    baseline = manifest.get("environment_baseline")
+    if not isinstance(environment, dict):
+        errors.append(f"{MANIFEST} schema v3 has no environment controls")
+    if not isinstance(baseline, dict):
+        errors.append(f"{MANIFEST} schema v3 has no idle environment baseline")
+    elif baseline.get("problems") != []:
+        errors.append(f"{MANIFEST} schema v3 idle environment baseline is invalid")
+    if isinstance(environment, dict) and isinstance(baseline, dict):
+        _validate_environment_baseline(environment, baseline, errors)
+
+    gpu = manifest.get("gpu")
+    if not isinstance(gpu, dict):
+        errors.append(f"{MANIFEST} schema v3 has no GPU power profile")
+    elif expected is not None and tolerance is not None:
+        _validate_power_profile(gpu, expected, tolerance, errors)
+        _validate_telemetry_power_limits(run_dir, expected, tolerance, errors)
+
+
+def _validate_environment_baseline(
+    limits: dict[str, Any],
+    baseline: dict[str, Any],
+    errors: list[str],
+) -> None:
+    duration = _strict_positive_number(baseline.get("duration_seconds"))
+    sample_count = baseline.get("sample_count")
+    max_utilization = _strict_nonnegative_number(limits.get("max_gpu_utilization_p95_percent"))
+    utilization = _strict_nonnegative_number(baseline.get("gpu_utilization_p95_percent"))
+    max_temperature = _strict_nonnegative_number(limits.get("max_start_temperature_c"))
+    temperature = _strict_nonnegative_number(baseline.get("temperature_start_c"))
+    max_vram_mib = _strict_nonnegative_number(limits.get("max_idle_vram_used_mib"))
+    vram_bytes = _strict_nonnegative_number(baseline.get("vram_used_peak_bytes"))
+
+    if duration is None or not isinstance(sample_count, int) or sample_count < 2:
+        errors.append(f"{MANIFEST} schema v3 has an incomplete idle baseline")
+    comparisons = (
+        (utilization, max_utilization, "GPU utilization"),
+        (temperature, max_temperature, "start temperature"),
+        (
+            None if vram_bytes is None else vram_bytes / 1024**2,
+            max_vram_mib,
+            "idle VRAM",
+        ),
+    )
+    for actual, maximum, label in comparisons:
+        if actual is None or maximum is None:
+            errors.append(f"{MANIFEST} schema v3 has incomplete {label} controls")
+        elif actual > maximum:
+            errors.append(f"{MANIFEST} schema v3 exceeds the {label} limit")
+
+
+def _validate_power_profile(
+    gpu: dict[str, Any],
+    expected: float,
+    tolerance: float,
+    errors: list[str],
+) -> None:
+    current = _strict_positive_number(gpu.get("power_limit_watts"))
+    default = _strict_positive_number(gpu.get("power_limit_default_watts"))
+    minimum = _strict_positive_number(gpu.get("power_limit_min_watts"))
+    maximum = _strict_positive_number(gpu.get("power_limit_max_watts"))
+    if None in {current, default, minimum, maximum}:
+        errors.append(f"{MANIFEST} schema v3 has an incomplete GPU power profile")
+        return
+    assert current is not None and minimum is not None and maximum is not None
+    if minimum > maximum or not minimum <= expected <= maximum:
+        errors.append(f"{MANIFEST} schema v3 power limit is outside the GPU profile")
+    if abs(current - expected) > tolerance:
+        errors.append(f"{MANIFEST} schema v3 current power limit differs from the expected value")
+
+
+def _validate_telemetry_power_limits(
+    run_dir: Path,
+    expected: float,
+    tolerance: float,
+    errors: list[str],
+) -> None:
+    try:
+        telemetry = read_gzip_jsonl(run_dir / TELEMETRY)
+    except ResultsError:
+        return
+    values = [_strict_positive_number(record.get("power_limit_watts")) for record in telemetry]
+    if not values or any(value is None for value in values):
+        errors.append(f"{TELEMETRY} schema v3 has missing power limit samples")
+        return
+    present = [value for value in values if value is not None]
+    if any(abs(value - expected) > tolerance for value in present):
+        errors.append(f"{TELEMETRY} power limit differs from the expected value")
+    if max(present) - min(present) > tolerance:
+        errors.append(f"{TELEMETRY} power limit changed during measured requests")
+
+
+def _strict_positive_number(value: Any) -> float | None:
+    number = _strict_nonnegative_number(value)
+    return number if number is not None and number > 0 else None
+
+
+def _strict_nonnegative_number(value: Any) -> float | None:
+    if isinstance(value, int | float) and not isinstance(value, bool) and value >= 0:
+        return float(value)
+    return None
 
 
 def _expected_request_count(manifest: dict[str, Any]) -> int | None:

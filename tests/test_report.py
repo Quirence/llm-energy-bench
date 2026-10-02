@@ -63,6 +63,9 @@ def gpu(source: EnergySource = EnergySource.POWER_INSTANT_INTEGRATION) -> GpuCap
         supports_clocks=True,
         supports_power_limit=True,
         power_limit_watts=80.0,
+        power_limit_default_watts=80.0,
+        power_limit_min_watts=5.0,
+        power_limit_max_watts=115.0,
         energy_source=source,
         energy_fallback_reason=(
             "total-energy counter unsupported"
@@ -183,6 +186,10 @@ def test_doctor_uses_and_reports_explicit_model_load_controls(tmp_path: Path) ->
 
     assert client.preload_options == [{"num_ctx": 4096, "num_gpu": 999}]
     assert report["controls"]["num_gpu"] == 999
+    assert report["gpu"]["power_limit_watts"] == 80.0
+    assert report["gpu"]["power_limit_default_watts"] == 80.0
+    assert report["gpu"]["power_limit_min_watts"] == 5.0
+    assert report["gpu"]["power_limit_max_watts"] == 115.0
 
 
 def test_doctor_rejects_partial_gpu_placement(tmp_path: Path) -> None:

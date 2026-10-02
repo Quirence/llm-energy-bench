@@ -13,11 +13,15 @@ import pytest
 
 import llm_energy_bench.runner as runner_module
 from llm_energy_bench.config import (
+    EnvironmentLimits,
     ExperimentConfig,
+    HostRole,
     InferenceOptions,
     PromptCase,
     PromptCategory,
+    StudyControls,
 )
+from llm_energy_bench.environment import ENVIRONMENT_REQUEST_ID, MeasurementEnvironmentError
 from llm_energy_bench.nvml import (
     EnergySource,
     GpuCapabilities,
@@ -95,6 +99,26 @@ def make_config(
     )
 
 
+def make_v2_config(tmp_path: Path) -> ExperimentConfig:
+    return replace(
+        make_config(tmp_path, repetitions=1),
+        study=StudyControls(
+            protocol_id="power-quality-v2",
+            host_role=HostRole.PRIMARY,
+            condition_id="llama32-q4-p80",
+            launch_index=1,
+        ),
+        expected_power_limit_watts=80.0,
+        power_limit_tolerance_watts=1.0,
+        environment=EnvironmentLimits(
+            idle_probe_seconds=0.01,
+            max_gpu_utilization_p95_percent=5.0,
+            max_start_temperature_c=55,
+            max_idle_vram_used_mib=512.0,
+        ),
+    )
+
+
 def capabilities(source: EnergySource = EnergySource.TOTAL_ENERGY_COUNTER) -> GpuCapabilities:
     return GpuCapabilities(
         gpu_index=0,
@@ -110,6 +134,9 @@ def capabilities(source: EnergySource = EnergySource.TOTAL_ENERGY_COUNTER) -> Gp
         supports_clocks=True,
         supports_power_limit=True,
         power_limit_watts=80.0,
+        power_limit_default_watts=80.0,
+        power_limit_min_watts=5.0,
+        power_limit_max_watts=115.0,
         energy_source=source,
         energy_fallback_reason=None,
     )
@@ -200,6 +227,7 @@ class FakeClient:
         load_durations: tuple[int, ...] | None = None,
         runtime_version: str = "0.99.0-test",
         digest: str = DIGEST,
+        resident_models: tuple[RunningModel, ...] = (),
     ) -> None:
         self.fully_on_gpu = fully_on_gpu
         self.interrupt_at = interrupt_at
@@ -207,6 +235,7 @@ class FakeClient:
         self.load_durations = load_durations
         self.runtime_version = runtime_version
         self.digest = digest
+        self.resident_models = resident_models
         self.requests: list[InferenceRequest] = []
         self.preload_options: list[dict[str, Any] | None] = []
         self.closed = False
@@ -219,6 +248,9 @@ class FakeClient:
 
     def version(self) -> str:
         return self.runtime_version
+
+    def running_models(self) -> tuple[RunningModel, ...]:
+        return self.resident_models
 
     def preload(self, model: str, *, options: dict[str, Any] | None = None) -> RunningModel:
         self.preload_options.append(options)
@@ -284,9 +316,47 @@ class FakeSampler:
             return ()
         request_id = self._request_id
         self._request_id = None
+        if request_id == ENVIRONMENT_REQUEST_ID:
+            return (
+                replace(
+                    sample(request_id, 0.0, energy_j=0.0, instant_w=10.0),
+                    gpu_utilization_percent=0,
+                    temperature_c=40,
+                    vram_used_bytes=128 * 1024**2,
+                ),
+                replace(
+                    sample(request_id, 0.1, energy_j=1.0, instant_w=10.0),
+                    gpu_utilization_percent=0,
+                    temperature_c=40,
+                    vram_used_bytes=128 * 1024**2,
+                ),
+            )
         return (
             sample(request_id, 0.0, energy_j=0.0, instant_w=10.0),
             sample(request_id, 0.1, energy_j=1.2, instant_w=14.0),
+        )
+
+
+class BusySampler(FakeSampler):
+    def stop(self) -> tuple[TelemetrySample, ...]:
+        request_id = self._request_id
+        if request_id != ENVIRONMENT_REQUEST_ID:
+            return super().stop()
+        self.stopped += 1
+        self._request_id = None
+        return (
+            replace(
+                sample(request_id, 0.0, energy_j=0.0, instant_w=40.0),
+                gpu_utilization_percent=95,
+                temperature_c=70,
+                vram_used_bytes=2 * 1024**3,
+            ),
+            replace(
+                sample(request_id, 0.1, energy_j=4.0, instant_w=40.0),
+                gpu_utilization_percent=99,
+                temperature_c=71,
+                vram_used_bytes=2 * 1024**3,
+            ),
         )
 
 
@@ -300,6 +370,42 @@ def prompt() -> PromptCase:
 )
 def test_exact_scoring_is_strict(text: str, score: float) -> None:
     assert runner_module.score_response(exact_prompt("16"), text) == score
+
+
+def test_v2_run_rejects_resident_model_before_idle_probe(tmp_path: Path) -> None:
+    resident = FakeClient().preload(MODEL)
+    client = FakeClient(resident_models=(resident,))
+
+    with pytest.raises(RunnerPreflightError, match="ollama stop"):
+        run_experiment(
+            make_v2_config(tmp_path),
+            client_factory=lambda _url: client,
+            sampler_factory=lambda **_kwargs: FakeSampler(),
+        )
+
+    assert not (tmp_path / "runs").exists()
+
+
+def test_v2_run_preserves_failed_environment_manifest(tmp_path: Path) -> None:
+    config = make_v2_config(tmp_path)
+
+    with pytest.raises(MeasurementEnvironmentError):
+        run_experiment(
+            config,
+            client_factory=lambda _url: FakeClient(),
+            sampler_factory=lambda **_kwargs: BusySampler(),
+        )
+
+    run_dir = next(config.output_dir.iterdir())
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == 3
+    assert manifest["status"] == "failed"
+    assert set(manifest["environment_baseline"]["problems"]) == {
+        "gpu_utilization_p95",
+        "start_temperature",
+        "idle_vram",
+    }
+    assert manifest["started_requests"] == 0
 
 
 def test_request_metrics_reject_power_limit_drift() -> None:

@@ -444,6 +444,77 @@ def schema_v2_run(tmp_path: Path) -> Path:
     return run_dir
 
 
+def schema_v3_run(
+    tmp_path: Path,
+    *,
+    telemetry_power_limits: tuple[float, float] = (80.0, 80.0),
+) -> Path:
+    run_dir = schema_v2_run(tmp_path)
+    (run_dir / "telemetry.jsonl.gz").unlink()
+    with GzipJsonlWriter(run_dir / "telemetry.jsonl.gz") as writer:
+        for timestamp, power_limit in zip((0.0, 0.1), telemetry_power_limits, strict=True):
+            writer.write(
+                {
+                    "request_id": "r0",
+                    "monotonic_s": timestamp,
+                    "power_limit_watts": power_limit,
+                }
+            )
+
+    manifest_path = run_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    study = {
+        "protocol_id": "power-quality-v2",
+        "host_role": "primary",
+        "condition_id": "llama32-q4-p80",
+        "launch_index": 1,
+    }
+    environment = {
+        "idle_probe_seconds": 15.0,
+        "max_gpu_utilization_p95_percent": 5.0,
+        "max_start_temperature_c": 55,
+        "max_idle_vram_used_mib": 512.0,
+    }
+    manifest.update(
+        {
+            "schema_version": 3,
+            "study": study,
+            "environment_baseline": {
+                "duration_seconds": 15.0,
+                "sample_count": 151,
+                "gpu_utilization_mean_percent": 0.0,
+                "gpu_utilization_median_percent": 0.0,
+                "gpu_utilization_p95_percent": 0.0,
+                "power_mean_watts": 10.0,
+                "power_p95_watts": 10.0,
+                "temperature_start_c": 40,
+                "temperature_peak_c": 40,
+                "vram_used_peak_bytes": 128 * 1024**2,
+                "problems": [],
+            },
+            "gpu": {
+                "power_limit_watts": 80.0,
+                "power_limit_default_watts": 80.0,
+                "power_limit_min_watts": 5.0,
+                "power_limit_max_watts": 115.0,
+            },
+        }
+    )
+    manifest["controls"].update(
+        {
+            "study": study,
+            "expected_power_limit_watts": 80.0,
+            "power_limit_tolerance_watts": 1.0,
+            "environment": environment,
+        }
+    )
+    manifest["artifact_sha256"] = {
+        name: sha256_file(run_dir / name) for name in manifest["artifact_sha256"]
+    }
+    write_json(manifest_path, manifest)
+    return run_dir
+
+
 def test_a_complete_run_validates(tmp_path: Path) -> None:
     report = validate_run(complete_run(tmp_path))
 
@@ -547,6 +618,32 @@ def test_schema_v2_run_passes_semantic_validation(tmp_path: Path) -> None:
 
     assert report.ok is True
     assert report.errors == ()
+
+    v3_report = validate_run(schema_v3_run(tmp_path / "v3"))
+    assert v3_report.ok is True
+    assert v3_report.errors == ()
+
+
+def test_schema_v3_rejects_changed_power_limit_even_if_output_claims_valid(
+    tmp_path: Path,
+) -> None:
+    report = validate_run(schema_v3_run(tmp_path, telemetry_power_limits=(80.0, 60.0)))
+
+    assert report.ok is False
+    assert any("power limit" in error.lower() for error in report.errors)
+
+
+def test_schema_v3_cannot_be_relabelled_schema_v2(tmp_path: Path) -> None:
+    run_dir = schema_v3_run(tmp_path)
+    manifest_path = run_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["schema_version"] = 2
+    write_json(manifest_path, manifest)
+
+    report = validate_run(run_dir)
+
+    assert report.ok is False
+    assert any("schema v3 controls" in error for error in report.errors)
 
 
 @pytest.mark.parametrize(

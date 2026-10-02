@@ -28,7 +28,12 @@ from llm_energy_bench.config import (
     load_prompts,
     prompts_fingerprint,
 )
-from llm_energy_bench.environment import request_power_limit_problems
+from llm_energy_bench.environment import (
+    MeasurementEnvironmentError,
+    capture_idle_baseline,
+    ensure_expected_power_limit,
+    request_power_limit_problems,
+)
 from llm_energy_bench.nvml import (
     EnergySource,
     GpuCapabilities,
@@ -347,17 +352,18 @@ def run_experiment(
             )
 
         load_options = _model_load_options(config)
-        models = tuple(
-            _preflight_model(client.preload(model, options=load_options), model)
-            for model in config.models
-        )
-        for requested_name, model in zip(config.models, models, strict=True):
-            expected_digest = config.expected_model_digests[requested_name]
-            if model.digest != expected_digest:
+        is_power_quality_v2 = config.study is not None
+        if is_power_quality_v2:
+            resident_models = client.running_models()
+            if resident_models:
+                names = ", ".join(model.name for model in resident_models)
                 raise RunnerPreflightError(
-                    f"model {requested_name!r} digest {model.digest!r} does not match the frozen "
-                    f"digest {expected_digest!r}"
+                    "power-quality-v2 requires an unloaded Ollama GPU before the idle probe; "
+                    f"run `ollama stop <model>` for: {names}"
                 )
+            models: tuple[RunningModel, ...] = ()
+        else:
+            models = _preflight_models(client, config, load_options)
 
         run_dir = create_run_dir(config.output_dir, config.experiment_id, config.host_id)
         resolved_config = _resolved_config_toml(config, prompts_fingerprint(prompts))
@@ -375,6 +381,37 @@ def run_experiment(
         _write_manifest(run_dir, manifest)
 
         try:
+            if is_power_quality_v2:
+                expected_power, power_tolerance = _power_controls(config)
+                limits = config.environment
+                if limits is None:
+                    raise RunnerPreflightError("power-quality-v2 has no environment limits")
+                _require_power_profile(capabilities)
+                ensure_expected_power_limit(
+                    capabilities.power_limit_watts,
+                    expected_power,
+                    power_tolerance,
+                )
+                baseline = capture_idle_baseline(sampler, limits)
+                baseline_problems = baseline.problems(limits)
+                manifest["environment_baseline"] = baseline.to_dict(baseline_problems)
+                _write_manifest(run_dir, manifest)
+                if baseline_problems:
+                    raise MeasurementEnvironmentError(
+                        "idle GPU does not satisfy the frozen environment limits: "
+                        + ", ".join(baseline_problems)
+                    )
+                ensure_expected_power_limit(
+                    sampler.probe(config.gpu_index).power_limit_watts,
+                    expected_power,
+                    power_tolerance,
+                )
+                models = _preflight_models(client, config, load_options)
+                manifest["models"] = [
+                    {**model.to_dict(), "template_cache_baseline_tokens": None} for model in models
+                ]
+                _write_manifest(run_dir, manifest)
+
             _execute_requests(
                 run_dir,
                 config,
@@ -385,6 +422,13 @@ def run_experiment(
                 models,
                 manifest,
             )
+            if is_power_quality_v2:
+                expected_power, power_tolerance = _power_controls(config)
+                ensure_expected_power_limit(
+                    sampler.probe(config.gpu_index).power_limit_watts,
+                    expected_power,
+                    power_tolerance,
+                )
         except BaseException as error:
             manifest["status"] = (
                 RunStatus.INTERRUPTED.value
@@ -404,6 +448,46 @@ def run_experiment(
         validation = validate_run(run_dir)
         write_json(run_dir / VALIDATION, validation.to_dict())
         return run_dir
+
+
+def _preflight_models(
+    client: Any,
+    config: ExperimentConfig,
+    load_options: dict[str, int],
+) -> tuple[RunningModel, ...]:
+    models = tuple(
+        _preflight_model(client.preload(model, options=load_options), model)
+        for model in config.models
+    )
+    for requested_name, model in zip(config.models, models, strict=True):
+        expected_digest = config.expected_model_digests[requested_name]
+        if model.digest != expected_digest:
+            raise RunnerPreflightError(
+                f"model {requested_name!r} digest {model.digest!r} does not match the frozen "
+                f"digest {expected_digest!r}"
+            )
+    return models
+
+
+def _power_controls(config: ExperimentConfig) -> tuple[float, float]:
+    expected = config.expected_power_limit_watts
+    tolerance = config.power_limit_tolerance_watts
+    if expected is None or tolerance is None:
+        raise RunnerPreflightError("power-quality-v2 has incomplete power-limit controls")
+    return expected, tolerance
+
+
+def _require_power_profile(capabilities: GpuCapabilities) -> None:
+    profile = (
+        capabilities.power_limit_watts,
+        capabilities.power_limit_default_watts,
+        capabilities.power_limit_min_watts,
+        capabilities.power_limit_max_watts,
+    )
+    if any(value is None for value in profile):
+        raise MeasurementEnvironmentError(
+            "power-quality-v2 requires current, default, minimum, and maximum power-limit telemetry"
+        )
 
 
 def _preflight_model(model: RunningModel, requested_name: str) -> RunningModel:
@@ -574,6 +658,8 @@ def _execute_requests(
                     template_cache_baseline_tokens=template_cache_baseline,
                     tariff_per_kwh=config.tariff_per_kwh,
                     currency=config.currency,
+                    expected_power_limit_watts=config.expected_power_limit_watts,
+                    power_limit_tolerance_watts=config.power_limit_tolerance_watts,
                 )
                 output_record = {
                     **inference.to_dict(),
@@ -845,8 +931,8 @@ def _initial_manifest(
     capabilities: GpuCapabilities,
     models: tuple[RunningModel, ...],
 ) -> dict[str, Any]:
-    return {
-        "schema_version": 2,
+    manifest = {
+        "schema_version": 3 if config.study is not None else 2,
         "run_id": run_dir.name,
         "status": RunStatus.RUNNING.value,
         "started_utc": datetime.now(UTC).isoformat(),
@@ -878,6 +964,10 @@ def _initial_manifest(
         "failure": None,
         "artifact_sha256": {},
     }
+    if config.study is not None:
+        manifest["study"] = config.study.to_dict()
+        manifest["environment_baseline"] = None
+    return manifest
 
 
 def _write_manifest(run_dir: Path, manifest: dict[str, Any]) -> None:
@@ -943,6 +1033,56 @@ def _resolved_config_toml(config: ExperimentConfig, prompt_hash: str) -> str:
             (
                 ("index", config.gpu_index),
                 ("telemetry_interval_ms", config.telemetry_interval_ms),
+                ("expected_power_limit_watts", config.expected_power_limit_watts),
+                ("power_limit_tolerance_watts", config.power_limit_tolerance_watts),
+            ),
+        ),
+        (
+            "study",
+            (
+                (
+                    "protocol_id",
+                    None if config.study is None else config.study.protocol_id,
+                ),
+                (
+                    "host_role",
+                    None if config.study is None else config.study.host_role.value,
+                ),
+                (
+                    "condition_id",
+                    None if config.study is None else config.study.condition_id,
+                ),
+                (
+                    "launch_index",
+                    None if config.study is None else config.study.launch_index,
+                ),
+            ),
+        ),
+        (
+            "environment",
+            (
+                (
+                    "idle_probe_seconds",
+                    None if config.environment is None else config.environment.idle_probe_seconds,
+                ),
+                (
+                    "max_gpu_utilization_p95_percent",
+                    None
+                    if config.environment is None
+                    else config.environment.max_gpu_utilization_p95_percent,
+                ),
+                (
+                    "max_start_temperature_c",
+                    None
+                    if config.environment is None
+                    else config.environment.max_start_temperature_c,
+                ),
+                (
+                    "max_idle_vram_used_mib",
+                    None
+                    if config.environment is None
+                    else config.environment.max_idle_vram_used_mib,
+                ),
             ),
         ),
         (
