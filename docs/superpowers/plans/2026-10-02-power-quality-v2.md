@@ -96,7 +96,9 @@ def test_legacy_contract_keeps_config_fingerprint_and_prompt_shape(tmp_path: Pat
     assert config.study is None
     assert config.expected_power_limit_watts is None
     assert "study" not in config.to_dict()
-    assert config.fingerprint() == "db5ae3196c7d6cc6432e21e13933e47f29a2dac04c62ef2fdfc28e4997838ebc"
+    assert (
+        config.fingerprint() == "db5ae3196c7d6cc6432e21e13933e47f29a2dac04c62ef2fdfc28e4997838ebc"
+    )
     prompt = load_prompts(write_prompts(tmp_path, SCORED))[0]
     assert "expect_exact" not in prompt.to_dict()
     assert prompt.to_dict()["expect_contains"] == ["4"]
@@ -212,10 +214,14 @@ git commit -m "feat: define power quality v2 controls"
 ```python
 @pytest.mark.parametrize("supported", [True, False])
 def test_probe_reports_power_limit_profile_or_explicit_nulls(supported: bool) -> None:
-    enabled = FULL_SUPPORT if supported else tuple(
-        field for field in FULL_SUPPORT if field not in {
-            "power_limit_constraints_mw", "power_limit_default_mw"
-        }
+    enabled = (
+        FULL_SUPPORT
+        if supported
+        else tuple(
+            field
+            for field in FULL_SUPPORT
+            if field not in {"power_limit_constraints_mw", "power_limit_default_mw"}
+        )
     )
     caps = NvmlSampler(binding=FakeNvml(supported=enabled, power_limit_mw=80_000)).probe(0)
     if supported:
@@ -257,8 +263,12 @@ UTC-временем и заполненными instant/legacy power. Из не
 
 ```python
 BUSY_SAMPLES = (
-    environment_sample(0.0, utilization=90, temperature=60, power=20.0, vram=600 * 1024**2, power_limit=80.0),
-    environment_sample(1.0, utilization=95, temperature=61, power=25.0, vram=620 * 1024**2, power_limit=80.0),
+    environment_sample(
+        0.0, utilization=90, temperature=60, power=20.0, vram=600 * 1024**2, power_limit=80.0
+    ),
+    environment_sample(
+        1.0, utilization=95, temperature=61, power=25.0, vram=620 * 1024**2, power_limit=80.0
+    ),
 )
 POWER_CHANGED = (
     environment_sample(0.0, utilization=0, temperature=40, power=10.0, vram=100, power_limit=80.0),
@@ -285,7 +295,8 @@ def test_idle_baseline_rejects_busy_or_hot_gpu() -> None:
 
 def test_request_power_limit_detects_change_and_missing_samples() -> None:
     assert request_power_limit_problems(POWER_CHANGED, 80.0, 1.0) == (
-        "power_limit_mismatch", "power_limit_changed"
+        "power_limit_mismatch",
+        "power_limit_changed",
     )
     assert request_power_limit_problems(POWER_MISSING, 80.0, 1.0) == ("power_limit_missing",)
 ```
@@ -400,8 +411,12 @@ def test_request_metrics_reject_power_limit_drift() -> None:
         sample("request-1", 1.0, energy_j=20.0, instant_w=10.0, power_limit_watts=60.0),
     )
     metrics = derive_request_metrics(
-        result(text="16"), changed, capabilities(), exact_prompt("16"),
-        repetition=0, expected_power_limit_watts=80.0,
+        result(text="16"),
+        changed,
+        capabilities(),
+        exact_prompt("16"),
+        repetition=0,
+        expected_power_limit_watts=80.0,
         power_limit_tolerance_watts=1.0,
     )
     assert metrics.valid is False
@@ -510,7 +525,9 @@ def rewrite_manifest(run_dir: Path, *, schema_version: int) -> None:
 ```python
 def test_v2_run_rejects_resident_model_before_idle_probe(tmp_path: Path) -> None:
     with pytest.raises(RunnerPreflightError, match="ollama stop"):
-        run_experiment(v2_config(tmp_path), client_factory=ResidentClient, sampler_factory=FakeSampler)
+        run_experiment(
+            v2_config(tmp_path), client_factory=ResidentClient, sampler_factory=FakeSampler
+        )
 
 
 def test_v2_run_preserves_failed_environment_manifest(tmp_path: Path) -> None:
@@ -687,7 +704,9 @@ def test_energy_per_correct_uses_sums_and_zero_is_null() -> None:
 
 
 def test_external_gpu_is_not_pooled_with_primary_hosts(tmp_path: Path) -> None:
-    result = analyze_power_quality(synthetic_v2_matrix(tmp_path), ("rtx5060", "rtx4060ti"), "gtx1080")
+    result = analyze_power_quality(
+        synthetic_v2_matrix(tmp_path), ("rtx5060", "rtx4060ti"), "gtx1080"
+    )
     assert {row.host_role for row in result.rows} == {"primary", "external"}
     assert all(row.host_id != "gtx1080" for row in result.primary_comparisons)
 ```
@@ -701,7 +720,9 @@ def test_tradeoff_frontier_distinguishes_inversion_and_no_inversion() -> None:
 
 
 def test_analysis_artifacts_are_byte_deterministic(tmp_path: Path) -> None:
-    analysis = analyze_power_quality(synthetic_v2_matrix(tmp_path), ("rtx5060", "rtx4060ti"), "gtx1080")
+    analysis = analyze_power_quality(
+        synthetic_v2_matrix(tmp_path), ("rtx5060", "rtx4060ti"), "gtx1080"
+    )
     first = write_power_quality_analysis(analysis, tmp_path / "first")
     second = write_power_quality_analysis(analysis, tmp_path / "second")
     assert [p.read_bytes() for p in first] == [p.read_bytes() for p in second]

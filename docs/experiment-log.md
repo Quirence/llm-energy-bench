@@ -687,3 +687,27 @@ decision blocks.
 - Artifacts: `experiments/studies/paper-dataset-v1/{analysis.json,
   calibration.csv,report.md}`. Two consecutive CLI generations were
   byte-identical.
+
+### 2026-10-02 — Подготовка power-quality-v2 и профиль RTX 5060
+
+- Цель: отдельный второй эксперимент по влиянию power limit на скорость,
+  GPU-энергию и точность фиксированных задач. Frozen paper dataset v1 не
+  изменялся.
+- Стенд: MAIBENBEN X16C, NVIDIA GeForce RTX 5060 Laptop GPU, 8151 MiB,
+  драйвер 591.66, питание от сети.
+- NVML profile: current/requested 80 Вт, default 50 Вт, min 5 Вт, max 115 Вт;
+  при профилировании 43 °C и 0 MiB VRAM. Все требуемые telemetry fields
+  доступны.
+- Runtime: Ollama 0.35.0. Llama 3.2 Q4 digest `a80c4f17acd5…` совпал и модель
+  полностью разместилась на GPU. После `doctor` модель выгружена, `ollama ps`
+  пуст.
+- `doctor` для будущего условия 80 Вт вернул `ok=true`, включая совпадение
+  expected/current power limit и полный power profile.
+- Уровни-кандидаты: 80, 65, 50, 35 Вт. Все находятся в объявленном диапазоне,
+  но probe `nvidia-smi -pl` из неадминистративной PowerShell был отклонён с
+  `Insufficient Permissions`; значения не считаются аппаратно принятыми до
+  проверки от имени администратора.
+- Заморожен prompt set из 12 собственных запросов с fingerprint
+  `7d7d1ee71cacc1129d4076b18d5ceb630052950994acab18e112892194d099ff`.
+- Результаты измерений на этом этапе отсутствуют. Запись документирует только
+  разработку протокола и preflight, а не научный результат.

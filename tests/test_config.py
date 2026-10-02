@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -572,6 +573,33 @@ def test_the_shipped_pilot_prompt_set_matches_the_approved_shape() -> None:
     assert len(by_category[PromptCategory.SHORT]) == 2
     assert len(by_category[PromptCategory.LONG]) == 2
     assert len(by_category[PromptCategory.SCORED]) == 2
+
+
+def test_power_quality_prompt_set_is_frozen() -> None:
+    prompts = load_prompts(REPO_ROOT / "prompts" / "power-quality-v2.jsonl")
+
+    assert len(prompts) == 12
+    assert Counter(item.category for item in prompts) == {
+        PromptCategory.SHORT: 2,
+        PromptCategory.LONG: 2,
+        PromptCategory.SCORED: 8,
+    }
+    assert all(item.expect_exact for item in prompts if item.is_scored)
+    assert prompts_fingerprint(prompts) == (
+        "7d7d1ee71cacc1129d4076b18d5ceb630052950994acab18e112892194d099ff"
+    )
+
+    configs = sorted((REPO_ROOT / "configs" / "power-quality-v2" / "rtx5060").glob("*.toml"))
+    assert len(configs) == 24
+    loaded = tuple(load_config(path) for path in configs)
+    assert {config.expected_runtime_version for config in loaded} == {"0.35.0"}
+    assert {config.expected_power_limit_watts for config in loaded} == {35.0, 50.0, 65.0, 80.0}
+    assert {config.study.launch_index for config in loaded if config.study} == {1, 2, 3}
+    assert all(config.repetitions == 5 and len(config.models) == 1 for config in loaded)
+    assert all(
+        prompts_fingerprint(load_prompts(config.prompt_path)) == prompts_fingerprint(prompts)
+        for config in loaded
+    )
 
 
 def test_the_pilot_produces_the_eighteen_records_task_8_expects() -> None:
