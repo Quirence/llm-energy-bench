@@ -70,4 +70,6 @@ M4 — Power Quality Study. Первый набор данных и его вы�
 - Study report: `experiments/studies/paper-dataset-v1/report.md`.
 - Power-quality profile: RTX 5060 Laptop, driver 591.66, current 80 Вт,
   default 50 Вт, range 5–115 Вт; Ollama 0.35.0; Q4 Llama digest и полное
-  размещение подтверждены. Производственных schema-v3 runs пока нет.
+  размещение подтверждены. Четыре schema-v3 acceptance runs при 80 Вт имеют
+  48/48 valid requests и чистую validation; отдельный mismatched run корректно
+  отказал до первого запроса. Производственных runs пока нет.
