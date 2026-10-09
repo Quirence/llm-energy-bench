@@ -54,15 +54,14 @@ M4 — Power Quality Study. Первый набор данных и его вы�
 - Repeatability-based material thresholds range from 5.00% to 63.14%, with the
   largest value in the very short scored block on RTX 4060 Ti.
 
-## Remaining Before Power-Quality Measurements
+## Remaining Before Multi-GPU Power-Quality Measurements
 
-1. Попросить оператора включить Turbo 115 Вт, подтвердить режим через
-   `doctor` и выполнить оставшиеся шесть запусков RTX 5060.
-2. Получить от Льва профиль RTX 4060 Ti, а от Димы профиль GTX 1080; после
+1. Опубликовать предварительную метку `power-quality-v2-profile` и получить
+   от Льва профиль RTX 4060 Ti, а от Димы профиль GTX 1080; после
    этого центрально зафиксировать их TOML и дополнить runbook.
-3. Один раз выполнить полный pytest/ruff gate, интегрировать ветку и выпустить
+2. Один раз выполнить полный pytest/ruff gate, интегрировать ветку и выпустить
    метку `power-quality-v2-code`.
-4. После метки собрать 12 + 24 + 18 запусков и построить отдельный отчёт. Не
+3. После метки собрать 24 + 18 внешних запусков и построить общий отчёт. Не
    изменять `paper-dataset-v1` и не смешивать external GPU с primary.
 
 ## Latest Validated Evidence
@@ -80,3 +79,9 @@ M4 — Power Quality Study. Первый набор данных и его вы�
   0.72–3.03%, CV tok/J 1.27–6.92%. Целого run-выброса нет; технический отчёт
   воспроизводится побайтно. Для коротких exact-запросов энергия трактуется
   только агрегированно из-за 2–3 telemetry samples и fallback источника.
+- Локальная матрица RTX 5060 завершена: 12 runs и 720/720 valid requests.
+  Переход Turbo 115 Вт → Gaming 80 Вт уменьшил скорость на 4.87–6.51%,
+  энергию запроса на 7.88–22.86% и повысил tok/J на 8.55–29.63%; exact
+  quality не изменилась. По консервативному порогу эффект устойчив в 4/6
+  workload-блоков, а long-блоки остаются неопределёнными. Это локальный
+  результат двух режимов ноутбука, а не итог multi-GPU исследования.

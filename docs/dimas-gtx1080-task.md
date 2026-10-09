@@ -9,18 +9,19 @@
 
 ```powershell
 git fetch --tags origin
-git checkout power-quality-v2-code
+git checkout power-quality-v2-profile
 git status --short
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/pilot-gtx1080-observation.toml --json
+.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/profile-gtx1080.toml --json
 nvidia-smi -q -d POWER,TEMPERATURE,MEMORY
 ollama ps
 ollama --version
 ollama list
 ```
 
-Если метка `power-quality-v2-code` ещё не опубликована, остановись. Если
-локальной `.venv` нет, создай её по README проекта без произвольного обновления
-зависимостей.
+Если метка `power-quality-v2-profile` ещё не опубликована, остановись. Эта
+метка предназначена только для профилирования; производственные измерения по
+ней запускать нельзя. Если локальной `.venv` нет, создай её по README проекта
+без произвольного обновления зависимостей.
 
 В сообщении отдельно укажи:
 
@@ -37,7 +38,8 @@ Q4-модели × три проверенных уровня × три запу
 
 ## После второго сообщения от Quirence
 
-Начинай измерения только после появления каталога
+Начинай измерения только после публикации финальной метки
+`power-quality-v2-code`, появления каталога
 `configs/power-quality-v2/gtx1080/` и прямого подтверждения. Выполняй
 `docs/power-quality-v2-runbook.md`. При ненулевом exit code остановись, ничего
 не исправляй в артефактах. После серии верни штатный power limit, добавь только

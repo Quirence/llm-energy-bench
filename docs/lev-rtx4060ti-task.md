@@ -9,18 +9,19 @@
 
 ```powershell
 git fetch --tags origin
-git checkout power-quality-v2-code
+git checkout power-quality-v2-profile
 git status --short
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/pilot-rtx4060ti.toml --json
+.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/profile-rtx4060ti.toml --json
 nvidia-smi -q -d POWER,TEMPERATURE,MEMORY
 ollama ps
 ollama --version
 ollama list
 ```
 
-Если метка `power-quality-v2-code` ещё не опубликована, остановись: это значит,
-что центральная аппаратная приёмка не завершена. Если локальной `.venv` нет,
-создай её по README проекта, но не обновляй зависимости сверх lock/pyproject.
+Если метка `power-quality-v2-profile` ещё не опубликована, остановись. Эта
+метка предназначена только для профилирования; производственные измерения по
+ней запускать нельзя. Если локальной `.venv` нет, создай её по README проекта,
+но не обновляй зависимости сверх lock/pyproject.
 
 В сообщении отдельно укажи:
 
@@ -36,7 +37,8 @@ Ollama 0.35.0; при другой версии не обновляйся сам
 
 ## После второго сообщения от Quirence
 
-Начинай измерения только после публикации метки, появления каталога
+Начинай измерения только после публикации финальной метки
+`power-quality-v2-code`, появления каталога
 `configs/power-quality-v2/rtx4060ti/` и прямого подтверждения. Выполняй
 `docs/power-quality-v2-runbook.md` без изменения порядка команд. На каждом
 условии сначала устанавливается указанный лимит, затем запускается `doctor`,

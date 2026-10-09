@@ -927,16 +927,17 @@ current/requested 80 Вт и Turbo с 115 Вт. `nvidia-smi -pl` на ноутб
 
 ```powershell
 git fetch --tags origin
-git checkout power-quality-v2-code
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/pilot-rtx4060ti.toml --json
+git checkout power-quality-v2-profile
+.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/profile-rtx4060ti.toml --json
 nvidia-smi -q -d POWER,TEMPERATURE,MEMORY
 ollama ps
 ```
 
-В документе Димы первая команда использует
-`configs/pilot-gtx1080-observation.toml`; остальные команды совпадают.
+В документе Димы команда `doctor` использует
+`configs/power-quality-v2/profile-gtx1080.toml`; остальные команды совпадают.
 
-До выпуска метки коллеги присылают только sanitized profile. После профиля
+По предварительной метке `power-quality-v2-profile` коллеги присылают только
+sanitized profile. После профиля
 центрально фиксируются 24 конфигурации RTX 4060 Ti и 18 конфигураций GTX 1080.
 Коллеги не редактируют код, prompts или TOML.
 

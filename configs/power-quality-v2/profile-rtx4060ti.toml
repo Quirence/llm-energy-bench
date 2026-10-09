@@ -1,0 +1,32 @@
+# Hardware-profile-only config for power-quality-v2. Not a production condition.
+
+[experiment]
+id = "power-quality-v2-profile"
+host_id = "rtx4060ti-desktop"
+output_dir = "../../experiments/runs/power-quality-v2-profile"
+repetitions = 1
+warmup_requests = 4
+order_seed = 42
+
+[runtime]
+ollama_url = "http://127.0.0.1:11434"
+models = ["llama3.2:3b-instruct-q4_K_M", "qwen3:4b-instruct-2507-q4_K_M"]
+expected_version = "0.35.0"
+expected_digests = { "llama3.2:3b-instruct-q4_K_M" = "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72", "qwen3:4b-instruct-2507-q4_K_M" = "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0" }
+
+[gpu]
+index = 0
+telemetry_interval_ms = 100
+
+[prompts]
+path = "../../prompts/power-quality-v2.jsonl"
+
+[options]
+num_ctx = 4096
+num_gpu = 999
+temperature = 0.0
+seed = 42
+num_predict = 256
+kv_cache = "f16"
+concurrency = 1
+

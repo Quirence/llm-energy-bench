@@ -1,0 +1,138 @@
+{
+  "artifact_sha256": {
+    "config.resolved.toml": "99ba1ef218c0851b67fc9c268cd5a56dabc3caf9ce8320bd8602c288d93a35ac",
+    "outputs.jsonl": "e42244a8165dcfacb9c9be02036c05ce07ad012152fb047fc704fbfa284ffde8",
+    "requests.jsonl": "5b3db5afbe9c4a7533b2198bef93409af5a796baeaca720f4f80546410204d01",
+    "telemetry.jsonl.gz": "137174f1b45b26869beedd1dd8f382c407aa1d261117cb480dcf75601664f250",
+    "warmups.jsonl": "f0a5b4f1208a3c6948557df859ccc5eb38c688a85b14005c92d408d0a3b828e9"
+  },
+  "cache_buster_policy": "uuid_stable_slot_prefix_v4",
+  "completed_requests": 60,
+  "completed_warmups": 4,
+  "config_sha256": "99ba1ef218c0851b67fc9c268cd5a56dabc3caf9ce8320bd8602c288d93a35ac",
+  "controls": {
+    "concurrency": 1,
+    "currency": null,
+    "environment": {
+      "idle_probe_seconds": 15.0,
+      "max_gpu_utilization_p95_percent": 5.0,
+      "max_idle_vram_used_mib": 512.0,
+      "max_start_temperature_c": 55
+    },
+    "expected_model_digests": {
+      "llama3.2:3b-instruct-q4_K_M": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+    },
+    "expected_power_limit_watts": 115.0,
+    "expected_runtime_version": "0.35.0",
+    "experiment_id": "power-quality-v2",
+    "gpu_index": 0,
+    "host_id": "maibenben-x16c-rtx5060",
+    "models": [
+      "llama3.2:3b-instruct-q4_K_M"
+    ],
+    "ollama_url": "http://127.0.0.1:11434",
+    "options": {
+      "kv_cache": "f16",
+      "num_ctx": 4096,
+      "num_gpu": 999,
+      "num_predict": 256,
+      "seed": 42,
+      "temperature": 0.0
+    },
+    "order_seed": 42,
+    "power_limit_tolerance_watts": 1.0,
+    "repetitions": 5,
+    "study": {
+      "condition_id": "llama32-q4-p115",
+      "host_role": "primary",
+      "launch_index": 2,
+      "protocol_id": "power-quality-v2"
+    },
+    "tariff_per_kwh": null,
+    "telemetry_interval_ms": 100,
+    "warmup_requests": 4
+  },
+  "ended_utc": "2026-10-09T02:56:21.734296+00:00",
+  "environment_baseline": {
+    "duration_seconds": 15.0,
+    "gpu_utilization_mean_percent": 0.0,
+    "gpu_utilization_median_percent": 0.0,
+    "gpu_utilization_p95_percent": 0.0,
+    "power_mean_watts": 8.848721854304635,
+    "power_p95_watts": 9.303,
+    "problems": [],
+    "sample_count": 151,
+    "temperature_peak_c": 66,
+    "temperature_start_c": 53,
+    "vram_used_peak_bytes": 264241152
+  },
+  "experiment_id": "power-quality-v2",
+  "failure": null,
+  "git_commit": "4764140204584ec503b7c49dab0ce09da96068e4",
+  "gpu": {
+    "driver_version": "591.66",
+    "energy_fallback_reason": null,
+    "energy_source": "total_energy_counter",
+    "field_errors": {},
+    "gpu_fingerprint": "e9a2b1cd50c10172",
+    "gpu_index": 0,
+    "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "power_limit_default_watts": 50.0,
+    "power_limit_max_watts": 115.0,
+    "power_limit_min_watts": 5.0,
+    "power_limit_watts": 115.0,
+    "supports_clocks": true,
+    "supports_power_instant": true,
+    "supports_power_legacy": true,
+    "supports_power_limit": true,
+    "supports_temperature": true,
+    "supports_total_energy": true,
+    "supports_utilization": true,
+    "unsupported_fields": [],
+    "vram_total_bytes": 8546942976
+  },
+  "host": {
+    "architecture": "AMD64",
+    "os": "Windows",
+    "os_release": "11"
+  },
+  "host_id": "maibenben-x16c-rtx5060",
+  "max_cache_excess_tokens": 1,
+  "max_measured_load_duration_ns": 100000000,
+  "models": [
+    {
+      "context_length": 4096,
+      "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "family": "llama",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "llama3.2:3b-instruct-q4_K_M",
+      "name": "llama3.2:3b-instruct-q4_K_M",
+      "parameter_size": "3.2B",
+      "quantization": "Q4_K_M",
+      "size_bytes": 2554708622,
+      "size_vram_bytes": 2554708622,
+      "template_cache_baseline_tokens": 20
+    }
+  ],
+  "prompt_cache_policy": "template_floor_v2",
+  "prompt_count": 12,
+  "prompt_set_sha256": "7d7d1ee71cacc1129d4076b18d5ceb630052950994acab18e112892194d099ff",
+  "repetitions": 5,
+  "run_id": "pqv2-20261009T025532Z-a642d0",
+  "runtime": {
+    "name": "ollama",
+    "version": "0.35.0"
+  },
+  "schema_version": 3,
+  "started_requests": 60,
+  "started_utc": "2026-10-09T02:55:32.407996+00:00",
+  "status": "completed",
+  "study": {
+    "condition_id": "llama32-q4-p115",
+    "host_role": "primary",
+    "launch_index": 2,
+    "protocol_id": "power-quality-v2"
+  },
+  "valid_requests": 60
+}
