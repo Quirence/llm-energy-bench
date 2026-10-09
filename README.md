@@ -91,6 +91,11 @@ Python 3.12 can misread the UTF-8 `.pth` created by an editable install when a
 checkout path contains Cyrillic or other non-ASCII characters. Reinstall after
 changing package code; tests continue to import directly from `src/`.
 
+The RTX 4060 Ti production campaign does not use the floating development
+install above. Its runbook installs the hash-locked Windows/Python 3.12 wheel
+set from `requirements/power-quality-v2-windows-py312.lock`, then installs the
+tagged local project with dependency resolution disabled.
+
 The checked-in host pilots are intentionally small: one
 `llama3.2:3b-instruct-q4_K_M` configuration, six prompts, four excluded
 warm-ups, and three measured repetitions (18 measured requests per host).

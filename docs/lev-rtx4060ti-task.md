@@ -39,11 +39,20 @@ git status --short
 
 ```powershell
 py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install ".[dev]"
+.\.venv\Scripts\python.exe -m pip install --require-hashes `
+  -r requirements/power-quality-v2-windows-py312.lock
+.\.venv\Scripts\python.exe -m pip install --no-deps --no-build-isolation .
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m ruff check .
 .\.venv\Scripts\python.exe -m ruff format --check .
 ```
+
+Lock предназначен для CPython 3.12 x86-64 на Windows, содержит точные версии
+и SHA-256 всех runtime/dev/build wheels. Его SHA-256 равен
+`474a00ce6ca43b0ee2a411dcd71f79a95ef7a94d7ffe699cfb1becc80c4662c0`.
+Проект устанавливается без повторного разрешения зависимостей. Скрипт ещё раз
+сравнит lock, Python и установленные версии перед первым изменением мощности,
+а затем запишет их в receipt.
 
 Любой ненулевой exit code — остановка и сообщение Quirence. Не исправляй
 тесты или зависимости на своей ветке.
@@ -118,14 +127,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 
 - требует точную Git-метку, чистую ветку, Ollama 0.35.0, драйвер 560.94 и
   профиль RTX 4060 Ti 100–195 Вт;
+- проверяет SHA-256 dependency lock и все версии Python-пакетов;
 - задаёт power limit через `nvidia-smi -pl`;
 - чередует уровни и порядок моделей по заранее зафиксированному расписанию;
 - перед каждым запуском выгружает обе модели и ждёт охлаждения GPU;
 - выполняет `doctor`, снова выгружает модели и запускает `run`;
 - немедленно останавливается при любой ошибке;
-- в блоке `finally` возвращает штатные 160 Вт;
+- в блоке `finally` возвращает штатные 160 Вт и повторно читает фактический
+  лимит; ошибка серии и ошибка восстановления выводятся вместе;
 - после серии принимает только 24 schema-v3 run с 1440/1440 валидными
-  запросами и создаёт `rtx4060ti-campaign-receipt.json`.
+  запросами, точной матрицей model/power/launch/condition и создаёт
+  `rtx4060ti-campaign-receipt.json` с Python/dependency provenance.
 
 Не запускай скрипт повторно после ошибки и не удаляй failed run. Скопируй
 последние строки консоли и сообщи Quirence: повторный запуск согласуем по

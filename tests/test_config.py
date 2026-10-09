@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -656,6 +658,47 @@ def test_power_quality_prompt_set_is_frozen() -> None:
     )
     assert "power-quality-v2-rtx4060ti-code" in campaign_script
     assert all(campaign_script.count(path.name) == 1 for path in rtx4060ti_configs)
+    schedule = [
+        (int(power), filename)
+        for power, filename in re.findall(
+            r'\[pscustomobject\]@\{ Power = (\d+); Config = "([^"]+)" \}',
+            campaign_script,
+        )
+    ]
+    assert schedule == [
+        (100, "llama32-q4-p100-launch1.toml"),
+        (100, "qwen3-q4-p100-launch1.toml"),
+        (130, "qwen3-q4-p130-launch1.toml"),
+        (130, "llama32-q4-p130-launch1.toml"),
+        (195, "qwen3-q4-p195-launch1.toml"),
+        (195, "llama32-q4-p195-launch1.toml"),
+        (160, "llama32-q4-p160-launch1.toml"),
+        (160, "qwen3-q4-p160-launch1.toml"),
+        (130, "llama32-q4-p130-launch2.toml"),
+        (130, "qwen3-q4-p130-launch2.toml"),
+        (160, "qwen3-q4-p160-launch2.toml"),
+        (160, "llama32-q4-p160-launch2.toml"),
+        (100, "qwen3-q4-p100-launch2.toml"),
+        (100, "llama32-q4-p100-launch2.toml"),
+        (195, "llama32-q4-p195-launch2.toml"),
+        (195, "qwen3-q4-p195-launch2.toml"),
+        (160, "llama32-q4-p160-launch3.toml"),
+        (160, "qwen3-q4-p160-launch3.toml"),
+        (195, "qwen3-q4-p195-launch3.toml"),
+        (195, "llama32-q4-p195-launch3.toml"),
+        (130, "qwen3-q4-p130-launch3.toml"),
+        (130, "llama32-q4-p130-launch3.toml"),
+        (100, "llama32-q4-p100-launch3.toml"),
+        (100, "qwen3-q4-p100-launch3.toml"),
+    ]
+    dependency_lock = REPO_ROOT / "requirements" / "power-quality-v2-windows-py312.lock"
+    assert dependency_lock.is_file()
+    assert "power-quality-v2-windows-py312.lock" in campaign_script
+    dependency_lock_sha256 = hashlib.sha256(dependency_lock.read_bytes()).hexdigest()
+    assert dependency_lock_sha256 == (
+        "474a00ce6ca43b0ee2a411dcd71f79a95ef7a94d7ffe699cfb1becc80c4662c0"
+    )
+    assert dependency_lock_sha256 in campaign_script
 
 
 def test_the_pilot_produces_the_eighteen_records_task_8_expects() -> None:
