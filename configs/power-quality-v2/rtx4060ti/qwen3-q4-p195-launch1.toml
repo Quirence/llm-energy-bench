@@ -1,0 +1,45 @@
+# Frozen power-quality-v2 condition for the RTX 4060 Ti desktop.
+
+[experiment]
+id = "power-quality-v2"
+host_id = "rtx4060ti-desktop"
+output_dir = "../../../experiments/runs/power-quality-v2"
+repetitions = 5
+warmup_requests = 4
+order_seed = 42
+
+[runtime]
+ollama_url = "http://127.0.0.1:11434"
+models = ["qwen3:4b-instruct-2507-q4_K_M"]
+expected_version = "0.35.0"
+expected_digests = { "qwen3:4b-instruct-2507-q4_K_M" = "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0" }
+
+[gpu]
+index = 0
+telemetry_interval_ms = 100
+expected_power_limit_watts = 195.0
+power_limit_tolerance_watts = 1.0
+
+[study]
+protocol_id = "power-quality-v2"
+host_role = "primary"
+condition_id = "qwen3-q4-p195"
+launch_index = 1
+
+[environment]
+idle_probe_seconds = 15.0
+max_gpu_utilization_p95_percent = 5.0
+max_start_temperature_c = 55
+max_idle_vram_used_mib = 2048.0
+
+[prompts]
+path = "../../../prompts/power-quality-v2.jsonl"
+
+[options]
+num_ctx = 4096
+num_gpu = 999
+temperature = 0.0
+seed = 42
+num_predict = 256
+kv_cache = "f16"
+concurrency = 1

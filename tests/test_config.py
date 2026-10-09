@@ -10,6 +10,8 @@ import pytest
 
 from llm_energy_bench.config import (
     ConfigError,
+    EnvironmentLimits,
+    HostRole,
     PromptCategory,
     load_config,
     load_prompts,
@@ -600,6 +602,60 @@ def test_power_quality_prompt_set_is_frozen() -> None:
         prompts_fingerprint(load_prompts(config.prompt_path)) == prompts_fingerprint(prompts)
         for config in loaded
     )
+
+    rtx4060ti_configs = sorted(
+        (REPO_ROOT / "configs" / "power-quality-v2" / "rtx4060ti").glob("*.toml")
+    )
+    assert len(rtx4060ti_configs) == 24
+    rtx4060ti = tuple(load_config(path) for path in rtx4060ti_configs)
+    assert {config.host_id for config in rtx4060ti} == {"rtx4060ti-desktop"}
+    assert {config.expected_runtime_version for config in rtx4060ti} == {"0.35.0"}
+    assert {config.expected_power_limit_watts for config in rtx4060ti} == {
+        100.0,
+        130.0,
+        160.0,
+        195.0,
+    }
+    expected_matrix = {
+        (model, power, launch)
+        for model in (
+            "llama3.2:3b-instruct-q4_K_M",
+            "qwen3:4b-instruct-2507-q4_K_M",
+        )
+        for power in (100.0, 130.0, 160.0, 195.0)
+        for launch in (1, 2, 3)
+    }
+    assert {
+        (
+            config.models[0],
+            config.expected_power_limit_watts,
+            config.study.launch_index if config.study else None,
+        )
+        for config in rtx4060ti
+    } == expected_matrix
+    assert {config.study.host_role for config in rtx4060ti if config.study} == {HostRole.PRIMARY}
+    assert {config.study.launch_index for config in rtx4060ti if config.study} == {1, 2, 3}
+    assert all(config.repetitions == 5 and len(config.models) == 1 for config in rtx4060ti)
+    assert all(config.power_limit_tolerance_watts == 1.0 for config in rtx4060ti)
+    assert all(
+        config.environment
+        == EnvironmentLimits(
+            idle_probe_seconds=15.0,
+            max_gpu_utilization_p95_percent=5.0,
+            max_start_temperature_c=55,
+            max_idle_vram_used_mib=2048.0,
+        )
+        for config in rtx4060ti
+    )
+    assert all(
+        prompts_fingerprint(load_prompts(config.prompt_path)) == prompts_fingerprint(prompts)
+        for config in rtx4060ti
+    )
+    campaign_script = (REPO_ROOT / "scripts" / "run-power-quality-v2-rtx4060ti.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert "power-quality-v2-rtx4060ti-code" in campaign_script
+    assert all(campaign_script.count(path.name) == 1 for path in rtx4060ti_configs)
 
 
 def test_the_pilot_produces_the_eighteen_records_task_8_expects() -> None:

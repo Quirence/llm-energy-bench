@@ -38,6 +38,9 @@ The repository now contains the tested building blocks for the MVP:
   campaigns, and one separately labelled GTX 1080 observation;
 - deterministic study-level JSON/CSV/Markdown artifacts with the frozen
   two-host hypothesis verdict;
+- a schema-v3 `power-quality-v2` protocol with fail-closed power/environment
+  checks, a completed 80/115 W RTX 5060 matrix, and a frozen four-level
+  RTX 4060 Ti campaign;
 - Windows and Linux CI with lint, format, and hardware-independent tests.
 
 The frozen primary result covers RTX 5060 Laptop and RTX 4060 Ti with Ollama
@@ -99,6 +102,7 @@ python -m llm_energy_bench doctor --config configs/pilot-rtx5060.toml --json
 python -m llm_energy_bench run --config configs/pilot.toml
 python -m llm_energy_bench report experiments/runs/<run-id>
 python -m llm_energy_bench analyze --calibration <run-dir> [...] --benchmark <run-dir> [...] --output-dir experiments/studies/paper-dataset-v1
+python -m llm_energy_bench analyze-power-quality --primary-host <host-a> --primary-host <host-b> --external-host <host-c> --run <run-dir> [...] --output-dir experiments/studies/power-quality-v2
 ```
 
 `doctor` is read-only: it checks the configured Ollama instance, NVML energy
@@ -128,5 +132,8 @@ and the selected source is stored in the request record.
 - [Project state and contribution report](docs/project-state-for-owner.md)
 - [Paper draft outline and author work split](docs/paper-draft.md)
 - [Indexed reading list](docs/reading-index.md)
+- [Power-quality-v2 runbook](docs/power-quality-v2-runbook.md)
+- [RTX 4060 Ti task](docs/lev-rtx4060ti-task.md)
+- [Accepted RTX 4060 Ti profile](docs/rtx4060ti-power-quality-profile.md)
 - [Implemented methodology and formulas](docs/methodology-and-formulas.md)
 - [Frozen paper-dataset result](experiments/studies/paper-dataset-v1/report.md)
