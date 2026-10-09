@@ -17,13 +17,13 @@ expected_digests = { "llama3.2:3b-instruct-q4_K_M" = "a80c4f17acd55265feec403c7a
 [gpu]
 index = 0
 telemetry_interval_ms = 100
-expected_power_limit_watts = 65.0
+expected_power_limit_watts = 115.0
 power_limit_tolerance_watts = 1.0
 
 [study]
 protocol_id = "power-quality-v2"
 host_role = "primary"
-condition_id = "llama32-q4-p65"
+condition_id = "llama32-q4-p115"
 launch_index = 3
 
 [environment]

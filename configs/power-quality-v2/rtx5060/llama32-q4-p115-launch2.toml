@@ -10,21 +10,21 @@ order_seed = 42
 
 [runtime]
 ollama_url = "http://127.0.0.1:11434"
-models = ["qwen3:4b-instruct-2507-q4_K_M"]
+models = ["llama3.2:3b-instruct-q4_K_M"]
 expected_version = "0.35.0"
-expected_digests = { "qwen3:4b-instruct-2507-q4_K_M" = "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0" }
+expected_digests = { "llama3.2:3b-instruct-q4_K_M" = "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72" }
 
 [gpu]
 index = 0
 telemetry_interval_ms = 100
-expected_power_limit_watts = 65.0
+expected_power_limit_watts = 115.0
 power_limit_tolerance_watts = 1.0
 
 [study]
 protocol_id = "power-quality-v2"
 host_role = "primary"
-condition_id = "qwen3-q4-p65"
-launch_index = 3
+condition_id = "llama32-q4-p115"
+launch_index = 2
 
 [environment]
 idle_probe_seconds = 15.0

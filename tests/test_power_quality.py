@@ -190,10 +190,10 @@ def synthetic_v2_matrix(
     *,
     omit: tuple[str, str, float, int] | None = None,
 ) -> tuple[Path, ...]:
-    """Create two primary 2x4x3 grids and one external 2x3x3 grid."""
+    """Create primary 2x2x3 and 2x4x3 grids plus an external 2x3x3 grid."""
     runs: list[Path] = []
     for host, role, powers in (
-        ("rtx5060", HostRole.PRIMARY, (120.0, 100.0, 80.0, 60.0)),
+        ("rtx5060", HostRole.PRIMARY, (115.0, 80.0)),
         ("rtx4060ti", HostRole.PRIMARY, (120.0, 100.0, 80.0, 60.0)),
         ("gtx1080", HostRole.EXTERNAL, (180.0, 140.0, 100.0)),
     ):

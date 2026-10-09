@@ -17,14 +17,14 @@ expected_digests = { "qwen3:4b-instruct-2507-q4_K_M" = "0edcdef34593eac1aa2be9c7
 [gpu]
 index = 0
 telemetry_interval_ms = 100
-expected_power_limit_watts = 35.0
+expected_power_limit_watts = 115.0
 power_limit_tolerance_watts = 1.0
 
 [study]
 protocol_id = "power-quality-v2"
 host_role = "primary"
-condition_id = "qwen3-q4-p35"
-launch_index = 2
+condition_id = "qwen3-q4-p115"
+launch_index = 1
 
 [environment]
 idle_probe_seconds = 15.0

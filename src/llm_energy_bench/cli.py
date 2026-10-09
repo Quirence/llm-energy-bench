@@ -435,7 +435,10 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         action="append",
         metavar="<host-id>",
-        help="Primary host id; provide exactly twice.",
+        help=(
+            "Primary host id; provide RTX 5060 first (two levels) and "
+            "RTX 4060 Ti second (four levels)."
+        ),
     )
     power.add_argument(
         "--external-host",

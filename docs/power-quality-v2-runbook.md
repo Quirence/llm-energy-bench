@@ -1,328 +1,95 @@
 # Runbook power-quality-v2
 
-Этот документ задаёт порядок производственных запусков. Он не меняет power limit автоматически: оператор выполняет каждую команду явно из PowerShell от имени администратора. Ненулевой exit code означает немедленную остановку серии; не переходите к следующей команде и не исправляйте артефакты вручную.
+Этот документ задаёт порядок производственных запусков. Runner не меняет
+режим питания. Ненулевой exit code означает немедленную остановку серии:
+следующий TOML не запускается, артефакты вручную не исправляются.
 
 ## Перед каждым сеансом
 
-- ноутбук или ПК подключён к сети, режим питания ОС не меняется между запусками;
-- закрыты игры, браузеры с аппаратным ускорением, видеоплееры, оверлеи, wallpaper renderer и другие GPU-задачи;
+- ноутбук или ПК подключён к сети;
+- закрыты игры, браузеры с аппаратным ускорением, видеоплееры, оверлеи и
+  другие GPU-задачи;
 - версии драйвера, Ollama и модели совпадают с TOML;
-- `git status --short` пуст, `git describe --tags --exact-match` выводит `power-quality-v2-code`;
 - обе модели установлены заранее; runner ничего не загружает из сети;
-- GPU остыл ниже порога TOML; `ollama ps` пуст;
+- `ollama ps` пуст, GPU остыл ниже порога TOML;
 - один блок выполняется целиком, параллельные запуски запрещены.
 
-`doctor` загружает проверяемую модель, поэтому после него обе модели обязательно выгружаются повторно. Сам `run` перед измерением проверяет пустой `/api/ps`, 15 секунд измеряет фон GPU и прекращает работу при несовпадении среды или power limit.
+`doctor` загружает модель, поэтому после него обе модели нужно снова
+выгрузить. `run` требует пустой `/api/ps`, 15 секунд измеряет фон GPU и
+останавливается при несовпадении среды или зарегистрированной мощности.
 
-## RTX 5060 Laptop — 24 зафиксированных условия
+## RTX 5060 Laptop: порядок 80 Вт → проверка → 115 Вт
 
-На этом стенде используются уровни 80, 65, 50 и 35 Вт. До основной серии все четыре значения должны быть подтверждены в административной PowerShell. Если `nvidia-smi -pl` возвращает `Insufficient Permissions`, производственные запуски начинать нельзя.
+На MAIBENBEN X16C мощность задаётся режимом Control Center:
 
-### Llama 3.2 Q4, 80 Вт, запуск 1
+- Gaming соответствует NVML current/requested 80 Вт;
+- Turbo соответствует NVML current/requested 115 Вт;
+- Custom и Office не используются, потому что отключают дискретную GPU.
 
-```powershell
-nvidia-smi -pl 80
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p80-launch1.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p80-launch1.toml
-```
+На этом ноутбуке `nvidia-smi -pl` не поддерживает изменение лимита. Не
+пытайтесь задавать им 80 или 115 Вт. Перед серией выберите режим вручную и
+подтвердите его командой `doctor`.
 
-### Llama 3.2 Q4, 80 Вт, запуск 2
+### Шаблон одного запуска
 
-```powershell
-nvidia-smi -pl 80
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p80-launch2.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p80-launch2.toml
-```
-
-### Llama 3.2 Q4, 80 Вт, запуск 3
+Подставьте в `$config` очередной TOML из списков ниже.
 
 ```powershell
-nvidia-smi -pl 80
+$config = "configs/power-quality-v2/rtx5060/llama32-q4-p80-launch1.toml"
 ollama stop llama3.2:3b-instruct-q4_K_M
 ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p80-launch3.toml --json
+.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config $config --json
+if ($LASTEXITCODE -ne 0) { throw "doctor failed: $config" }
 ollama stop llama3.2:3b-instruct-q4_K_M
 ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p80-launch3.toml
+.\.venv\Scripts\python.exe -m llm_energy_bench run --config $config
+if ($LASTEXITCODE -ne 0) { throw "run failed: $config" }
 ```
 
-### Llama 3.2 Q4, 65 Вт, запуск 1
+### Этап A — Gaming 80 Вт
 
-```powershell
-nvidia-smi -pl 65
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p65-launch1.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p65-launch1.toml
-```
+Режим Gaming не менять до завершения всех шести запусков:
 
-### Llama 3.2 Q4, 65 Вт, запуск 2
+1. `llama32-q4-p80-launch1.toml`
+2. `llama32-q4-p80-launch2.toml`
+3. `llama32-q4-p80-launch3.toml`
+4. `qwen3-q4-p80-launch1.toml`
+5. `qwen3-q4-p80-launch2.toml`
+6. `qwen3-q4-p80-launch3.toml`
 
-```powershell
-nvidia-smi -pl 65
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p65-launch2.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p65-launch2.toml
-```
+После этапа A центральный исполнитель проверяет каждый run: статус
+`completed`, 60/60 валидных измерений, ожидаемый digest и полное размещение
+в GPU, отсутствие повторной загрузки модели, совпадение мощности, пробелы
+телеметрии не более 500 мс, положительную энергию, качество, разброс трёх
+запусков и выбросы. До этого оператор не переключается на Turbo.
 
-### Llama 3.2 Q4, 65 Вт, запуск 3
+### Этап B — Turbo 115 Вт
 
-```powershell
-nvidia-smi -pl 65
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p65-launch3.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p65-launch3.toml
-```
+Только после явного подтверждения этапа A включите Turbo и сообщите об этом.
+`doctor` должен увидеть 115 Вт. Затем выполните:
 
-### Llama 3.2 Q4, 50 Вт, запуск 1
+1. `llama32-q4-p115-launch1.toml`
+2. `llama32-q4-p115-launch2.toml`
+3. `llama32-q4-p115-launch3.toml`
+4. `qwen3-q4-p115-launch1.toml`
+5. `qwen3-q4-p115-launch2.toml`
+6. `qwen3-q4-p115-launch3.toml`
 
-```powershell
-nvidia-smi -pl 50
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p50-launch1.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p50-launch1.toml
-```
-
-### Llama 3.2 Q4, 50 Вт, запуск 2
-
-```powershell
-nvidia-smi -pl 50
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p50-launch2.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p50-launch2.toml
-```
-
-### Llama 3.2 Q4, 50 Вт, запуск 3
-
-```powershell
-nvidia-smi -pl 50
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p50-launch3.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p50-launch3.toml
-```
-
-### Llama 3.2 Q4, 35 Вт, запуск 1
-
-```powershell
-nvidia-smi -pl 35
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p35-launch1.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p35-launch1.toml
-```
-
-### Llama 3.2 Q4, 35 Вт, запуск 2
-
-```powershell
-nvidia-smi -pl 35
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p35-launch2.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p35-launch2.toml
-```
-
-### Llama 3.2 Q4, 35 Вт, запуск 3
-
-```powershell
-nvidia-smi -pl 35
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/llama32-q4-p35-launch3.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/llama32-q4-p35-launch3.toml
-```
-
-### Qwen3 4B Q4, 80 Вт, запуск 1
-
-```powershell
-nvidia-smi -pl 80
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p80-launch1.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p80-launch1.toml
-```
-
-### Qwen3 4B Q4, 80 Вт, запуск 2
-
-```powershell
-nvidia-smi -pl 80
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p80-launch2.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p80-launch2.toml
-```
-
-### Qwen3 4B Q4, 80 Вт, запуск 3
-
-```powershell
-nvidia-smi -pl 80
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p80-launch3.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p80-launch3.toml
-```
-
-### Qwen3 4B Q4, 65 Вт, запуск 1
-
-```powershell
-nvidia-smi -pl 65
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p65-launch1.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p65-launch1.toml
-```
-
-### Qwen3 4B Q4, 65 Вт, запуск 2
-
-```powershell
-nvidia-smi -pl 65
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p65-launch2.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p65-launch2.toml
-```
-
-### Qwen3 4B Q4, 65 Вт, запуск 3
-
-```powershell
-nvidia-smi -pl 65
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p65-launch3.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p65-launch3.toml
-```
-
-### Qwen3 4B Q4, 50 Вт, запуск 1
-
-```powershell
-nvidia-smi -pl 50
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p50-launch1.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p50-launch1.toml
-```
-
-### Qwen3 4B Q4, 50 Вт, запуск 2
-
-```powershell
-nvidia-smi -pl 50
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p50-launch2.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p50-launch2.toml
-```
-
-### Qwen3 4B Q4, 50 Вт, запуск 3
-
-```powershell
-nvidia-smi -pl 50
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p50-launch3.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p50-launch3.toml
-```
-
-### Qwen3 4B Q4, 35 Вт, запуск 1
-
-```powershell
-nvidia-smi -pl 35
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p35-launch1.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p35-launch1.toml
-```
-
-### Qwen3 4B Q4, 35 Вт, запуск 2
-
-```powershell
-nvidia-smi -pl 35
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p35-launch2.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p35-launch2.toml
-```
-
-### Qwen3 4B Q4, 35 Вт, запуск 3
-
-```powershell
-nvidia-smi -pl 35
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/rtx5060/qwen3-q4-p35-launch3.toml --json
-ollama stop llama3.2:3b-instruct-q4_K_M
-ollama stop qwen3:4b-instruct-2507-q4_K_M
-.\.venv\Scripts\python.exe -m llm_energy_bench run --config configs/power-quality-v2/rtx5060/qwen3-q4-p35-launch3.toml
-```
-
-## Завершение серии RTX 5060
-
-```powershell
-nvidia-smi -pl 80
-nvidia-smi -q -d POWER
-ollama ps
-```
-
-Проверьте, что все 24 новых каталога имеют `schema_version = 3`, статус `completed`, пустой список ошибок в `validation.json` и по 60 валидных measured requests. Добавьте каталоги и одну запись в `docs/experiment-log.md`; не запускайте общий анализ до получения полной матрицы трёх стендов.
+После серии можно вернуть предпочитаемый пользователем режим. В статье
+Gaming/Turbo трактуются как двухточечное сравнение режимов ноутбука: они могут
+менять не только предел GPU, но также охлаждение и политику CPU.
 
 ## RTX 4060 Ti и GTX 1080
 
-Точные блоки этих стендов будут добавлены центрально после получения minimum/default/maximum/current профилей и проверки административной команды `nvidia-smi -pl`. До появления committed TOML коллеги выполняют только профиль из своих заданий. Значения мощности по памяти или из интернета не подставляются.
+RTX 4060 Ti получает четыре подтверждённых уровня и роль `primary`; GTX
+1080 — три уровня и роль `external`. Их power limit можно менять только
+поддерживаемым на конкретном стенде способом. Значения из интернета не
+подставляются: используются только committed TOML после аппаратного профиля.
 
-RTX 4060 Ti получает четыре уровня и роль `primary`; GTX 1080 — три уровня и роль `external`. Порядок команд для каждого будущего TOML полностью совпадает с блоками выше, а завершающая команда возвращает фактический штатный лимит конкретной карты.
+## Анализ после полных серий
 
-## Анализ после трёх серий
+Порядок двух `--primary-host` значим: первым указывается двухуровневый
+RTX 5060, вторым — четырёхуровневый RTX 4060 Ti.
 
 ```powershell
 $runArguments = @()
@@ -337,5 +104,6 @@ Get-ChildItem experiments/runs/power-quality-v2 -Directory | ForEach-Object {
   --output-dir experiments/studies/power-quality-v2
 ```
 
-Анализ обязан отклонить неполную матрицу, schema v2, drift digest/runtime/prompts или смешение ролей.
+Анализ обязан отклонить неполную матрицу, schema v2, drift
+digest/runtime/prompts или смешение ролей.
 

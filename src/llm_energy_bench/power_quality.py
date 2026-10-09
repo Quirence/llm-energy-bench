@@ -19,6 +19,10 @@ class PowerQualityError(Exception):
     """The supplied runs cannot support the frozen power-quality analysis."""
 
 
+PRIMARY_POWER_LEVEL_COUNTS = (2, 4)
+EXTERNAL_POWER_LEVEL_COUNT = 3
+
+
 @dataclass(frozen=True, slots=True)
 class PowerQualitySample:
     host_id: str
@@ -287,6 +291,8 @@ def _validate_matrix(
     primary_hosts: tuple[str, str],
     external_host: str,
 ) -> None:
+    required_power_counts = dict(zip(primary_hosts, PRIMARY_POWER_LEVEL_COUNTS, strict=True))
+    required_power_counts[external_host] = EXTERNAL_POWER_LEVEL_COUNT
     for host in (*primary_hosts, external_host):
         host_conditions = {
             (model, power): launches
@@ -294,7 +300,7 @@ def _validate_matrix(
             if condition_host == host
         }
         models = sorted({model for model, _power in host_conditions})
-        required_power_count = 3 if host == external_host else 4
+        required_power_count = required_power_counts[host]
         complete = len(models) == 2
         power_sets: list[set[float]] = []
         for model in models:

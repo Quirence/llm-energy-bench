@@ -590,10 +590,10 @@ def test_power_quality_prompt_set_is_frozen() -> None:
     )
 
     configs = sorted((REPO_ROOT / "configs" / "power-quality-v2" / "rtx5060").glob("*.toml"))
-    assert len(configs) == 24
+    assert len(configs) == 12
     loaded = tuple(load_config(path) for path in configs)
     assert {config.expected_runtime_version for config in loaded} == {"0.35.0"}
-    assert {config.expected_power_limit_watts for config in loaded} == {35.0, 50.0, 65.0, 80.0}
+    assert {config.expected_power_limit_watts for config in loaded} == {80.0, 115.0}
     assert {config.study.launch_index for config in loaded if config.study} == {1, 2, 3}
     assert all(config.repetitions == 5 and len(config.models) == 1 for config in loaded)
     assert all(
