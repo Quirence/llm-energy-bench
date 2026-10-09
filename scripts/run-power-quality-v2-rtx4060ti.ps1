@@ -17,6 +17,11 @@ $models = @(
     "llama3.2:3b-instruct-q4_K_M",
     "qwen3:4b-instruct-2507-q4_K_M"
 )
+$expectedDigests = @{
+    "llama3.2:3b-instruct-q4_K_M" = "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+    "qwen3:4b-instruct-2507-q4_K_M" = "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0"
+}
+$expectedPromptFingerprint = "7d7d1ee71cacc1129d4076b18d5ceb630052950994acab18e112892194d099ff"
 
 # Frozen before measurement: power position varies across launch blocks and
 # model-first order is balanced within each block.
@@ -141,6 +146,8 @@ Assert-LastExitCode "Git working tree check"
 if ($dirty.Count -ne 0) {
     throw "Working tree must be clean before the series: $($dirty -join '; ')"
 }
+$commit = (& git rev-parse HEAD).Trim()
+Assert-LastExitCode "Git commit read"
 
 $ollamaVersion = (& ollama --version 2>&1 | Out-String).Trim()
 Assert-LastExitCode "Ollama version check"
@@ -211,27 +218,57 @@ if ($newRunDirs.Count -ne 24) {
 }
 
 $runIds = @()
+$seenConditions = @{}
 foreach ($directory in $newRunDirs) {
     $manifest = Get-Content (Join-Path $directory.FullName "manifest.json") -Raw |
         ConvertFrom-Json
     $validation = Get-Content (Join-Path $directory.FullName "validation.json") -Raw |
         ConvertFrom-Json
+    $modelRecords = @($manifest.models)
+    $conditionKey = "$($manifest.study.condition_id)|$($manifest.study.launch_index)"
+    if ($manifest.study.condition_id -notmatch "-p(?<power>[0-9]+)$") {
+        throw "Unexpected condition id: $($manifest.study.condition_id)"
+    }
+    $conditionPower = [double]$Matches.power
+    $modelRecord = if ($modelRecords.Count -eq 1) { $modelRecords[0] } else { $null }
+    $expectedDigest = if ($null -ne $modelRecord) {
+        $expectedDigests[[string]$modelRecord.model]
+    } else {
+        $null
+    }
     if (
         $manifest.schema_version -ne 3 -or
         $manifest.status -ne "completed" -or
         $manifest.host_id -ne "rtx4060ti-desktop" -or
+        $manifest.git_commit -ne $commit -or
         $manifest.completed_requests -ne 60 -or
         $manifest.valid_requests -ne 60 -or
         $manifest.runtime.version -ne "0.35.0" -or
+        $manifest.prompt_set_sha256 -ne $expectedPromptFingerprint -or
+        $manifest.study.protocol_id -ne "power-quality-v2" -or
+        $manifest.study.host_role -ne "primary" -or
+        $manifest.study.launch_index -notin @(1, 2, 3) -or
+        $seenConditions.ContainsKey($conditionKey) -or
+        $conditionPower -notin @(100.0, 130.0, 160.0, 195.0) -or
+        $manifest.gpu.name -ne "NVIDIA GeForce RTX 4060 Ti" -or
+        $manifest.gpu.driver_version -ne "560.94" -or
+        [Math]::Abs([double]$manifest.gpu.power_limit_watts - $conditionPower) -gt 1.0 -or
+        $null -eq $modelRecord -or
+        $null -eq $expectedDigest -or
+        $modelRecord.digest -ne $expectedDigest -or
+        -not $modelRecord.fully_on_gpu -or
+        [double]$modelRecord.gpu_fraction -ne 1.0 -or
         -not $validation.ok
     ) {
         throw "Final validation failed: $($directory.Name)"
     }
+    $seenConditions[$conditionKey] = $true
     $runIds += $manifest.run_id
 }
+if ($seenConditions.Count -ne 24) {
+    throw "Expected 24 unique study conditions; found $($seenConditions.Count)"
+}
 
-$commit = (& git rev-parse HEAD).Trim()
-Assert-LastExitCode "Git commit read"
 $receipt = [ordered]@{
     schema_version = 1
     protocol_id = "power-quality-v2"
