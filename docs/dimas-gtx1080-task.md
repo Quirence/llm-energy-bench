@@ -1,48 +1,174 @@
-# Задание Диме: профиль GTX 1080 и внешняя серия power-quality-v2
+# Задание Диме: внешняя серия GTX 1080 для power-quality-v2
 
-## Сейчас: только аппаратный профиль
+Производственную серию нужно выполнять только по неизменяемой метке
+`power-quality-v2-gtx1080-code`. GTX 1080 имеет роль `external`: её данные
+показываются отдельным блоком и не входят в объединённый вывод двух основных
+GPU.
 
-1. Не меняй код, prompts и TOML.
-2. Открой PowerShell от имени администратора в чистом клоне репозитория.
-3. Выполни команды и пришли Quirence весь вывод личным сообщением. Не коммить
-   сырой вывод `nvidia-smi -q`: сначала он будет санитизирован.
+Зафиксировано до измерений:
+
+- стенд `gtx1080-observation`, Palit GeForce GTX 1080 GameRock, 8192 MiB;
+- драйвер `582.66`;
+- предварительный профиль BIOS: default 200 Вт, minimum 100 Вт, maximum 240 Вт;
+- исследуемые уровни 100, 150 и 200 Вт; 240 Вт намеренно не используется,
+  потому что эксперимент проверяет снижение относительно штатных 200 Вт, а не
+  разгон старой карты;
+- Ollama `0.35.0`;
+- модели только `llama3.2:3b-instruct-q4_K_M` и
+  `qwen3:4b-instruct-2507-q4_K_M` с уже проверенными digest;
+- 18 запусков: 2 модели × 3 уровня × 3 launch;
+- в каждом запуске 12 запросов × 5 повторений = 60 измерений;
+- итог серии — 1080 измеряемых запросов плюс исключённые прогревы.
+
+Профиль мощности основан на сохранённом наблюдении этого стенда (текущий
+лимит 200 Вт) и спецификациях семейства Palit GameRock. Скрипт до первого
+изменения мощности считывает фактические default/minimum/maximum. Если BIOS
+карты сообщает другие значения, серия остановится до измерений. В таком
+случае ничего не исправляй вручную: пришли Quirence строку ошибки, после чего
+центрально будет выпущена исправленная метка.
+
+Код, prompts и TOML менять нельзя. Модели повторно загружать или обновлять
+нельзя.
+
+## 1. Подготовка чистой копии
+
+Открой обычную PowerShell, клонируй репозиторий в новый каталог и перейди в
+него. Если чистый клон уже есть, первая команда не нужна.
 
 ```powershell
+git clone https://github.com/Quirence/llm-energy-bench.git
+cd llm-energy-bench
 git fetch --tags origin
-git checkout power-quality-v2-profile
+git checkout power-quality-v2-gtx1080-code
+git switch -c data/gtx1080-power-quality-v2
 git status --short
-.\.venv\Scripts\python.exe -m llm_energy_bench doctor --config configs/power-quality-v2/profile-gtx1080.toml --json
-nvidia-smi -q -d POWER,TEMPERATURE,MEMORY
-ollama ps
+```
+
+Последняя команда обязана вывести пустую строку. Затем создай окружение из
+зафиксированного проекта и проверь код:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --require-hashes `
+  -r requirements/power-quality-v2-windows-py312.lock
+.\.venv\Scripts\python.exe -m pip install --no-deps --no-build-isolation .
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m ruff format --check .
+```
+
+Lock предназначен для CPython 3.12 x86-64 на Windows, содержит точные версии
+и SHA-256 всех runtime/dev/build wheels. Его SHA-256 равен
+`474a00ce6ca43b0ee2a411dcd71f79a95ef7a94d7ffe699cfb1becc80c4662c0`.
+Скрипт ещё раз сравнит lock, Python и установленные версии перед первым
+изменением мощности, а затем запишет их в receipt.
+
+Любой ненулевой exit code — остановка и сообщение Quirence. Не исправляй
+тесты или зависимости на своей ветке.
+
+## 2. Обновление Ollama ровно до 0.35.0
+
+Исторические прогоны выполнялись на 0.34.2, поэтому до серии её нужно заменить
+на 0.35.0. Используй официальный установщик именно релиза
+[v0.35.0](https://github.com/ollama/ollama/releases/tag/v0.35.0), а не
+автообновление до более новой версии.
+
+```powershell
+$installer = Join-Path $env:TEMP "OllamaSetup-0.35.0.exe"
+Invoke-WebRequest `
+  -Uri "https://github.com/ollama/ollama/releases/download/v0.35.0/OllamaSetup.exe" `
+  -OutFile $installer
+(Get-FileHash $installer -Algorithm SHA256).Hash
+```
+
+Ожидаемый SHA-256 официального файла:
+`92E45C3518DAF7D4EA60480896EE7BDB1BED71381593CFC9F2D7C1CEB941EFDE`.
+Если хеш отличается, файл не запускай. При совпадении:
+
+```powershell
+Start-Process -FilePath $installer -Wait
 ollama --version
 ollama list
 ```
 
-Если метка `power-quality-v2-profile` ещё не опубликована, остановись. Эта
-метка предназначена только для профилирования; производственные измерения по
-ней запускать нельзя. Если локальной `.venv` нет, создай её по README проекта
-без произвольного обновления зависимостей.
+Версия должна быть ровно `0.35.0`, а ID двух Q4-моделей должны начинаться с
+`a80c4f17acd5` и `0edcdef34593`. Не выполняй `ollama pull`:
+производственный скрипт сам проверит полные digest.
 
-В сообщении отдельно укажи:
+## 3. Подготовка ПК
 
-- current, requested, default, minimum и maximum power limit;
-- драйвер, точное имя GPU и объём VRAM;
-- проходит ли `nvidia-smi -pl <значение>` из административной PowerShell;
-- версию Ollama и ID обеих Q4-моделей;
-- температуру, VRAM и фоновые GPU-программы во время профиля.
+Перед началом:
 
-GTX 1080 имеет роль `external`: её результаты не входят в объединённый вывод
-двух основных GPU. После профиля Quirence/Codex добавит 18 конфигураций: две
-Q4-модели × три проверенных уровня × три запуска. Нужны обе модели из задания;
-если одна не помещается полностью в VRAM, сообщи это и не начинай серию.
+1. Перезагрузи ПК после установки Ollama, если установщик это потребует.
+2. Оставь обычную схему питания Windows и питание от сети.
+3. Закрой Wallpaper Engine, браузеры, Discord, Steam overlay, видеоплееры,
+   редакторы и другие программы с аппаратным ускорением.
+4. Не обновляй драйвер `582.66` до завершения серии.
+5. Не меняй BIOS, положение его переключателя, разгон, undervolt, кривую
+   напряжения или настройки MSI Afterburner/ThunderMaster.
+6. Не запускай игры, видео, удалённый рабочий стол и параллельные задачи GPU.
 
-## После второго сообщения от Quirence
+Скрипт допускает перед загрузкой модели не более 5% GPU, 50 °C и 2048 MiB
+VRAM; runner дополнительно измеряет 15-секундный фон и требует p95 загрузки
+не более 5%, температуру не выше 55 °C и точное совпадение power limit.
 
-Начинай измерения только после публикации финальной метки
-`power-quality-v2-code`, появления каталога
-`configs/power-quality-v2/gtx1080/` и прямого подтверждения. Выполняй
-`docs/power-quality-v2-runbook.md`. При ненулевом exit code остановись, ничего
-не исправляй в артефактах. После серии верни штатный power limit, добавь только
-новые каталоги `experiments/runs/power-quality-v2/` и одну запись в
-`docs/experiment-log.md`, затем открой PR. Код, prompts, config и анализ не
-менять.
+## 4. Проверка плана без изменений
+
+Открой **PowerShell от имени администратора** в каталоге репозитория и сначала
+выведи расписание:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\run-power-quality-v2-gtx1080.ps1
+```
+
+Должно быть ровно 18 строк. На этом шаге power limit и результаты не
+изменяются.
+
+## 5. Полная серия
+
+Не меняя окно и окружение, запусти:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\run-power-quality-v2-gtx1080.ps1 -Execute
+```
+
+Скрипт сам:
+
+- требует точную Git-метку, чистую ветку, Ollama 0.35.0, драйвер 582.66 и
+  профиль GTX 1080 default/min/max 200/100/240 Вт;
+- проверяет SHA-256 dependency lock и версии Python-пакетов;
+- задаёт 100, 150 и 200 Вт через `nvidia-smi -pl`;
+- чередует уровни и порядок моделей по заранее зафиксированному расписанию;
+- перед каждым запуском выгружает обе модели и ждёт охлаждения GPU;
+- выполняет `doctor`, снова выгружает модели и запускает `run`;
+- немедленно останавливается при любой ошибке;
+- в блоке `finally` возвращает штатные 200 Вт и повторно читает фактический
+  лимит; ошибка серии и ошибка восстановления выводятся вместе;
+- после серии принимает только 18 schema-v3 run с 1080/1080 валидными
+  запросами, точной матрицей model/power/launch/condition и создаёт
+  `gtx1080-campaign-receipt.json`.
+
+Не запускай скрипт повторно после ошибки и не удаляй failed run. Скопируй
+последние строки консоли и сообщи Quirence: повторный запуск согласуем по
+сохранённым артефактам.
+
+## 6. Загрузка результатов
+
+Только если скрипт напечатал `Series accepted locally: 18/18 runs` и
+подтвердил возврат 200 Вт:
+
+```powershell
+git status --short
+git add experiments/runs/power-quality-v2
+git diff --cached --stat
+git commit -m "data: add GTX 1080 power quality v2 campaign"
+git push -u origin data/gtx1080-power-quality-v2
+```
+
+В коммит должны попасть только 18 новых run-каталогов и один receipt. Не
+добавляй `.venv`, сырые профили, код, configs, prompts или исправленные
+результаты. После push пришли Quirence имя ветки и ссылку, которую GitHub
+покажет для создания Pull Request. Центральный исполнитель отдельно проверит
+артефакты и только затем объединит данные.

@@ -708,6 +708,88 @@ def test_the_pilot_produces_the_eighteen_records_task_8_expects() -> None:
     assert len(prompts) * config.repetitions * len(config.models) == 18
 
 
+def test_gtx1080_external_campaign_is_frozen() -> None:
+    prompt_path = REPO_ROOT / "prompts" / "power-quality-v2.jsonl"
+    prompts = load_prompts(prompt_path)
+    config_paths = sorted((REPO_ROOT / "configs" / "power-quality-v2" / "gtx1080").glob("*.toml"))
+
+    assert len(config_paths) == 18
+    configs = tuple(load_config(path) for path in config_paths)
+    expected_matrix = {
+        (model, power, launch)
+        for model in (
+            "llama3.2:3b-instruct-q4_K_M",
+            "qwen3:4b-instruct-2507-q4_K_M",
+        )
+        for power in (100.0, 150.0, 200.0)
+        for launch in (1, 2, 3)
+    }
+    assert {
+        (
+            config.models[0],
+            config.expected_power_limit_watts,
+            config.study.launch_index if config.study else None,
+        )
+        for config in configs
+    } == expected_matrix
+    assert {config.host_id for config in configs} == {"gtx1080-observation"}
+    assert {config.expected_runtime_version for config in configs} == {"0.35.0"}
+    assert {config.study.host_role for config in configs if config.study} == {HostRole.EXTERNAL}
+    assert all(config.repetitions == 5 and len(config.models) == 1 for config in configs)
+    assert all(config.power_limit_tolerance_watts == 1.0 for config in configs)
+    assert all(
+        config.environment
+        == EnvironmentLimits(
+            idle_probe_seconds=15.0,
+            max_gpu_utilization_p95_percent=5.0,
+            max_start_temperature_c=55,
+            max_idle_vram_used_mib=2048.0,
+        )
+        for config in configs
+    )
+    assert all(
+        prompts_fingerprint(load_prompts(config.prompt_path)) == prompts_fingerprint(prompts)
+        for config in configs
+    )
+
+    campaign_script = (REPO_ROOT / "scripts" / "run-power-quality-v2-gtx1080.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert "power-quality-v2-gtx1080-code" in campaign_script
+    assert all(campaign_script.count(path.name) == 1 for path in config_paths)
+    schedule = [
+        (int(power), filename)
+        for power, filename in re.findall(
+            r'\[pscustomobject\]@\{ Power = (\d+); Config = "([^"]+)" \}',
+            campaign_script,
+        )
+    ]
+    assert schedule == [
+        (100, "llama32-q4-p100-launch1.toml"),
+        (100, "qwen3-q4-p100-launch1.toml"),
+        (200, "qwen3-q4-p200-launch1.toml"),
+        (200, "llama32-q4-p200-launch1.toml"),
+        (150, "llama32-q4-p150-launch1.toml"),
+        (150, "qwen3-q4-p150-launch1.toml"),
+        (150, "qwen3-q4-p150-launch2.toml"),
+        (150, "llama32-q4-p150-launch2.toml"),
+        (100, "qwen3-q4-p100-launch2.toml"),
+        (100, "llama32-q4-p100-launch2.toml"),
+        (200, "llama32-q4-p200-launch2.toml"),
+        (200, "qwen3-q4-p200-launch2.toml"),
+        (200, "llama32-q4-p200-launch3.toml"),
+        (200, "qwen3-q4-p200-launch3.toml"),
+        (150, "qwen3-q4-p150-launch3.toml"),
+        (150, "llama32-q4-p150-launch3.toml"),
+        (100, "llama32-q4-p100-launch3.toml"),
+        (100, "qwen3-q4-p100-launch3.toml"),
+    ]
+    dependency_lock = REPO_ROOT / "requirements" / "power-quality-v2-windows-py312.lock"
+    dependency_lock_sha256 = hashlib.sha256(dependency_lock.read_bytes()).hexdigest()
+    assert "power-quality-v2-windows-py312.lock" in campaign_script
+    assert dependency_lock_sha256 in campaign_script
+
+
 @pytest.mark.parametrize(
     ("filename", "experiment_id", "host_id"),
     [

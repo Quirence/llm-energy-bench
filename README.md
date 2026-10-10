@@ -40,7 +40,7 @@ The repository now contains the tested building blocks for the MVP:
   two-host hypothesis verdict;
 - a schema-v3 `power-quality-v2` protocol with fail-closed power/environment
   checks, a completed 80/115 W RTX 5060 matrix, and a frozen four-level
-  RTX 4060 Ti campaign;
+  RTX 4060 Ti campaign plus a three-level external Palit GTX 1080 package;
 - Windows and Linux CI with lint, format, and hardware-independent tests.
 
 The frozen primary result covers RTX 5060 Laptop and RTX 4060 Ti with Ollama
