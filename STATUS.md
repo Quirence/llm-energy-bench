@@ -71,7 +71,7 @@ Palit GTX 1080 GameRock подготовлен с fail-closed проверкой
 ## Remaining Before Final Multi-GPU Analysis
 
 1. Лев запускает 24 условия только по метке
-   `power-quality-v2-rtx4060ti-code` и загружает отдельную data-ветку.
+   `power-quality-v2-rtx4060ti-code-v2` и загружает отдельную data-ветку.
 2. Дима запускает 18 условий только по метке
    `power-quality-v2-gtx1080-code`; фактический BIOS-профиль проверяется
    скриптом до первого измерения.

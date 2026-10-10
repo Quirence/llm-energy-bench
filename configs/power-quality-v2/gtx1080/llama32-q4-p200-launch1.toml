@@ -43,4 +43,3 @@ seed = 42
 num_predict = 256
 kv_cache = "f16"
 concurrency = 1
-

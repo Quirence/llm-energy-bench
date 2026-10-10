@@ -656,7 +656,7 @@ def test_power_quality_prompt_set_is_frozen() -> None:
     campaign_script = (REPO_ROOT / "scripts" / "run-power-quality-v2-rtx4060ti.ps1").read_text(
         encoding="utf-8"
     )
-    assert "power-quality-v2-rtx4060ti-code" in campaign_script
+    assert '$expectedTag = "power-quality-v2-rtx4060ti-code-v2"' in campaign_script
     assert all(campaign_script.count(path.name) == 1 for path in rtx4060ti_configs)
     schedule = [
         (int(power), filename)
@@ -755,7 +755,7 @@ def test_gtx1080_external_campaign_is_frozen() -> None:
     campaign_script = (REPO_ROOT / "scripts" / "run-power-quality-v2-gtx1080.ps1").read_text(
         encoding="utf-8"
     )
-    assert "power-quality-v2-gtx1080-code" in campaign_script
+    assert '$expectedTag = "power-quality-v2-gtx1080-code"' in campaign_script
     assert all(campaign_script.count(path.name) == 1 for path in config_paths)
     schedule = [
         (int(power), filename)

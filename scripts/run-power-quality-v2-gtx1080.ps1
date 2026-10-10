@@ -7,11 +7,22 @@ $ErrorActionPreference = "Stop"
 
 $expectedTag = "power-quality-v2-gtx1080-code"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$commonScript = Join-Path $PSScriptRoot "power-quality-campaign-common.ps1"
+. $commonScript
 $python = Join-Path $repoRoot ".venv\Scripts\python.exe"
 $runRoot = Join-Path $repoRoot "experiments\runs\power-quality-v2"
 $dependencyLock = Join-Path $repoRoot "requirements\power-quality-v2-windows-py312.lock"
 $expectedDependencyLockSha256 = "474a00ce6ca43b0ee2a411dcd71f79a95ef7a94d7ffe699cfb1becc80c4662c0"
 $defaultPowerWatts = 200
+$expectedRuntimeVersion = "0.35.0"
+$expectedHostId = "gtx1080-observation"
+$expectedHostRole = "external"
+$expectedGpuName = "NVIDIA GeForce GTX 1080"
+$expectedDriverVersion = "582.66"
+$expectedVramMiB = 8192
+$expectedMinimumPowerWatts = 100
+$expectedMaximumPowerWatts = 240
+$expectedPowers = @(100.0, 150.0, 200.0)
 $coolTemperatureC = 50
 $maxIdleVramMiB = 2048
 $maxWaitMinutes = 20
@@ -226,11 +237,9 @@ foreach ($packageName in @($expectedPackages.Keys | Sort-Object)) {
 }
 $pipVersion = $installedPackages["pip"]
 
-$ollamaVersion = (& ollama --version 2>&1 | Out-String).Trim()
-Assert-LastExitCode "Ollama version check"
-if ($ollamaVersion -notmatch "(?<![0-9])0\.35\.0(?![0-9])") {
-    throw "Ollama 0.35.0 is required; found: $ollamaVersion"
-}
+$ollamaServerVersion = Assert-OllamaServerVersion `
+    -BaseUrl "http://127.0.0.1:11434" `
+    -ExpectedVersion $expectedRuntimeVersion
 
 $gpuRow = & nvidia-smi -i 0 `
     --query-gpu=name,driver_version,memory.total,power.default_limit,power.min_limit,power.max_limit `
@@ -239,12 +248,12 @@ Assert-LastExitCode "Frozen GPU profile check"
 $gpuParts = @($gpuRow -split "," | ForEach-Object { $_.Trim() })
 if (
     $gpuParts.Count -ne 6 -or
-    $gpuParts[0] -ne "NVIDIA GeForce GTX 1080" -or
-    $gpuParts[1] -ne "582.66" -or
-    [double]$gpuParts[2] -ne 8192 -or
-    [double]$gpuParts[3] -ne 200 -or
-    [double]$gpuParts[4] -ne 100 -or
-    [double]$gpuParts[5] -ne 240
+    $gpuParts[0] -ne $expectedGpuName -or
+    $gpuParts[1] -ne $expectedDriverVersion -or
+    [double]$gpuParts[2] -ne $expectedVramMiB -or
+    [double]$gpuParts[3] -ne $defaultPowerWatts -or
+    [double]$gpuParts[4] -ne $expectedMinimumPowerWatts -or
+    [double]$gpuParts[5] -ne $expectedMaximumPowerWatts
 ) {
     throw "GPU or driver differs from the frozen profile: $gpuRow"
 }
@@ -278,38 +287,39 @@ catch {
 }
 finally {
     Write-Host "Restoring default power limit $defaultPowerWatts W"
-    Stop-StudyModels
-    & nvidia-smi -i 0 -pl $defaultPowerWatts
-    $restoreSetExit = $LASTEXITCODE
-    $restoreRow = & nvidia-smi -i 0 --query-gpu=power.limit --format=csv,noheader,nounits
-    $restoreQueryExit = $LASTEXITCODE
-    $restorePower = $null
-    if ($restoreQueryExit -eq 0) {
-        try {
-            $restorePower = [double]::Parse(
-                ([string]$restoreRow).Trim(), [Globalization.CultureInfo]::InvariantCulture
-            )
+    $cleanup = Invoke-CampaignCleanup `
+        -Models $models `
+        -DefaultPowerWatts $defaultPowerWatts `
+        -StopModelAction {
+            param($model)
+            & ollama stop $model 2>$null | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                throw "ollama stop exited with code $LASTEXITCODE"
+            }
+        } `
+        -SetPowerAction {
+            param($watts)
+            & nvidia-smi -i 0 -pl $watts | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                throw "nvidia-smi -pl exited with code $LASTEXITCODE"
+            }
+        } `
+        -ReadPowerAction {
+            $row = & nvidia-smi -i 0 `
+                --query-gpu=power.limit --format=csv,noheader,nounits
+            if ($LASTEXITCODE -ne 0) {
+                throw "nvidia-smi readback exited with code $LASTEXITCODE"
+            }
+            ([string]$row).Trim()
         }
-        catch {
-            $restorePower = $null
-        }
-    }
-    if (
-        $restoreSetExit -ne 0 -or
-        $restoreQueryExit -ne 0 -or
-        $null -eq $restorePower -or
-        [Math]::Abs($restorePower - $defaultPowerWatts) -gt 1.0
-    ) {
-        $restoreMessage = (
-            "default power restore failed: set_exit=$restoreSetExit, " +
-            "query_exit=$restoreQueryExit, observed=$restorePower"
-        )
+    if ($cleanup.Errors.Count -ne 0) {
+        $cleanupMessage = $cleanup.Errors -join "; "
         if ($null -ne $seriesError) {
-            throw "campaign failed: $($seriesError.Exception.Message); $restoreMessage"
+            throw "campaign failed: $($seriesError.Exception.Message); cleanup failed: $cleanupMessage"
         }
-        throw $restoreMessage
+        throw "campaign cleanup failed: $cleanupMessage"
     }
-    Write-Host "Verified restored power limit: $restorePower W"
+    Write-Host "Verified restored power limit: $($cleanup.ObservedPowerWatts) W"
 }
 
 if ($null -ne $seriesError) {
@@ -332,54 +342,21 @@ foreach ($directory in $newRunDirs) {
         ConvertFrom-Json
     $validation = Get-Content (Join-Path $directory.FullName "validation.json") -Raw |
         ConvertFrom-Json
-    $modelRecords = @($manifest.models)
-    if ($manifest.study.condition_id -notmatch "-p(?<power>[0-9]+)$") {
-        throw "Unexpected condition id: $($manifest.study.condition_id)"
-    }
-    $conditionPower = [double]$Matches.power
-    $modelRecord = if ($modelRecords.Count -eq 1) { $modelRecords[0] } else { $null }
-    $expectedDigest = if ($null -ne $modelRecord) {
-        $expectedDigests[[string]$modelRecord.model]
-    } else {
-        $null
-    }
-    $matrixKey = if ($null -ne $modelRecord) {
-        (
-            "$($modelRecord.model)|$([int]$conditionPower)|" +
-            "$($manifest.study.launch_index)|$($manifest.study.condition_id)"
-        )
-    } else {
-        ""
-    }
-    if (
-        $manifest.schema_version -ne 3 -or
-        $manifest.status -ne "completed" -or
-        $manifest.host_id -ne "gtx1080-observation" -or
-        $manifest.git_commit -ne $commit -or
-        $manifest.completed_requests -ne 60 -or
-        $manifest.valid_requests -ne 60 -or
-        $manifest.runtime.version -ne "0.35.0" -or
-        $manifest.prompt_set_sha256 -ne $expectedPromptFingerprint -or
-        $manifest.study.protocol_id -ne "power-quality-v2" -or
-        $manifest.study.host_role -ne "external" -or
-        $manifest.study.launch_index -notin @(1, 2, 3) -or
-        -not $expectedRunMatrix.ContainsKey($matrixKey) -or
-        $seenRunMatrix.ContainsKey($matrixKey) -or
-        $conditionPower -notin @(100.0, 150.0, 200.0) -or
-        $manifest.gpu.name -ne "NVIDIA GeForce GTX 1080" -or
-        $manifest.gpu.driver_version -ne "560.94" -or
-        [Math]::Abs([double]$manifest.gpu.power_limit_watts - $conditionPower) -gt 1.0 -or
-        $null -eq $modelRecord -or
-        $null -eq $expectedDigest -or
-        $modelRecord.digest -ne $expectedDigest -or
-        -not $modelRecord.fully_on_gpu -or
-        [double]$modelRecord.gpu_fraction -ne 1.0 -or
-        -not $validation.ok
-    ) {
-        throw "Final validation failed: $($directory.Name)"
-    }
-    $seenRunMatrix[$matrixKey] = $true
-    $runIds += $manifest.run_id
+    $runIds += Assert-CampaignRun `
+        -Manifest $manifest `
+        -Validation $validation `
+        -DirectoryName $directory.Name `
+        -ExpectedHostId $expectedHostId `
+        -ExpectedHostRole $expectedHostRole `
+        -ExpectedCommit $commit `
+        -ExpectedRuntimeVersion $expectedRuntimeVersion `
+        -ExpectedPromptFingerprint $expectedPromptFingerprint `
+        -ExpectedGpuName $expectedGpuName `
+        -ExpectedDriverVersion $expectedDriverVersion `
+        -ExpectedPowers $expectedPowers `
+        -ExpectedRunMatrix $expectedRunMatrix `
+        -SeenRunMatrix $seenRunMatrix `
+        -ExpectedDigests $expectedDigests
 }
 if ($seenRunMatrix.Count -ne $expectedRunMatrix.Count) {
     throw "Expected exact 18-condition matrix; found $($seenRunMatrix.Count)"
@@ -396,8 +373,8 @@ $receipt = [ordered]@{
     dependency_lock_sha256 = $dependencyLockSha256
     pip_version = $pipVersion
     dependency_versions = $dependencySnapshot
-    runtime_version = "0.35.0"
-    driver_version_expected = "582.66"
+    runtime_version = $ollamaServerVersion
+    driver_version_expected = $expectedDriverVersion
     power_levels_watts = @(100, 150, 200)
     run_count = $runIds.Count
     run_ids = $runIds
@@ -410,5 +387,3 @@ $receipt | ConvertTo-Json -Depth 4 | Set-Content $receiptPath -Encoding utf8
 Write-Host "Series accepted locally: 18/18 runs, 1080/1080 valid requests."
 Write-Host "Default 200 W limit restored. Receipt: $receiptPath"
 Write-Host "Now follow the upload section in docs/dimas-gtx1080-task.md."
-
-

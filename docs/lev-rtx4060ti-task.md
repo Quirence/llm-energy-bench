@@ -1,7 +1,9 @@
 # Задание Льву: полная серия RTX 4060 Ti для power-quality-v2
 
 Профиль стенда принят. Производственную серию нужно выполнять только по
-неизменяемой метке `power-quality-v2-rtx4060ti-code`. Это промежуточная
+неизменяемой метке `power-quality-v2-rtx4060ti-code-v2`. Предыдущая метка без
+суффикса `-v2` отозвана до начала данных: её скрипт недостаточно надёжно
+обрабатывал ошибку выгрузки Ollama при восстановлении power limit. Это промежуточная
 метка именно для RTX 4060 Ti; общая метка `power-quality-v2-code` будет
 выпущена после подготовки GTX 1080.
 
@@ -29,7 +31,7 @@
 git clone https://github.com/Quirence/llm-energy-bench.git
 cd llm-energy-bench
 git fetch --tags origin
-git checkout power-quality-v2-rtx4060ti-code
+git checkout power-quality-v2-rtx4060ti-code-v2
 git switch -c data/rtx4060ti-power-quality-v2
 git status --short
 ```
