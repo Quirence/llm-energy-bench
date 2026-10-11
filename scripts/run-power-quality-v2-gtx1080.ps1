@@ -5,7 +5,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$expectedTag = "power-quality-v2-gtx1080-code"
+$expectedTag = "power-quality-v2-gtx1080-code-v2"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $commonScript = Join-Path $PSScriptRoot "power-quality-campaign-common.ps1"
 . $commonScript
@@ -20,7 +20,7 @@ $expectedHostRole = "external"
 $expectedGpuName = "NVIDIA GeForce GTX 1080"
 $expectedDriverVersion = "582.66"
 $expectedVramMiB = 8192
-$expectedMinimumPowerWatts = 100
+$expectedMinimumPowerWatts = 90
 $expectedMaximumPowerWatts = 240
 $expectedPowers = @(100.0, 150.0, 200.0)
 $coolTemperatureC = 50
