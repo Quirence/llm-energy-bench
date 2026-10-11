@@ -38,6 +38,44 @@ function Assert-OllamaServerVersion {
 }
 
 
+function Invoke-OllamaStop {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Model,
+
+        [string]$Executable = "ollama"
+    )
+
+    # Windows PowerShell 5.1 turns every native stderr line into an error record,
+    # and under ErrorActionPreference=Stop that record aborts the caller even when
+    # stderr is redirected. Ollama 0.35 writes its spinner to stderr on success, so
+    # only the exit code decides whether the stop failed.
+    try {
+        $command = Get-Command -Name $Executable -CommandType Application -ErrorAction Stop |
+            Select-Object -First 1
+    }
+    catch {
+        throw "ollama executable not found: $Executable"
+    }
+
+    $previousPreference = $ErrorActionPreference
+    $exitCode = $null
+    try {
+        $ErrorActionPreference = "Continue"
+        & $command.Source stop $Model 2>$null | Out-Null
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+
+    if ($exitCode -ne 0) {
+        throw "ollama stop $Model exited with code $exitCode"
+    }
+}
+
+
 function Invoke-CampaignCleanup {
     [CmdletBinding()]
     param(

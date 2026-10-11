@@ -114,7 +114,7 @@ function Assert-LastExitCode {
 
 function Stop-StudyModels {
     foreach ($model in $models) {
-        & ollama stop $model 2>$null | Out-Null
+        Invoke-OllamaStop -Model $model
     }
 }
 
@@ -292,10 +292,7 @@ finally {
         -DefaultPowerWatts $defaultPowerWatts `
         -StopModelAction {
             param($model)
-            & ollama stop $model 2>$null | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                throw "ollama stop exited with code $LASTEXITCODE"
-            }
+            Invoke-OllamaStop -Model $model
         } `
         -SetPowerAction {
             param($watts)

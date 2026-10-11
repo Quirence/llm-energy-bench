@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -10,6 +11,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 COMMON_SCRIPT = REPO_ROOT / "scripts" / "power-quality-campaign-common.ps1"
 POWERSHELL = shutil.which("powershell.exe") or shutil.which("pwsh")
+CAMPAIGN_SCRIPTS = (
+    REPO_ROOT / "scripts" / "run-power-quality-v2-gtx1080.ps1",
+    REPO_ROOT / "scripts" / "run-power-quality-v2-rtx4060ti.ps1",
+)
 
 
 def _ps_quote(path: Path) -> str:
@@ -248,3 +253,84 @@ Assert-CampaignRun @params
 
     assert result.returncode != 0
     assert "Final validation failed: run-dir" in (result.stdout + result.stderr)
+
+
+def _fake_ollama(tmp_path: Path, exit_code: int) -> Path:
+    """A real executable that mimics Ollama 0.35: spinner on stderr, then exit."""
+    if os.name == "nt":
+        fake = tmp_path / "fake-ollama.cmd"
+        fake.write_text(
+            "@echo off\r\n"
+            ">&2 echo [?25l spinner\r\n"
+            '>"%~dp0args.txt" echo %*\r\n'
+            f"exit /b {exit_code}\r\n",
+            encoding="ascii",
+            newline="",
+        )
+    else:
+        fake = tmp_path / "fake-ollama"
+        fake.write_text(
+            "#!/bin/sh\n"
+            'echo "[?25l spinner" >&2\n'
+            'echo "$*" > "$(dirname "$0")/args.txt"\n'
+            f"exit {exit_code}\n",
+            encoding="ascii",
+            newline="",
+        )
+        fake.chmod(0o755)
+    return fake
+
+
+def _invoke_ollama_stop(tmp_path: Path, executable: Path) -> dict[str, str | None]:
+    result = _run_powershell(
+        tmp_path,
+        f"""
+$caught = $null
+try {{
+    Invoke-OllamaStop -Model "model-a" -Executable '{_ps_quote(executable)}'
+}}
+catch {{
+    $caught = $_.Exception.Message
+}}
+[pscustomobject]@{{
+    caught = $caught
+    preference = "$ErrorActionPreference"
+}} | ConvertTo-Json -Compress
+""",
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip())
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is required for campaign script tests")
+def test_ollama_stop_accepts_stderr_output_with_a_zero_exit_code(tmp_path: Path) -> None:
+    payload = _invoke_ollama_stop(tmp_path, _fake_ollama(tmp_path, 0))
+
+    assert payload["caught"] is None
+    assert payload["preference"] == "Stop"
+    assert (tmp_path / "args.txt").read_text(encoding="ascii").strip() == "stop model-a"
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is required for campaign script tests")
+def test_ollama_stop_fails_only_on_a_nonzero_exit_code(tmp_path: Path) -> None:
+    payload = _invoke_ollama_stop(tmp_path, _fake_ollama(tmp_path, 3))
+
+    assert payload["caught"] == "ollama stop model-a exited with code 3"
+    assert payload["preference"] == "Stop"
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is required for campaign script tests")
+def test_ollama_stop_rejects_a_missing_executable(tmp_path: Path) -> None:
+    payload = _invoke_ollama_stop(tmp_path, tmp_path / "missing-ollama.exe")
+
+    assert payload["caught"] is not None
+    assert payload["caught"].startswith("ollama executable not found:")
+    assert payload["preference"] == "Stop"
+
+
+@pytest.mark.parametrize("script", CAMPAIGN_SCRIPTS, ids=lambda path: path.stem)
+def test_campaign_scripts_stop_models_only_through_the_shared_helper(script: Path) -> None:
+    text = script.read_text(encoding="utf-8")
+
+    assert "& ollama stop" not in text
+    assert text.count("Invoke-OllamaStop -Model $model") == 2
