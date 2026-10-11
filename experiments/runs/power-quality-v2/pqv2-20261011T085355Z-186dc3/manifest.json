@@ -1,0 +1,138 @@
+{
+  "artifact_sha256": {
+    "config.resolved.toml": "1cb865528bd5c97b661953411bdb4bdd2aa7a27e0cd40d53b0f3d08f0866fc6c",
+    "outputs.jsonl": "6c638370481a200a1b87958693f5c4b7ab02ec6b8336fa7874803144b09438ae",
+    "requests.jsonl": "9c777363b7b1d88bbf61370094f5bbbb5ab204d823573bc1ef0a0c5d4f14abe1",
+    "telemetry.jsonl.gz": "ba9bbd36b1cf2cdcfaf7a9d5e6ea15ce449fa3ef286ad46defa509514a86419b",
+    "warmups.jsonl": "404769537373ad9def0a8f260c820cd39cb94faeb14d205c36a89bb91a07691a"
+  },
+  "cache_buster_policy": "uuid_stable_slot_prefix_v4",
+  "completed_requests": 60,
+  "completed_warmups": 4,
+  "config_sha256": "1cb865528bd5c97b661953411bdb4bdd2aa7a27e0cd40d53b0f3d08f0866fc6c",
+  "controls": {
+    "concurrency": 1,
+    "currency": null,
+    "environment": {
+      "idle_probe_seconds": 15.0,
+      "max_gpu_utilization_p95_percent": 5.0,
+      "max_idle_vram_used_mib": 2048.0,
+      "max_start_temperature_c": 55
+    },
+    "expected_model_digests": {
+      "qwen3:4b-instruct-2507-q4_K_M": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0"
+    },
+    "expected_power_limit_watts": 100.0,
+    "expected_runtime_version": "0.35.0",
+    "experiment_id": "power-quality-v2",
+    "gpu_index": 0,
+    "host_id": "rtx4060ti-desktop",
+    "models": [
+      "qwen3:4b-instruct-2507-q4_K_M"
+    ],
+    "ollama_url": "http://127.0.0.1:11434",
+    "options": {
+      "kv_cache": "f16",
+      "num_ctx": 4096,
+      "num_gpu": 999,
+      "num_predict": 256,
+      "seed": 42,
+      "temperature": 0.0
+    },
+    "order_seed": 42,
+    "power_limit_tolerance_watts": 1.0,
+    "repetitions": 5,
+    "study": {
+      "condition_id": "qwen3-q4-p100",
+      "host_role": "primary",
+      "launch_index": 1,
+      "protocol_id": "power-quality-v2"
+    },
+    "tariff_per_kwh": null,
+    "telemetry_interval_ms": 100,
+    "warmup_requests": 4
+  },
+  "ended_utc": "2026-10-11T08:54:55.325509+00:00",
+  "environment_baseline": {
+    "duration_seconds": 15.014999999999873,
+    "gpu_utilization_mean_percent": 0.09271523178807947,
+    "gpu_utilization_median_percent": 0.0,
+    "gpu_utilization_p95_percent": 0.0,
+    "power_mean_watts": 14.494337748344371,
+    "power_p95_watts": 33.5135,
+    "problems": [],
+    "sample_count": 151,
+    "temperature_peak_c": 48,
+    "temperature_start_c": 48,
+    "vram_used_peak_bytes": 832577536
+  },
+  "experiment_id": "power-quality-v2",
+  "failure": null,
+  "git_commit": "b2486166c7a7107f5bd210ebbb46652b762214cd",
+  "gpu": {
+    "driver_version": "560.94",
+    "energy_fallback_reason": null,
+    "energy_source": "total_energy_counter",
+    "field_errors": {},
+    "gpu_fingerprint": "8a7c37ae035a1091",
+    "gpu_index": 0,
+    "name": "NVIDIA GeForce RTX 4060 Ti",
+    "power_limit_default_watts": 160.0,
+    "power_limit_max_watts": 195.0,
+    "power_limit_min_watts": 100.0,
+    "power_limit_watts": 100.0,
+    "supports_clocks": true,
+    "supports_power_instant": true,
+    "supports_power_legacy": true,
+    "supports_power_limit": true,
+    "supports_temperature": true,
+    "supports_total_energy": true,
+    "supports_utilization": true,
+    "unsupported_fields": [],
+    "vram_total_bytes": 8585740288
+  },
+  "host": {
+    "architecture": "AMD64",
+    "os": "Windows",
+    "os_release": "11"
+  },
+  "host_id": "rtx4060ti-desktop",
+  "max_cache_excess_tokens": 1,
+  "max_measured_load_duration_ns": 100000000,
+  "models": [
+    {
+      "context_length": 4096,
+      "digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "family": "qwen3",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "name": "qwen3:4b-instruct-2507-q4_K_M",
+      "parameter_size": "4.0B",
+      "quantization": "Q4_K_M",
+      "size_bytes": 3178149969,
+      "size_vram_bytes": 3178149969,
+      "template_cache_baseline_tokens": 3
+    }
+  ],
+  "prompt_cache_policy": "template_floor_v2",
+  "prompt_count": 12,
+  "prompt_set_sha256": "7d7d1ee71cacc1129d4076b18d5ceb630052950994acab18e112892194d099ff",
+  "repetitions": 5,
+  "run_id": "pqv2-20261011T085355Z-186dc3",
+  "runtime": {
+    "name": "ollama",
+    "version": "0.35.0"
+  },
+  "schema_version": 3,
+  "started_requests": 60,
+  "started_utc": "2026-10-11T08:53:55.350995+00:00",
+  "status": "completed",
+  "study": {
+    "condition_id": "qwen3-q4-p100",
+    "host_role": "primary",
+    "launch_index": 1,
+    "protocol_id": "power-quality-v2"
+  },
+  "valid_requests": 60
+}
