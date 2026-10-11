@@ -1,0 +1,32 @@
+{
+  "checksums": {
+    "config.resolved.toml": "74d0c986f983c7ed5e7d3213cad9f2599944b8891e17775f12fb46cf543d3bec",
+    "manifest.json": "698d7af0578297b1e34fb6150df3c883e2f37ee6c7e364830b3617ecbb11257e",
+    "outputs.jsonl": "ddb2b416b12de62641e5b2db402d8900a663b8928c158c57c1d062f794713e10",
+    "requests.jsonl": "f81228499344731044143dd47ebca8bb2141becca74187f425218e8785eb6aa5",
+    "telemetry.jsonl.gz": "03c61d5cb8c2fc0e23d994fe95d89ee1b20e48c8509539a842386e51f94a7ffc",
+    "warmups.jsonl": "99731a801550adbfac9e36f6a19fde4b56e53e8edaa7955b9af2fb77220a4460"
+  },
+  "errors": [],
+  "ok": true,
+  "record_counts": {
+    "outputs.jsonl": 60,
+    "requests.jsonl": 60,
+    "telemetry.jsonl.gz": 436,
+    "warmups.jsonl": 4
+  },
+  "run_id": "pqv2-20261011T090616Z-371a6b",
+  "sizes": {
+    "config.resolved.toml": 1042,
+    "manifest.json": 4445,
+    "outputs.jsonl": 144490,
+    "requests.jsonl": 71960,
+    "telemetry.jsonl.gz": 17469,
+    "warmups.jsonl": 1329
+  },
+  "status": "completed",
+  "warnings": [
+    "summary.csv has not been generated yet",
+    "report.md has not been generated yet"
+  ]
+}
