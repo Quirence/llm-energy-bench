@@ -41,7 +41,7 @@
 git clone https://github.com/Quirence/llm-energy-bench.git
 cd llm-energy-bench
 git fetch --tags origin
-git checkout power-quality-v2-gtx1080-code-v2
+git checkout power-quality-v2-gtx1080-code-v3
 git switch -c data/gtx1080-power-quality-v2-v2
 git status --short
 ```

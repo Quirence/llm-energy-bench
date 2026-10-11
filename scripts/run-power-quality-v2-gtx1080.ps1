@@ -5,7 +5,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$expectedTag = "power-quality-v2-gtx1080-code-v2"
+$expectedTag = "power-quality-v2-gtx1080-code-v3"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $commonScript = Join-Path $PSScriptRoot "power-quality-campaign-common.ps1"
 . $commonScript

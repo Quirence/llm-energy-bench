@@ -31,7 +31,7 @@
 git clone https://github.com/Quirence/llm-energy-bench.git
 cd llm-energy-bench
 git fetch --tags origin
-git checkout power-quality-v2-rtx4060ti-code-v2
+git checkout power-quality-v2-rtx4060ti-code-v3
 git switch -c data/rtx4060ti-power-quality-v2
 git status --short
 ```
