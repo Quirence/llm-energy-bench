@@ -1,0 +1,138 @@
+{
+  "artifact_sha256": {
+    "config.resolved.toml": "0053c100ac3d247a10dfc14e14984129f643fb5212a4fc8c198259eb0443acc5",
+    "outputs.jsonl": "4e27cfa66df351cccd9de3816cc84182bdac5410a467917e7d526d1101f5073b",
+    "requests.jsonl": "6fb0d2ff697bab9e1a3490b6ce506fbfd20080a879c8619a790a08201f5b1c4e",
+    "telemetry.jsonl.gz": "526f358a37e692c8d1b27a7d716c7fe8fa16924e02d27a64b9bd13eca8fc0679",
+    "warmups.jsonl": "2a9071834c6d240614fbce5ff1dd2497057fbde056c9d1b0f405aa1161b5fb5c"
+  },
+  "cache_buster_policy": "uuid_stable_slot_prefix_v4",
+  "completed_requests": 60,
+  "completed_warmups": 4,
+  "config_sha256": "0053c100ac3d247a10dfc14e14984129f643fb5212a4fc8c198259eb0443acc5",
+  "controls": {
+    "concurrency": 1,
+    "currency": null,
+    "environment": {
+      "idle_probe_seconds": 15.0,
+      "max_gpu_utilization_p95_percent": 5.0,
+      "max_idle_vram_used_mib": 2048.0,
+      "max_start_temperature_c": 55
+    },
+    "expected_model_digests": {
+      "qwen3:4b-instruct-2507-q4_K_M": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0"
+    },
+    "expected_power_limit_watts": 150.0,
+    "expected_runtime_version": "0.35.0",
+    "experiment_id": "power-quality-v2",
+    "gpu_index": 0,
+    "host_id": "gtx1080-observation",
+    "models": [
+      "qwen3:4b-instruct-2507-q4_K_M"
+    ],
+    "ollama_url": "http://127.0.0.1:11434",
+    "options": {
+      "kv_cache": "f16",
+      "num_ctx": 4096,
+      "num_gpu": 999,
+      "num_predict": 256,
+      "seed": 42,
+      "temperature": 0.0
+    },
+    "order_seed": 42,
+    "power_limit_tolerance_watts": 1.0,
+    "repetitions": 5,
+    "study": {
+      "condition_id": "qwen3-q4-p150",
+      "host_role": "external",
+      "launch_index": 2,
+      "protocol_id": "power-quality-v2"
+    },
+    "tariff_per_kwh": null,
+    "telemetry_interval_ms": 100,
+    "warmup_requests": 4
+  },
+  "ended_utc": "2026-10-11T08:33:34.844911+00:00",
+  "environment_baseline": {
+    "duration_seconds": 15.01600000000144,
+    "gpu_utilization_mean_percent": 0.15894039735099338,
+    "gpu_utilization_median_percent": 0.0,
+    "gpu_utilization_p95_percent": 1.0,
+    "power_mean_watts": 8.713066225165562,
+    "power_p95_watts": 9.205,
+    "problems": [],
+    "sample_count": 151,
+    "temperature_peak_c": 48,
+    "temperature_start_c": 48,
+    "vram_used_peak_bytes": 1267433472
+  },
+  "experiment_id": "power-quality-v2",
+  "failure": null,
+  "git_commit": "3aa6a043ec261b10c29f341cb040c5efabca5dc2",
+  "gpu": {
+    "driver_version": "582.66",
+    "energy_fallback_reason": null,
+    "energy_source": "total_energy_counter",
+    "field_errors": {},
+    "gpu_fingerprint": "f38122daceae19f4",
+    "gpu_index": 0,
+    "name": "NVIDIA GeForce GTX 1080",
+    "power_limit_default_watts": 200.0,
+    "power_limit_max_watts": 240.0,
+    "power_limit_min_watts": 90.0,
+    "power_limit_watts": 150.0,
+    "supports_clocks": true,
+    "supports_power_instant": true,
+    "supports_power_legacy": true,
+    "supports_power_limit": true,
+    "supports_temperature": true,
+    "supports_total_energy": true,
+    "supports_utilization": true,
+    "unsupported_fields": [],
+    "vram_total_bytes": 8589934592
+  },
+  "host": {
+    "architecture": "AMD64",
+    "os": "Windows",
+    "os_release": "11"
+  },
+  "host_id": "gtx1080-observation",
+  "max_cache_excess_tokens": 1,
+  "max_measured_load_duration_ns": 100000000,
+  "models": [
+    {
+      "context_length": 4096,
+      "digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "family": "qwen3",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "name": "qwen3:4b-instruct-2507-q4_K_M",
+      "parameter_size": "4.0B",
+      "quantization": "Q4_K_M",
+      "size_bytes": 3178149969,
+      "size_vram_bytes": 3178149969,
+      "template_cache_baseline_tokens": 3
+    }
+  ],
+  "prompt_cache_policy": "template_floor_v2",
+  "prompt_count": 12,
+  "prompt_set_sha256": "7d7d1ee71cacc1129d4076b18d5ceb630052950994acab18e112892194d099ff",
+  "repetitions": 5,
+  "run_id": "pqv2-20261011T083204Z-307dd3",
+  "runtime": {
+    "name": "ollama",
+    "version": "0.35.0"
+  },
+  "schema_version": 3,
+  "started_requests": 60,
+  "started_utc": "2026-10-11T08:32:04.481380+00:00",
+  "status": "completed",
+  "study": {
+    "condition_id": "qwen3-q4-p150",
+    "host_role": "external",
+    "launch_index": 2,
+    "protocol_id": "power-quality-v2"
+  },
+  "valid_requests": 60
+}
