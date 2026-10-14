@@ -1,9 +1,14 @@
 # Задание Диме: внешняя серия GTX 1080 для power-quality-v2
 
-Производственную серию нужно выполнять только по неизменяемой метке
-`power-quality-v2-gtx1080-code-v2`. Предыдущая метка без суффикса `-v2`
-отозвана до начала данных: аппаратный preflight Димы подтвердил minimum 90 Вт
-вместо предварительно принятого minimum 100 Вт. GTX 1080 имеет роль
+> Статус: выполнено по метке `power-quality-v2-gtx1080-code-v3`.
+> Приняты 18/18 запусков и 1080/1080 валидных запросов. Повторять серию не
+> требуется; команды ниже сохранены для аудита процедуры.
+
+Производственная серия выполнена по неизменяемой метке
+`power-quality-v2-gtx1080-code-v3`. Предыдущие метки отозваны до начала
+принятой серии: аппаратный preflight Димы подтвердил minimum 90 Вт вместо
+предварительно принятого minimum 100 Вт, а v3 исправила обработку вывода
+`ollama stop`. GTX 1080 имеет роль
 `external`: её данные показываются отдельным блоком и не входят в объединённый
 вывод двух основных GPU.
 
@@ -42,7 +47,7 @@ git clone https://github.com/Quirence/llm-energy-bench.git
 cd llm-energy-bench
 git fetch --tags origin
 git checkout power-quality-v2-gtx1080-code-v3
-git switch -c data/gtx1080-power-quality-v2-v2
+git switch -c data/gtx1080-power-quality-v2
 git status --short
 ```
 

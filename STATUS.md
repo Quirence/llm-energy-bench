@@ -1,112 +1,82 @@
-# Project Status
+# Состояние проекта
 
-Last updated: 2026-10-10
+Последнее обновление: 14 октября 2026 года.
 
-## Current Milestone
+## Текущий этап
 
-M4 — Power Quality Study. Первый набор данных и его вывод остаются
-зафиксированными. Реализуется отдельный эксперимент по кривым
-`power limit → скорость/энергия/точность`; локальная матрица RTX 5060 готова,
-пакет производственного запуска RTX 4060 Ti зафиксирован, а внешний пакет
-Palit GTX 1080 GameRock подготовлен с fail-closed проверкой BIOS-профиля.
+M4 — сбор данных завершён. Код, сырые данные трёх стендов и итоговые
+агрегаты объединены в ветке `feat/power-quality-v2`. Проект готов к написанию
+черновика статьи; повторные аппаратные прогоны для текущего дизайна не нужны.
 
-## Done
+## Наборы данных
 
-- Python 3.12 CLI commands `doctor`, `run`, `report`, and `analyze` are covered
-  by Windows/Linux hardware-independent tests.
-- Ollama streaming, TTFT, full-GPU placement, schema-v2 cache/load controls,
-  request-scoped NVML telemetry, atomic artifacts, validation, privacy guards,
-  and deterministic reports are implemented.
-- Runtime Ollama 0.34.2, the four model digests, prompt set, inference controls,
-  and `benchmark-v1-code-v5` commit are frozen.
-- Three independent `pilot-v1` calibration launches are accepted on each
-  primary GPU: RTX 5060 Laptop and RTX 4060 Ti desktop (108/108 valid requests).
-- The compatible primary campaigns contain 480/480 valid requests on each GPU.
-  Their logical prompt maps, runtime, code commit, and model digests match.
-- The GTX 1080 campaign is retained as observation-only evidence and cannot
-  enter the primary hypothesis verdict.
-- `analyze` validates role-specific inputs, requires exactly three calibration
-  launches per primary GPU, applies equal-prompt quality weighting, computes
-  ratio-of-sums metrics, and evaluates all pairwise rank inversions.
-- Study artifacts are frozen under `experiments/studies/paper-dataset-v1/` and
-  regenerate byte-identically.
-- Добавлен строгий контракт `power-quality-v2`: schema v3, точные ответы,
-  expected power limit, профиль min/default/max/current, проверка пустого
-  Ollama и фонового состояния GPU до загрузки модели.
-- Отдельная команда `analyze-power-quality` проверяет полную матрицу,
-  совместимость runtime/prompts/digest/controls, отношения сумм, энергию и
-  задержку на правильный ответ и границу компромисса. GTX 1080 остаётся
-  внешним наблюдением.
-- Заморожен набор из 12 запросов и 12 конфигураций RTX 5060: две модели ×
-  режимы Gaming 80 Вт и Turbo 115 Вт × три независимых запуска.
-- Аппаратно подтверждено, что `nvidia-smi -pl` на MAIBENBEN не меняет лимит,
-  а Gaming/Turbo дают NVML current/requested 80/115 Вт. Custom и Office
-  исключены, поскольку отключают дискретную GPU.
-- Принят профиль RTX 4060 Ti: драйвер 560.94, 8188 MiB, default 160 Вт,
-  доступный диапазон 100–195 Вт и рабочее изменение лимита через
-  административную PowerShell.
-- До измерений заморожены 24 конфигурации RTX 4060 Ti на 100/130/160/195 Вт,
-  пороги среды, Williams-порядок и хешированный Windows/Python lock. Скрипт
-  требует точную метку, Ollama 0.35.0 и профиль GPU, выполняет 24 запуска,
-  валидирует точную матрицу 1440 запросов и подтверждает возврат штатных
-  160 Вт обратным чтением.
-- Для внешней Palit GTX 1080 GameRock заморожены 18 конфигураций на
-  100/150/200 Вт и автоматический скрипт на 1080 запросов. Исторический
-  стенд подтверждает драйвер 582.66, 8192 MiB и текущие 200 Вт; аппаратный
-  preflight Димы подтвердил BIOS-профиль 200/90/240 Вт. Профиль проверяется
-  до первого измерения, а при отличии серия останавливается без ручной
-  подмены параметров.
+| Серия | Роль | Автор | Запуски | Валидные запросы |
+| --- | --- | --- | ---: | ---: |
+| RTX 5060 Laptop, 80/115 Вт | primary | Quirence | 12 | 720/720 |
+| RTX 4060 Ti, 100/130/160/195 Вт | primary | Лев (`Qcsteeven`) | 24 | 1440/1440 |
+| Palit GTX 1080 GameRock, 100/150/200 Вт | external | Дима (`Skipl1`) | 18 | 1080/1080 |
+| **Всего** |  |  | **54** | **3240/3240** |
 
-## Frozen Result
+Данные Льва интегрированы коммитом `b8cb2c9`, данные Димы — `852419b`;
+авторство сохранено. Сырые каталоги находятся в
+`experiments/runs/power-quality-v2/`.
 
-- Speed and GPU-energy winners agree in 6/6 primary `host × workload` blocks.
-- Llama 3.2 Q4 is the top eligible configuration in every primary block.
-- No descriptive or material pairwise speed/energy rank inversion is present.
-- The preregistered rank-inversion hypothesis is therefore **not supported in
-  the investigated domain**. This is not a universal equivalence claim.
-- Llama 3.2 Q8 is quality-eligible on RTX 5060 (0.750) but excluded locally on
-  RTX 4060 Ti (0.725); the other three configurations are eligible on both.
-- Repeatability-based material thresholds range from 5.00% to 63.14%, with the
-  largest value in the very short scored block on RTX 4060 Ti.
+## Проверено
 
-## Remaining Before Final Multi-GPU Analysis
+- Все 54 manifest имеют статус `completed`, а все 3240 измерений валидны.
+- Полная матрица принята командой `analyze-power-quality`.
+- На всех стендах совпадают Ollama 0.35.0, prompt hash, digest двух моделей и
+  общие параметры генерации.
+- Модели полностью размещены на GPU; фон и телеметрия прошли заданные пороги.
+- Максимальный разрыв телеметрии — 203 мс при допустимых 500 мс.
+- Энергия положительна во всех запросах; источник энергии записан отдельно
+  для каждого запроса.
+- GTX 1080 сохранена в роли external и не смешивается с основными GPU.
 
-1. Лев запускает 24 условия только по метке
-   `power-quality-v2-rtx4060ti-code-v2` и загружает отдельную data-ветку.
-2. Дима запускает 18 условий только по метке
-   `power-quality-v2-gtx1080-code-v2`; фактический BIOS-профиль проверяется
-   скриптом до первого измерения.
-3. После приёмки обеих внешних серий выполнить общий gate и выпустить
-   финальную метку `power-quality-v2-code`; затем
-   построить общий отчёт. Не изменять `paper-dataset-v1` и не смешивать
-   external GPU с primary.
+## Итог второго эксперимента
 
-## Latest Validated Evidence
+- RTX 4060 Ti: 195 → 100 Вт, потеря скорости Qwen 1,25–1,59%, рост
+  токенов/Дж 23,13–34,17%.
+- RTX 5060 Laptop: 115 → 80 Вт, потеря скорости Qwen 4,87–6,43%, рост
+  токенов/Дж 15,18–25,59%.
+- GTX 1080 external: 200 → 100 Вт, потеря скорости Qwen 11,22–11,86%, рост
+  токенов/Дж 52,17–63,88%.
+- Exact-match качество не изменилось ни на одном уровне мощности.
+- При пороге качества 0,75 проходит Qwen; Llama не проходит. Поэтому выбор
+  модели нельзя делать только по сырым токенам на джоуль.
 
-- RTX 5060: `benchmark-v1-maibenben-x16c-20260929T021056Z-ad31b3`.
-- RTX 4060 Ti: `benchmark-v1-rtx4060ti-desktop-20260929T111918Z-f5692c`.
-- Study report: `experiments/studies/paper-dataset-v1/report.md`.
-- Power-quality profile: RTX 5060 Laptop, driver 591.66, current 80 Вт,
-  default 50 Вт, range 5–115 Вт; Ollama 0.35.0; Q4 Llama digest и полное
-  размещение подтверждены. Четыре schema-v3 acceptance runs при 80 Вт имеют
-  48/48 valid requests и чистую validation; отдельный mismatched run корректно
-  отказал до первого запроса.
-- Первая производственная половина RTX 5060 завершена в Gaming 80 Вт: шесть
-  runs, 360/360 valid requests, максимальный telemetry gap 141 мс, CV tok/s
-  0.72–3.03%, CV tok/J 1.27–6.92%. Целого run-выброса нет; технический отчёт
-  воспроизводится побайтно. Для коротких exact-запросов энергия трактуется
-  только агрегированно из-за 2–3 telemetry samples и fallback источника.
-- Локальная матрица RTX 5060 завершена: 12 runs и 720/720 valid requests.
-  Переход Turbo 115 Вт → Gaming 80 Вт уменьшил скорость на 4.87–6.51%,
-  энергию запроса на 7.88–22.86% и повысил tok/J на 8.55–29.63%; exact
-  quality не изменилась. По консервативному порогу эффект устойчив в 4/6
-  workload-блоков, а long-блоки остаются неопределёнными. Это локальный
-  результат двух режимов ноутбука, а не итог multi-GPU исследования.
-- Ветка `feat/power-quality-v2` и предварительная метка
-  `power-quality-v2-profile` опубликованы. Profile-only configs проверяют
-  Ollama 0.35.0, digest и полное GPU-размещение обеих Q4-моделей; коллегам
-  производственные прогоны по этой метке запрещены.
-- Санитизированный профиль RTX 4060 Ti принят. Его production-пакет содержит
-  24 TOML, автоматический fail-closed скрипт и отдельную русскую инструкцию;
-  на профиле Ollama 0.34.2, поэтому серия заблокирована до установки ровно
-  0.35.0. Данные RTX 4060 Ti power-quality-v2 ещё не получены.
+Подробная интерпретация находится в
+`docs/power-quality-v2-final-analysis.md`, а машинные таблицы — в
+`experiments/studies/power-quality-v2/`.
+
+## Зафиксированный научный вывод
+
+Первый эксперимент не подтвердил, что учёт энергии меняет победителя среди
+исследованных моделей: рейтинг скорости и энергоэффективности совпал в 6 из 6
+основных блоков. Второй эксперимент показал, что учёт энергии меняет выбор
+рабочего лимита мощности. Особенно выражена область насыщения RTX 4060 Ti,
+где лимит 100 Вт сохраняет не менее 98,4% скорости Qwen и существенно снижает
+GPU-энергию.
+
+Область применимости ограничена двумя основными GPU, одним runtime, двумя
+Q4-моделями, последовательной обработкой и GPU-only телеметрией. Это
+эмпирический результат, а не универсальное правило для всех кластеров.
+
+## Следующий этап
+
+1. Зафиксировать интегрированную ветку и итоговую метку набора данных.
+2. Использовать готовые таблицы и выводы при написании черновика.
+3. Не расширять эксперимент до новых моделей или стендов до решения авторов
+   после первого полного черновика.
+
+## Основные документы
+
+- `docs/power-quality-v2-final-analysis.md` — полный итоговый анализ.
+- `docs/methodology-and-formulas.md` — методика и формулы.
+- `docs/reading-index.md` — индекс источников.
+- `docs/paper-draft.md` — структура статьи и распределение работы.
+- `docs/experiment-log.md` — хронология решений и запусков.
+- `experiments/studies/paper-dataset-v1/report.md` — результат первого
+  эксперимента.
+- `experiments/studies/power-quality-v2/power-quality-report.md` — результат
+  второго эксперимента.

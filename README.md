@@ -39,14 +39,19 @@ The repository now contains the tested building blocks for the MVP:
 - deterministic study-level JSON/CSV/Markdown artifacts with the frozen
   two-host hypothesis verdict;
 - a schema-v3 `power-quality-v2` protocol with fail-closed power/environment
-  checks, a completed 80/115 W RTX 5060 matrix, and a frozen four-level
-  RTX 4060 Ti campaign plus a three-level external Palit GTX 1080 package;
+  checks and completed RTX 5060, RTX 4060 Ti, and external Palit GTX 1080
+  campaigns: 54 runs and 3240/3240 valid measured requests;
 - Windows and Linux CI with lint, format, and hardware-independent tests.
 
 The frozen primary result covers RTX 5060 Laptop and RTX 4060 Ti with Ollama
 0.34.2. Speed and GPU-energy winners agree in all 6/6 host-by-workload blocks;
 the preregistered rank-inversion hypothesis is therefore not supported in this
 investigated domain. This is not a claim about all runtimes, models, or GPUs.
+
+The completed follow-up `power-quality-v2` study uses Ollama 0.35.0. It finds
+that energy-aware selection changes the useful GPU power operating point even
+when it does not change the model winner. The full Russian-language analysis is
+in `docs/power-quality-v2-final-analysis.md`.
 
 ## Minimal Scope
 
@@ -138,6 +143,7 @@ and the selected source is stored in the request record.
 - [Paper draft outline and author work split](docs/paper-draft.md)
 - [Indexed reading list](docs/reading-index.md)
 - [Power-quality-v2 runbook](docs/power-quality-v2-runbook.md)
+- [Final power-quality-v2 analysis](docs/power-quality-v2-final-analysis.md)
 - [RTX 4060 Ti task](docs/lev-rtx4060ti-task.md)
 - [Accepted RTX 4060 Ti profile](docs/rtx4060ti-power-quality-profile.md)
 - [Implemented methodology and formulas](docs/methodology-and-formulas.md)
