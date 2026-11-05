@@ -1,0 +1,101 @@
+{
+  "protocol": "docs/quality-v3-preregistration.md",
+  "sources": {
+    "mgsm_ru": {
+      "url": "https://raw.githubusercontent.com/google-research/url-nlp/4b1e7a43efb517abadd16041e8b47f3be975c76e/mgsm/mgsm_ru.tsv",
+      "revision": "google-research/url-nlp@4b1e7a43efb517abadd16041e8b47f3be975c76e",
+      "license": "upstream repository states no license; the Hugging Face mirror juletxara/mgsm declares CC BY-SA 4.0 (GSM8K source: MIT)",
+      "citation": "Shi et al. Language Models are Multilingual Chain-of-Thought Reasoners. arXiv:2210.03057, 2022.",
+      "sha256": "6bd30fd2e80c5bac23f566fb4ae0e6a55a19578401fbf9a01fb21beb3645fef8"
+    },
+    "ifeval": {
+      "url": "https://huggingface.co/datasets/google/IFEval/resolve/966cd89545d6b6acfd7638bc708b98261ca58e84/ifeval_input_data.jsonl",
+      "revision": "huggingface.co/datasets/google/IFEval@966cd89545d6b6acfd7638bc708b98261ca58e84",
+      "license": "Apache-2.0",
+      "citation": "Zhou et al. Instruction-Following Evaluation for Large Language Models. arXiv:2311.07911, 2023.",
+      "sha256": "6a85310ca8ce15eff755aa08a3a4ff931c7e273e7515ebb3c492ea85fd8288f2"
+    }
+  },
+  "templates": {
+    "mgsm_direct": "{question}\n\nВыведи только ответ — одно целое число без пояснений.",
+    "mgsm_cot": "{question}\n\nРеши задачу пошагово. В последней строке напиши «Ответ: N», где N — целое число."
+  },
+  "determinism_subset": {
+    "seed": 42,
+    "ids": [
+      "mgsm-ru-002",
+      "mgsm-ru-007",
+      "mgsm-ru-008",
+      "mgsm-ru-009",
+      "mgsm-ru-023",
+      "mgsm-ru-024",
+      "mgsm-ru-027",
+      "mgsm-ru-029",
+      "mgsm-ru-036",
+      "mgsm-ru-040",
+      "mgsm-ru-041",
+      "mgsm-ru-051",
+      "mgsm-ru-056",
+      "mgsm-ru-057",
+      "mgsm-ru-058",
+      "mgsm-ru-060",
+      "mgsm-ru-063",
+      "mgsm-ru-071",
+      "mgsm-ru-072",
+      "mgsm-ru-087",
+      "mgsm-ru-088",
+      "mgsm-ru-108",
+      "mgsm-ru-109",
+      "mgsm-ru-115",
+      "mgsm-ru-130",
+      "mgsm-ru-140",
+      "mgsm-ru-144",
+      "mgsm-ru-151",
+      "mgsm-ru-152",
+      "mgsm-ru-155",
+      "mgsm-ru-164",
+      "mgsm-ru-167",
+      "mgsm-ru-174",
+      "mgsm-ru-179",
+      "mgsm-ru-180",
+      "mgsm-ru-184",
+      "mgsm-ru-189",
+      "mgsm-ru-190",
+      "mgsm-ru-195",
+      "mgsm-ru-196",
+      "mgsm-ru-207",
+      "mgsm-ru-208",
+      "mgsm-ru-215",
+      "mgsm-ru-229",
+      "mgsm-ru-230",
+      "mgsm-ru-234",
+      "mgsm-ru-237",
+      "mgsm-ru-241",
+      "mgsm-ru-247",
+      "mgsm-ru-248"
+    ]
+  },
+  "ifeval_parts": {
+    "a": [
+      0,
+      181
+    ],
+    "b": [
+      181,
+      361
+    ],
+    "c": [
+      361,
+      541
+    ]
+  },
+  "prompt_file_sha256": {
+    "quality-v3-mgsm-ru-direct.jsonl": "02fa6c76c72308a68b933c71c24f4e02eff1039e2fac2c6b551a64afb37ee2dd",
+    "quality-v3-mgsm-ru-cot.jsonl": "7de7718e3f64dc329525010199bdf5acb6faec7f91435da97efb64445c2338dc",
+    "quality-v3-det-direct.jsonl": "a7b7ca82dce15eb8209cd3e2cff9d5b846eba56f9dee802bf8f350541c3efcf3",
+    "quality-v3-det-cot.jsonl": "93e9ce6cc2ffad331482badcad30b5e1ac06e60da2396e3c582e2d0dfb393e30",
+    "quality-v3-ifeval-a.jsonl": "95cb4568e290e0d3fe0ccd4abb139f1b52950cd87097c087a7f67b371bce978b",
+    "quality-v3-ifeval-b.jsonl": "c84fdfc56eb092c988387e691269858ec2eb0b274a15f4746ece34d4c440cc20",
+    "quality-v3-ifeval-c.jsonl": "94f5f154076207db2127d93df7fa5822cca8705df40628c05ae980896d39aff2"
+  }
+}
