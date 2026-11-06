@@ -1,5 +1,5 @@
 # quality-v3 (ifeval-a). Frozen by docs/quality-v3-preregistration.md.
-# IFEval, часть a (строки 1-181): 181 x 4 = 724 запроса.
+# IFEval, часть a (строки 1-181 без ifeval-1880, § 12.5): 180 x 4 = 720 запросов.
 # Stand: RTX 5060 Laptop, MAIBENBEN Gaming mode (NVML 80 W), checked before the run.
 
 [experiment]

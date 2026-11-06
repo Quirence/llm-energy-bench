@@ -160,7 +160,6 @@
 {"id": "ifeval-1857", "category": "long", "prompt": "I work for a software development company named \"grid\", and they want a catchy tweet. Can you write one that includes the name of the company at least five times?"}
 {"id": "ifeval-1858", "category": "long", "prompt": "Write a very angry letter to someone who's been trying to convince you that 1+1=3. There should be exactly 4 paragraphs. Separate the paragraphs with ***."}
 {"id": "ifeval-1879", "category": "long", "prompt": "Can you please continue and expand: \"A man is performing for a crowd on a stage, ...\"\nUse at least 60 sentences, but less than 600 words."}
-{"id": "ifeval-1880", "category": "long", "prompt": "Write a short article about the morphology of the Ukrainian language, with 200 words or less. Make sure the letter c appears at least 60 times in your response."}
 {"id": "ifeval-1883", "category": "long", "prompt": "Write a song about being excited to go on vacation, without using the letter e whatsoever in your entire response. Separate your song into 3 parts, where each part is separated with ***."}
 {"id": "ifeval-1886", "category": "long", "prompt": "Write a riddle for the word \"façade\" that contains at least 3 italic text phrases in markdown syntax, i.e *italic text*."}
 {"id": "ifeval-1893", "category": "long", "prompt": "Write a strange rap song about Alexander the Great becoming the king of Macedon. Finish the song with:\n\nPeace!\n\nNo additional words should follow \"Peace!\""}

@@ -89,12 +89,15 @@
       541
     ]
   },
+  "ifeval_excluded": {
+    "ifeval-1880": "qwen3:4b-instruct-2507-q4_K_M repeats 'c' until Ollama aborts (2026-11-06)"
+  },
   "prompt_file_sha256": {
     "quality-v3-mgsm-ru-direct.jsonl": "02fa6c76c72308a68b933c71c24f4e02eff1039e2fac2c6b551a64afb37ee2dd",
     "quality-v3-mgsm-ru-cot.jsonl": "7de7718e3f64dc329525010199bdf5acb6faec7f91435da97efb64445c2338dc",
     "quality-v3-det-direct.jsonl": "a7b7ca82dce15eb8209cd3e2cff9d5b846eba56f9dee802bf8f350541c3efcf3",
     "quality-v3-det-cot.jsonl": "93e9ce6cc2ffad331482badcad30b5e1ac06e60da2396e3c582e2d0dfb393e30",
-    "quality-v3-ifeval-a.jsonl": "95cb4568e290e0d3fe0ccd4abb139f1b52950cd87097c087a7f67b371bce978b",
+    "quality-v3-ifeval-a.jsonl": "89e68bc12fb197d7eeaa191fcbf0389c63ba6ef6376d2d7568b941cbfc211a0c",
     "quality-v3-ifeval-b.jsonl": "c84fdfc56eb092c988387e691269858ec2eb0b274a15f4746ece34d4c440cc20",
     "quality-v3-ifeval-c.jsonl": "94f5f154076207db2127d93df7fa5822cca8705df40628c05ae980896d39aff2"
   }

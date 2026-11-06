@@ -1,0 +1,32 @@
+{
+  "checksums": {
+    "config.resolved.toml": "f561a8e9cc1dc026abca52a6a5a361d1f940476598dbc5c88cd34183986cf630",
+    "manifest.json": "14ca670ab09da33f013ffac071db5237da0292343f729af6ad3b35194f7a585d",
+    "outputs.jsonl": "b15ef09659a1e6eb203eba95a60653fd289284b7993506f56b7eab6438c13206",
+    "requests.jsonl": "27c78c588353b0ed510ea7d6875c97b531d7d6140b886e419514b88a8033b042",
+    "telemetry.jsonl.gz": "9057127f8292aa939c6b1a9114ae3348fef349101343d0284d09283076d3659f",
+    "warmups.jsonl": "a1fb70cf68a5569f516bb4106248c72ad6eeb479196a1eddc8d2a75b25e3b086"
+  },
+  "errors": [],
+  "ok": true,
+  "record_counts": {
+    "outputs.jsonl": 1000,
+    "requests.jsonl": 1000,
+    "telemetry.jsonl.gz": 37305,
+    "warmups.jsonl": 16
+  },
+  "run_id": "quality-v3-mgsm-ru-cot-maibenben-x16c-rtx5060-20261105T234939Z-d173f3",
+  "sizes": {
+    "config.resolved.toml": 1128,
+    "manifest.json": 5353,
+    "outputs.jsonl": 3508203,
+    "requests.jsonl": 1111472,
+    "telemetry.jsonl.gz": 1280349,
+    "warmups.jsonl": 5974
+  },
+  "status": "completed",
+  "warnings": [
+    "summary.csv has not been generated yet",
+    "report.md has not been generated yet"
+  ]
+}

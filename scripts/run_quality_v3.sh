@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Run the quality-v3 series on the RTX 5060 stand (docs/quality-v3-preregistration.md).
-# Usage: bash scripts/run_quality_v3.sh   (from the repository root, Git Bash)
+# Usage: bash scripts/run_quality_v3.sh [block ...]   (from the repository root, Git Bash)
+# Without arguments every block runs in the order below.
 # Stops at the first failed preflight or run; completed runs are kept.
 set -euo pipefail
 
@@ -14,6 +15,7 @@ EXPECTED_COMMIT_TAG="quality-v3-prereg"
 EXPECTED_POWER_W="80.0"
 BLOCKS=(mgsm-ru-direct mgsm-ru-cot det-direct det-cot ifeval-a ifeval-b ifeval-c
         mgsm-ru-direct-p2 mgsm-ru-cot-p2 mgsm-ru-direct-p3 mgsm-ru-cot-p3)
+if [ "$#" -gt 0 ]; then BLOCKS=("$@"); fi
 HOST_ID="maibenben-x16c-rtx5060"
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }

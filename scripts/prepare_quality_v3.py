@@ -62,6 +62,13 @@ COT_TEMPLATE = (
     "{question}\n\nРеши задачу пошагово. В последней строке напиши «Ответ: N», где N — целое число."
 )
 IFEVAL_PARTS = (("a", 0, 181), ("b", 181, 361), ("c", 361, 541))
+# Prompts on which Ollama 0.35.0 aborts generation ("token repeat limit reached")
+# for some configuration. The runner stops on such server errors, so the prompt
+# is removed for every model (protocol section 12.5). Part boundaries stay those
+# of the upstream order.
+IFEVAL_EXCLUDED = {
+    1880: "qwen3:4b-instruct-2507-q4_K_M repeats 'c' until Ollama aborts (2026-11-06)",
+}
 DETERMINISM_ITEMS = 50
 DETERMINISM_SEED = 42
 
@@ -113,6 +120,9 @@ def mgsm_items(raw: bytes) -> list[tuple[str, str, str]]:
 
 def ifeval_items(raw: bytes) -> list[dict]:
     rows = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()]
+    missing = set(IFEVAL_EXCLUDED) - {row["key"] for row in rows}
+    if missing:
+        raise SystemExit(f"excluded IFEval keys not in the dataset: {sorted(missing)}")
     if len(rows) != 541:
         raise SystemExit(f"IFEval must have 541 prompts, found {len(rows)}")
     return rows
@@ -161,6 +171,7 @@ def main() -> None:
         records = [
             {"id": f"ifeval-{row['key']}", "category": "long", "prompt": row["prompt"]}
             for row in ifeval[start:stop]
+            if row["key"] not in IFEVAL_EXCLUDED
         ]
         name = f"quality-v3-ifeval-{part}.jsonl"
         outputs[name] = write_jsonl(PROMPTS / name, records)
@@ -171,6 +182,7 @@ def main() -> None:
         "templates": {"mgsm_direct": DIRECT_TEMPLATE, "mgsm_cot": COT_TEMPLATE},
         "determinism_subset": {"seed": DETERMINISM_SEED, "ids": subset_ids},
         "ifeval_parts": {part: [start, stop] for part, start, stop in IFEVAL_PARTS},
+        "ifeval_excluded": {f"ifeval-{key}": why for key, why in IFEVAL_EXCLUDED.items()},
         "prompt_file_sha256": outputs,
     }
     (PROMPTS / "quality-v3-sources.json").write_bytes(

@@ -1,0 +1,32 @@
+{
+  "checksums": {
+    "config.resolved.toml": "766a3a777ea2da43c559f97c4bbf0d98d2b8cbf0b1043ae9fe861338f9fc69ce",
+    "manifest.json": "f4e037dd2749a75a6fe11499f660a7872b4d240022d6238864d91a296d3eecad",
+    "outputs.jsonl": "42ace571ac503d1203314883d830394860a2f1bb034d3367f2bd388d72e6be2e",
+    "requests.jsonl": "867aeec57520b38df7b81797224b67d898ab2d478db83899a469f9c04e562eb7",
+    "telemetry.jsonl.gz": "87f712dc373f7109e5e69cc44d2010f77d17637ad2888613801d874cf5eb4feb",
+    "warmups.jsonl": "8f0e3ff0d194dc702e0a19e19d0bbd88793798c8075cd7e08b235bd3dc4e3a46"
+  },
+  "errors": [],
+  "ok": true,
+  "record_counts": {
+    "outputs.jsonl": 1000,
+    "requests.jsonl": 1000,
+    "telemetry.jsonl.gz": 3079,
+    "warmups.jsonl": 16
+  },
+  "run_id": "quality-v3-mgsm-ru-direct-maibenben-x16c-rtx5060-20261105T234447Z-0182e1",
+  "sizes": {
+    "config.resolved.toml": 1133,
+    "manifest.json": 5361,
+    "outputs.jsonl": 2259801,
+    "requests.jsonl": 1069472,
+    "telemetry.jsonl.gz": 93111,
+    "warmups.jsonl": 6023
+  },
+  "status": "completed",
+  "warnings": [
+    "summary.csv has not been generated yet",
+    "report.md has not been generated yet"
+  ]
+}
