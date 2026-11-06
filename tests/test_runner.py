@@ -1082,3 +1082,27 @@ def test_measured_model_reload_is_written_then_aborts_the_run(tmp_path: Path) ->
     assert len(outputs) == 1
     assert outputs[0]["valid"] is False
     assert "model_reloaded" in outputs[0]["invalid_reasons"]
+
+
+class PathEchoClient(FakeClient):
+    """A model whose code answer contains path-like strings."""
+
+    TEXT = "with open('/home/user/data.txt') as f:\n    pass  # or " + r"C:\Users\dev\data.txt"
+
+    def generate_stream(self, request: InferenceRequest) -> InferenceResult:
+        return replace(super().generate_stream(request), text=self.TEXT)
+
+
+def test_path_like_text_in_a_model_response_does_not_abort_the_run(tmp_path: Path) -> None:
+    config = make_config(tmp_path, repetitions=1)
+
+    run_dir = run_experiment(
+        config,
+        client_factory=lambda _url: PathEchoClient(),
+        sampler_factory=lambda **_kwargs: FakeSampler(),
+    )
+
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    outputs = read_jsonl(run_dir / "outputs.jsonl")
+    assert manifest["status"] == "completed"
+    assert outputs and all(record["text"] == PathEchoClient.TEXT for record in outputs)

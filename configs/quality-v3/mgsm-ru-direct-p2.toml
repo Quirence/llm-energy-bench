@@ -1,0 +1,43 @@
+# quality-v3 (mgsm-ru-direct-p2): repeat pass, added under docs/quality-v3-preregistration.md § 12.
+# MGSM-ru, ответ сразу: 250 задач x 1 повтор (проход 2 из 3) x 4 конфигурации = 1000 запросов.
+# Stand: RTX 5060 Laptop, MAIBENBEN Gaming mode (NVML 80 W), checked before the run.
+
+[experiment]
+id = "quality-v3-mgsm-ru-direct-p2"
+host_id = "maibenben-x16c-rtx5060"
+output_dir = "../../experiments/runs/quality-v3"
+repetitions = 1
+warmup_requests = 4
+order_seed = 42
+
+[runtime]
+ollama_url = "http://127.0.0.1:11434"
+models = [
+    "qwen3:4b-instruct-2507-q4_K_M",
+    "llama3.2:3b-instruct-q4_K_M",
+    "qwen3:4b-instruct-2507-q8_0",
+    "llama3.2:3b-instruct-q8_0",
+]
+expected_version = "0.35.0"
+
+[runtime.expected_digests]
+"qwen3:4b-instruct-2507-q4_K_M" = "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0"
+"qwen3:4b-instruct-2507-q8_0" = "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374"
+"llama3.2:3b-instruct-q4_K_M" = "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72"
+"llama3.2:3b-instruct-q8_0" = "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a"
+
+[gpu]
+index = 0
+telemetry_interval_ms = 100
+
+[prompts]
+path = "../../prompts/quality-v3-mgsm-ru-direct.jsonl"
+
+[options]
+num_ctx = 4096
+num_gpu = 999
+temperature = 0.0
+seed = 42
+num_predict = 256
+kv_cache = "f16"
+concurrency = 1
