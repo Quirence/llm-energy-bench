@@ -1,0 +1,153 @@
+{
+  "artifact_sha256": {
+    "config.resolved.toml": "a899de61e0481ef5315c74d0171c51e05d4b63de98624a7c3fb6091c5b8635a9",
+    "outputs.jsonl": "f2251da73882da3a11ba17ee4744030576413f5d4f2b49a0b431f5aac16ed0e0",
+    "requests.jsonl": "63d85046e5ac79963ee3ae4977833adba9a603568b172fcd09c68300a6ef7d5e",
+    "telemetry.jsonl.gz": "fbb4a0447735a37e0ed27f16232ab2e1f8ca1f3bb3e30502c27fb12cfff1d488",
+    "warmups.jsonl": "0f34f7ebbe3f3c71842f3db197534beaa2acde31e4f06650ae1abde5facf682a"
+  },
+  "cache_buster_policy": "uuid_stable_slot_prefix_v4",
+  "completed_requests": 720,
+  "completed_warmups": 16,
+  "config_sha256": "a899de61e0481ef5315c74d0171c51e05d4b63de98624a7c3fb6091c5b8635a9",
+  "controls": {
+    "concurrency": 1,
+    "currency": null,
+    "expected_model_digests": {
+      "llama3.2:3b-instruct-q4_K_M": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "llama3.2:3b-instruct-q8_0": "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a",
+      "qwen3:4b-instruct-2507-q4_K_M": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "qwen3:4b-instruct-2507-q8_0": "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374"
+    },
+    "expected_runtime_version": "0.35.0",
+    "experiment_id": "quality-v3-ifeval-b",
+    "gpu_index": 0,
+    "host_id": "maibenben-x16c-rtx5060",
+    "models": [
+      "qwen3:4b-instruct-2507-q4_K_M",
+      "llama3.2:3b-instruct-q4_K_M",
+      "qwen3:4b-instruct-2507-q8_0",
+      "llama3.2:3b-instruct-q8_0"
+    ],
+    "ollama_url": "http://127.0.0.1:11434",
+    "options": {
+      "kv_cache": "f16",
+      "num_ctx": 4096,
+      "num_gpu": 999,
+      "num_predict": 1024,
+      "seed": 42,
+      "temperature": 0.0
+    },
+    "order_seed": 42,
+    "repetitions": 1,
+    "tariff_per_kwh": null,
+    "telemetry_interval_ms": 100,
+    "warmup_requests": 4
+  },
+  "ended_utc": "2026-11-07T09:17:44.462549+00:00",
+  "experiment_id": "quality-v3-ifeval-b",
+  "failure": null,
+  "git_commit": "d95f9321169d34616ade2e6aeb6e22b98ee6052c",
+  "gpu": {
+    "driver_version": "591.66",
+    "energy_fallback_reason": null,
+    "energy_source": "total_energy_counter",
+    "field_errors": {},
+    "gpu_fingerprint": "e9a2b1cd50c10172",
+    "gpu_index": 0,
+    "name": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "power_limit_default_watts": 50.0,
+    "power_limit_max_watts": 115.0,
+    "power_limit_min_watts": 5.0,
+    "power_limit_watts": 80.0,
+    "supports_clocks": true,
+    "supports_power_instant": true,
+    "supports_power_legacy": true,
+    "supports_power_limit": true,
+    "supports_temperature": true,
+    "supports_total_energy": true,
+    "supports_utilization": true,
+    "unsupported_fields": [],
+    "vram_total_bytes": 8546942976
+  },
+  "host": {
+    "architecture": "AMD64",
+    "os": "Windows",
+    "os_release": "11"
+  },
+  "host_id": "maibenben-x16c-rtx5060",
+  "max_cache_excess_tokens": 1,
+  "max_measured_load_duration_ns": 100000000,
+  "models": [
+    {
+      "context_length": 4096,
+      "digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+      "family": "qwen3",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "name": "qwen3:4b-instruct-2507-q4_K_M",
+      "parameter_size": "4.0B",
+      "quantization": "Q4_K_M",
+      "size_bytes": 3178149969,
+      "size_vram_bytes": 3178149969,
+      "template_cache_baseline_tokens": 3
+    },
+    {
+      "context_length": 4096,
+      "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+      "family": "llama",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "llama3.2:3b-instruct-q4_K_M",
+      "name": "llama3.2:3b-instruct-q4_K_M",
+      "parameter_size": "3.2B",
+      "quantization": "Q4_K_M",
+      "size_bytes": 2554708622,
+      "size_vram_bytes": 2554708622,
+      "template_cache_baseline_tokens": 20
+    },
+    {
+      "context_length": 4096,
+      "digest": "aa7252f68dda4d25dfffa65b3760af6d2c3231a140c0060c78d444686d98a374",
+      "family": "qwen3",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "qwen3:4b-instruct-2507-q8_0",
+      "name": "qwen3:4b-instruct-2507-q8_0",
+      "parameter_size": "4.0B",
+      "quantization": "Q8_0",
+      "size_bytes": 4961274428,
+      "size_vram_bytes": 4961274428,
+      "template_cache_baseline_tokens": 3
+    },
+    {
+      "context_length": 4096,
+      "digest": "e410b836fe6132b8c5e09bd83156dab0ce2c19f371e0bce2d77e993f8a65241a",
+      "family": "llama",
+      "fully_on_gpu": true,
+      "gpu_fraction": 1.0,
+      "model": "llama3.2:3b-instruct-q8_0",
+      "name": "llama3.2:3b-instruct-q8_0",
+      "parameter_size": "3.2B",
+      "quantization": "Q8_0",
+      "size_bytes": 3957231451,
+      "size_vram_bytes": 3957231451,
+      "template_cache_baseline_tokens": 20
+    }
+  ],
+  "prompt_cache_policy": "template_floor_v2",
+  "prompt_count": 180,
+  "prompt_set_sha256": "6de8189997fa3a9521e619f3c92c2878f3508bae32301530ba78df7a9f608633",
+  "repetitions": 1,
+  "run_id": "quality-v3-ifeval-b-maibenben-x16c-rtx5060-20261107T083517Z-5a2515",
+  "runtime": {
+    "name": "ollama",
+    "version": "0.35.0"
+  },
+  "schema_version": 2,
+  "started_requests": 720,
+  "started_utc": "2026-11-07T08:35:17.515648+00:00",
+  "status": "completed",
+  "valid_requests": 720
+}
